@@ -1,14 +1,17 @@
 # coding=utf-8
 
+# Only define handlers and dicts that store info
+
+from telegram import Update, Chat
 from typing import Dict
-from telegram.ext import Updater
+from telegram.ext import Updater, CallbackContext
 from telegram.ext import InlineQueryHandler
 from telegram.ext import MessageHandler, Filters
 from telegram.ext import CommandHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import logging
 import numpy as np
-
+from class import *
 import re
 import createcard
 from cfg import *
@@ -24,7 +27,6 @@ dispatcher = updater.dispatcher
 
 CARDINFO_KEYBOARD = [
     [InlineKeyboardButton("姓名", callback_data="姓名")],
-    [InlineKeyboardButton("年龄", callback_data="年龄")],
     [InlineKeyboardButton("职业", callback_data="职业")]
 ]
 
@@ -33,10 +35,10 @@ logging.basicConfig(
 
 
 # read all dicts from file. Initialize the bot service
-USER_DICT, GROUP_DICT, USER_GROUP_DICT, GROUP_KP_DICT, GROUP_PL_CARD_DICT = readinfo()
+USER_DICT, GROUP_DICT, USER_GROUP_DICT, GROUP_KP_DICT, GROUP_PL_CARD_DICT, CARDS_LIST = readinfo()
 
 
-def start(update, context) -> bool:
+def start(update: Update, context: CallbackContext) -> bool:
     chattype = ""  # if info changed, chattype indicates which file should be written
     chatid = update.effective_chat.id
     uname = update.effective_chat.username
@@ -90,7 +92,7 @@ start_handler = CommandHandler('start', start)
 dispatcher.add_handler(start_handler)
 
 
-def addkp(update, context) -> bool:
+def addkp(update: Update, context: CallbackContext) -> bool:
     if update.effective_chat.chat_id < 0:
         if update.effective_chat.id not in GROUP_DICT:
             context.bot.send_message(
@@ -100,6 +102,7 @@ def addkp(update, context) -> bool:
             GROUP_KP_DICT[update.effective_chat.id] = update.message.from_user.id
             context.bot.send_message(chat_id=update.effective_chat.id, text="Bind group (id): " + str(
                 update.effective_chat.id) + " with KP (id): " + str(update.message.from_user.id))
+            writekpinfo(GROUP_KP_DICT)
             return True
         else:
             context.bot.send_message(chat_id=update.effective_chat.id,
@@ -115,7 +118,7 @@ addkp_handler = CommandHandler('addkp', addkp)
 dispatcher.add_handler(addkp_handler)
 
 
-def delkp(update, context) -> bool:
+def delkp(update: Update, context: CallbackContext) -> bool:
     if update.effective_chat.chat_id < 0:
         if update.effective_chat.id not in GROUP_DICT:
             context.bot.send_message(
@@ -128,7 +131,7 @@ def delkp(update, context) -> bool:
                     chat_id=update.effective_chat.id, text='KP deleted.')
                 return True
             context.bot.send_message(
-                chat_id=update.effective_chat.id, text='You are not KP. Only KP can delete KP.')
+                chat_id=update.effective_chat.id, text='You are not KP.')
             return False
         else:
             context.bot.send_message(
@@ -144,7 +147,19 @@ delkp_handler = CommandHandler('delkp', delkp)
 dispatcher.add_handler(delkp_handler)
 
 
-def bind(update, context) -> bool:
+def reload(update, context) -> bool:
+    global USER_DICT, GROUP_DICT, USER_GROUP_DICT, GROUP_KP_DICT, GROUP_PL_CARD_DICT
+    context.bot.send_message(
+        chat_id=update.effective_chat.id, text='Reload successful')
+    USER_DICT, GROUP_DICT, USER_GROUP_DICT, GROUP_KP_DICT, GROUP_PL_CARD_DICT = readinfo()
+    return True
+
+
+reload_handler = CommandHandler('reload', reload)
+dispatcher.add_handler(reload_handler)
+
+
+def bind(update: Update, context: CallbackContext) -> bool:
     if update.effective_chat.chat_id < 0:
         if update.effective_chat.id not in GROUP_DICT:
             context.bot.send_message(
@@ -153,6 +168,7 @@ def bind(update, context) -> bool:
         USER_GROUP_DICT[update.message.from_user.id] = update.effective_chat.id
         context.bot.send_message(chat_id=update.effective_chat.id, text="Bind user (id): " + str(
             update.message.from_user.id) + " with group (id): " + str(update.effective_chat.id))
+        writeusergroupinfo(USER_GROUP_DICT)
         return True
     else:
         context.bot.send_message(
@@ -164,14 +180,14 @@ bind_handler = CommandHandler('bind', bind)
 dispatcher.add_handler(bind_handler)
 
 
-def showuserlist(update, context) -> None:
+def showuserlist(update: Update, context: CallbackContext) -> None:
     if update.effective_chat.id == USERID:
         userlist = "User:\n"
         for keys in USER_DICT:
             userlist += keys + ": " + USER_DICT[keys] + "\n"
         userlist += "Groups:\n"
         for keys in GROUP_DICT:
-            userlist += keys + ": " + USER_DICT[keys] + "\n"
+            userlist += keys + ": " + GROUP_DICT[keys] + "\n"
         context.bot.send_message(
             parse_mode='HTML', chat_id=update.effective_chat.id, text=userlist)
     else:
@@ -184,7 +200,7 @@ showuserlist_handler = CommandHandler('showuserlist', showuserlist)
 dispatcher.add_handler(showuserlist_handler)
 
 
-def newgroup(groupid, context):
+def newgroup(groupid, context: CallbackContext):
     if groupid < 0 and groupid in GROUP_DICT:
         return False
     context.bot.send_message(
@@ -223,21 +239,34 @@ dispatcher.add_handler(roll1d100_handler)
 """
 
 
-def card(update, context):
-    text = context.args[0]
+def getid(update: Update, context: CallbackContext) -> None:
+    context.bot.send_message(parse_mode='HTML', chat_id=update.effective_chat.id, text="<code>"+str(update.effective_chat.id)+"</code> \n点击即可复制")
+
+
+getid_handler = CommandHandler('getid', getid)
+dispatcher.add_handler(getid_handler)
+
+
+def card(update: Update, context: CallbackContext):
     if update.effective_chat.id < 0:
         context.bot.send_message(
             chat_id=update.effective_chat.id, text="Send private message to generate new card.")
         return False
-    text = text.strip()
+    msg = context.args[0]
+    msg = msg.strip()
     createcard.generateNewCard(update.effective_chat.id)
+    pass
 
 
 card_handler = CommandHandler('card', card)
 dispatcher.add_handler(card_handler)
 
 
-def discard(update, context):
+def discard(update: Update, context: CallbackContext):
+    if update.effective_chat.id < 0:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id, text="Send private message to generate new card.")
+        return False
     pass
 
 
@@ -245,7 +274,7 @@ discard_handler = CommandHandler('discard', discard)
 dispatcher.add_handler(discard_handler)
 
 
-def roll(update, context):  # this function will be complicated
+def roll(update: Update, context: CallbackContext):  # this function will be complicated
     if newgroup(update.effective_chat.id, context):
         return
     dicename = str(context.args[0])
@@ -319,7 +348,7 @@ dispatcher.add_handler(resettest_handler)
 """
 
 
-def unknown(update, context):
+def unknown(update: Update, context: CallbackContext) -> None:
     if update.effective_chat.id > 0:
         context.bot.send_message(
             chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")
