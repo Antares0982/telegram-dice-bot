@@ -72,11 +72,11 @@ tg跑团用骰子机器人，开发中
           "myth":str,
           "thirdencounter":str
       },
-      "temp":
+      "tempstatus":
       {
         	"global":int,
           "STR":int,
-          "...":int
+          "...":int // all skills can be found here
       },
       "item":str,
       "assets":str,
