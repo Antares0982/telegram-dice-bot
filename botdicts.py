@@ -2,17 +2,7 @@
 import json
 from typing import Tuple
 from cfg import *
-
-
-def writeuserinfo(dict1: dict) -> None:
-    with open(PATH_USER, "w") as f:
-        json.dump(dict1, f)
-
-
-def writegroupinfo(dict1: dict) -> None:
-    with open(PATH_GROUP, "w") as f:
-        json.dump(dict1, f)
-
+from gameclass import *
 
 def writeusergroupinfo(dict1: dict) -> None:
     with open(PATH_USER_GROUP, "w") as f:
@@ -34,11 +24,18 @@ def writecards(listofdict) -> None:
         json.dump(listofdict, f)
 
 
-def readinfo() -> Tuple(dict, dict, dict, dict, dict, list):
-    with open(PATH_USER, "r") as f:
-        usdict = json.load(f)
-    with open(PATH_GROUP, "r") as f:
-        gpdict = json.load(f)
+def writegameinfo(listofobj: list[GroupGame]) -> None:
+    savelist = []
+    for i in range(listofobj):
+        newdict = {}
+        newdict["groupid"] = listofobj[i].groupid
+        newdict["kpid"] = listofobj[i].kpid
+        newdict["cards"] = listofobj[i].cards
+        savelist.append(newdict)
+    with open(PATH_ONGAME, "w") as f:
+        json.dump(savelist, f)
+
+def readinfo() -> Tuple(dict, dict, dict, list, list):
     with open(PATH_USER_GROUP, "r") as f:
         usgpdict = json.load(f)
     with open(PATH_GROUP_KP, "r") as f:
@@ -47,4 +44,14 @@ def readinfo() -> Tuple(dict, dict, dict, dict, dict, list):
         gppldict = json.load(f)
     with open(PATH_CARDSLIST, "r") as f:
         cardslist = json.load(f)
-    return usdict, gpdict, usgpdict, gpkpdict, gppldict, cardslist
+    with open(PATH_ONGAME, "r") as f:
+        ongamelistdict = json.load(f)
+    ongamelist = []
+    for i in range(ongamelistdict):
+        ongamelistdict.append(GroupGame(groupid=ongamelistdict[i]["groupid"], kpid=ongamelist[i]["kpid"], cards=ongamelist[i]["cards"]))
+    return usgpdict, gpkpdict, gppldict, cardslist, ongamelist
+
+def readskilldict() -> dict:
+    with open(PATH_SKILLDICT, 'r') as f:
+        d = json.load(f)
+    return d

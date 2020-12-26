@@ -20,6 +20,8 @@ PATH_USER_GROUP = DATA_PATH+r'usergrouplist.json'
 PATH_GROUP_KP = DATA_PATH+r'groupkplist.json'
 PATH_GROUP_PL_CARD = DATA_PATH+r'grouppllist.json'
 PATH_CARDSLIST = DATA_PATH+r'cards.json'
+PATH_ONGAME=DATA_PATH+r'ongame.json'
+PATH_SKILLDICT=DATA_PATH+r'skilldict.json'
 
 USERID = cfgparser.getint("ID", "USERID")  # BOT控制者的userid
 
