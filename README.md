@@ -72,10 +72,17 @@ tg跑团用骰子机器人，开发中
           "myth":str,
           "thirdencounter":str
       },
+      "temp":
+      {
+        	"global":int,
+          "STR":int,
+          "...":int
+      },
       "item":str,
       "assets":str,
       "type":str,
-      "discard":bool
+      "discard":bool,
+      "status":alive // or dead
   }
   ```
   

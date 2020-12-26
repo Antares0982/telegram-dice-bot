@@ -14,8 +14,6 @@ TOKEN = cfgparser.get("TOKEN", "TOKEN")  # BOT TOKEN
 
 DATA_PATH = cfgparser.get("PATH", "DATA_PATH")
 
-PATH_USER = DATA_PATH+r'userlist.json'
-PATH_GROUP = DATA_PATH+r'grouplist.json'
 PATH_USER_GROUP = DATA_PATH+r'usergrouplist.json'
 PATH_GROUP_KP = DATA_PATH+r'groupkplist.json'
 PATH_GROUP_PL_CARD = DATA_PATH+r'grouppllist.json'

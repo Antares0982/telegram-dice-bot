@@ -312,4 +312,10 @@ def generatePoints():
 
 
 def checkcard(card: dict)->bool:
-    pass
+    if "skill" not in card:
+        return False
+    if "points" not in card["skill"]:
+        return False
+    if card["skill"]["points"]!=0:
+        return False
+    return True
