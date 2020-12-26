@@ -46,7 +46,8 @@ tg跑团用骰子机器人，开发中
       "skill":
       {
           "credit":int,
-          "points":int
+          "points":int,
+          "otherskills":strs//etc.
       },
       "attr":
       {
@@ -73,7 +74,8 @@ tg跑团用骰子机器人，开发中
       },
       "item":str,
       "assets":str,
-      "type":str
+      "type":str,
+      "discard":bool
   }
   ```
   
