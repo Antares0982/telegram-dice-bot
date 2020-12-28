@@ -42,7 +42,7 @@ def generateNewCard(userid, groupid) -> Tuple[dict, str]:
             "thirdencounter": ""
         },
         "tempstatus": {
-
+            "global":0
         },
         "item": {
 

@@ -8,3 +8,4 @@ class GroupGame: # If defined, game is started.
             if cards[i]["player"]["playerid"] == kpid:
                 self.kpcards.append(cards[i])
         self.kpctrl = -1
+        self.tpcheck = 0

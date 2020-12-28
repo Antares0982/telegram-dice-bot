@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
 # Only define handlers and dicts that store info
-
+import time
 from telegram import Update, Chat, Bot
 from typing import Dict
 from telegram.ext import Updater, CallbackContext
@@ -28,10 +28,12 @@ else:
 
 dispatcher = updater.dispatcher
 
+"""
 CARDINFO_KEYBOARD = [
     [InlineKeyboardButton("姓名", callback_data="姓名")],
     [InlineKeyboardButton("职业", callback_data="职业")]
 ]
+"""
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -43,7 +45,8 @@ global GROUP_KP_DICT, CARDS_LIST, ON_GAME
 try:
     GROUP_KP_DICT, CARDS_LIST, ON_GAME = readinfo()
 except:
-    updater.bot.send_message(chat_id=USERID, text="Something went wrong, please check json files!")
+    updater.bot.send_message(
+        chat_id=USERID, text="Something went wrong, please check json files!")
     exit()
 else:
     updater.bot.send_message(chat_id=USERID, text="Bot is live!")
@@ -51,7 +54,7 @@ DETAIL_DICT = {}  # temply stores details
 
 SKILL_DICT = readskilldict()
 
-
+TEMP_CHECK = {}
 
 
 def start(update: Update, context: CallbackContext) -> bool:
@@ -59,7 +62,7 @@ def start(update: Update, context: CallbackContext) -> bool:
     if chatid > 0:  # private message
         context.bot.send_message(chat_id=chatid, text=HELP_TEXT)
         # store only username
-    if update.effective_chat.id==USERID and isinstance(GROUP_KP_DICT, dict) and isinstance(CARDS_LIST, list) and isinstance(ON_GAME, list) and isinstance(SKILL_DICT, dict):
+    if update.effective_chat.id == USERID and isinstance(GROUP_KP_DICT, dict) and isinstance(CARDS_LIST, list) and isinstance(ON_GAME, list) and isinstance(SKILL_DICT, dict):
         context.bot.send_message(chat_id=chatid, text="All checked")
     return True
 
@@ -69,22 +72,21 @@ dispatcher.add_handler(start_handler)
 
 
 def addkp(update: Update, context: CallbackContext) -> bool:
-    if update.effective_chat.id < 0:
-        if str(update.effective_chat.id) not in GROUP_KP_DICT:
-            GROUP_KP_DICT[str(update.effective_chat.id)
-                          ] = update.message.from_user.id
-            context.bot.send_message(chat_id=update.effective_chat.id, text="Bind group (id): " + str(
-                update.effective_chat.id) + " with KP (id): " + str(update.message.from_user.id))
-            writekpinfo(GROUP_KP_DICT)
-            return True
-        else:
-            context.bot.send_message(chat_id=update.effective_chat.id,
-                                     text=r'This group already has a KP, please delete KP with /delkp first.')
-            return False
-    else:
+    if update.effective_chat.id > 0:
         context.bot.send_message(
             chat_id=update.effective_chat.id, text='Send group message to add KP.')
         return False
+    gpid = update.effective_chat.id
+    kpid = update.message.from_user.id
+    if str(gpid) in GROUP_KP_DICT:
+        context.bot.send_message(
+            chat_id=gpid, text='This group already has a KP, please delete KP with /delkp first.')
+        return False
+    GROUP_KP_DICT[str(gpid)] = kpid
+    context.bot.send_message(
+        chat_id=gpid, text="Bind group (id): " + str(gpid) + " with KP (id): " + str(kpid))
+    writekpinfo(GROUP_KP_DICT)
+    return True
 
 
 addkp_handler = CommandHandler('addkp', addkp)
@@ -92,25 +94,23 @@ dispatcher.add_handler(addkp_handler)
 
 
 def delkp(update: Update, context: CallbackContext) -> bool:
-    if update.effective_chat.id < 0:
-        if str(update.effective_chat.id) in GROUP_KP_DICT:
-            if update.message.from_user.id == GROUP_KP_DICT[str(update.effective_chat.id)]:
-                GROUP_KP_DICT.pop(str(update.effective_chat.id))
-                writekpinfo(GROUP_KP_DICT)
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id, text='KP deleted.')
-                return True
-            context.bot.send_message(
-                chat_id=update.effective_chat.id, text='You are not KP.')
-            return False
-        else:
-            context.bot.send_message(
-                chat_id=update.effective_chat.id, text='This group does not have a KP.')
-            return False
-    else:
+    if update.effective_chat.id > 0:
         context.bot.send_message(
             chat_id=update.effective_chat.id, text='Send group message to delete KP.')
         return False
+    if str(update.effective_chat.id) not in GROUP_KP_DICT:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id, text='This group does not have a KP.')
+        return False
+    if update.message.from_user.id != GROUP_KP_DICT[str(update.effective_chat.id)]:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id, text='You are not KP.')
+        return False
+    GROUP_KP_DICT.pop(str(update.effective_chat.id))
+    writekpinfo(GROUP_KP_DICT)
+    context.bot.send_message(
+        chat_id=update.effective_chat.id, text='KP deleted.')
+    return True
 
 
 delkp_handler = CommandHandler('delkp', delkp)
@@ -119,9 +119,14 @@ dispatcher.add_handler(delkp_handler)
 
 def reload(update, context) -> bool:
     global GROUP_KP_DICT, CARDS_LIST, ON_GAME
+    try:
+        GROUP_KP_DICT, CARDS_LIST, ON_GAME = readinfo()
+    except:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id, text='"Something went wrong, please check json files!"')
+        return False
     context.bot.send_message(
-        chat_id=update.effective_chat.id, text='Reload successful')
-    GROUP_KP_DICT, CARDS_LIST, ON_GAME = readinfo()
+        chat_id=update.effective_chat.id, text='Reload successfully')
     return True
 
 
@@ -142,37 +147,6 @@ showuserlist_handler = CommandHandler('showuserlist', showuserlist)
 dispatcher.add_handler(showuserlist_handler)
 
 
-"""
-def roll1d100(update, context):
-    if newgroup(update.effective_chat.id, context):
-        return
-    rand=np.random.randint(1, 101)
-    with open(path_test, 'r', encoding = 'utf-8') as f:
-        data = json.load(f)
-        RollTest = data[str(update.effective_chat.id)]
-    if RollTest > 0 and RollTest < 100:    
-        text_roll1d100 = '1d100: （检定/出目） ' + str(RollTest) + '/' + str(rand)
-        if rand > 96:
-            text_roll1d100 = text_roll1d100 + ' 大失败'
-        elif rand < 4:
-            text_roll1d100 = text_roll1d100 + ' 大成功'
-        elif rand > RollTest:
-            text_roll1d100 = text_roll1d100 + ' 失败'
-        else:
-            text_roll1d100 = text_roll1d100 + ' 成功'
-    else:
-        text_roll1d100 = '1d100: ' + str(rand)
-        if rand > 96:
-            text_roll1d100 = text_roll1d100 + ' 大失败'
-        elif rand < 4:
-            text_roll1d100 = text_roll1d100 + ' 大成功'
-    context.bot.send_message(chat_id = update.effective_chat.id, text = text_roll1d100)
-
-roll1d100_handler = CommandHandler('roll1d100', roll1d100)
-dispatcher.add_handler(roll1d100_handler)
-"""
-
-
 def getid(update: Update, context: CallbackContext) -> None:
     context.bot.send_message(parse_mode='HTML', chat_id=update.effective_chat.id,
                              text="<code>"+str(update.effective_chat.id)+"</code> \nClick to copy")
@@ -183,41 +157,43 @@ dispatcher.add_handler(getid_handler)
 
 
 def newcard(update: Update, context: CallbackContext):
-    if update.effective_chat.id < 0:
+    plid = update.effective_chat.id
+    if plid < 0:
         context.bot.send_message(
-            chat_id=update.effective_chat.id, text="Send private message to generate new card.")
+            chat_id=plid, text="Send private message to generate new card.")
         return False
     if len(context.args) == 0:
         context.bot.send_message(
-            chat_id=update.effective_chat.id, text="Need groupid to generate new card.")
+            chat_id=plid, text="Need groupid to generate new card.")
         return False
     msg = context.args[0]
     print(msg)
     global CARDS_LIST, DETAIL_DICT
     if not botdice.isint(msg):
-        context.bot.send_message(chat_id=update.effective_chat.id, text="Invalid input. Use '/newcard groupid' to generate card.")
+        context.bot.send_message(chat_id=plid,
+                                 text="Invalid input. Use '/newcard groupid' to generate card.")
         return False
     gpid = int(msg)
     new_card, detailmsg = createcard.generateNewCard(
-        update.effective_chat.id, gpid)
-    DETAIL_DICT[update.effective_chat.id] = detailmsg
+        plid, gpid)
+    DETAIL_DICT[plid] = detailmsg
     new_card["id"] = len(CARDS_LIST)
-    context.bot.send_message(chat_id=update.effective_chat.id,
-                                text="Card generated. Use /details to see detail.")
+    context.bot.send_message(chat_id=plid,
+                             text="Card generated. Use /details to see detail.")
     countless50 = 0
     for keys in new_card["data"]:
         if new_card["data"][keys] < 50:
             countless50 += 1
     if countless50 >= 3:
         new_card["discard"] = True
-        context.bot.send_message(chat_id=update.effective_chat.id,
-                                    text="If you want, use /discard to delete this card. After setting age you cannot delete this card.")
-    context.bot.send_message(chat_id=update.effective_chat.id,
-                                text="Long press /setage and type a number to set AGE. If you need help, use /createcardhelp to read help.")
+        context.bot.send_message(chat_id=plid,
+                                 text="If you want, use /discard to delete this card. After setting age you cannot delete this card.")
+    context.bot.send_message(chat_id=plid,
+                             text="Long press /setage and type a number to set AGE. If you need help, use /createcardhelp to read help.")
     CARDS_LIST.append(new_card)
     writecards(CARDS_LIST)
     return True
-    
+
 
 newcard_handler = CommandHandler('newcard', newcard)
 dispatcher.add_handler(newcard_handler)
@@ -293,7 +269,7 @@ def setage(update: Update, context: CallbackContext):
         context.bot.send_message(
             chat_id=update.effective_chat.id, text="Can't find card.")
         return False
-    if "AGE" in cardi["info"] and cardi["info"]["AGE"]>0:
+    if "AGE" in cardi["info"] and cardi["info"]["AGE"] > 0:
         context.bot.send_message(
             chat_id=update.effective_chat.id, text="Age is already set.")
         return False
@@ -332,7 +308,8 @@ def setstrdec(update: Update, context: CallbackContext):
     writecards(CARDS_LIST)
     context.bot.send_message(chat_id=update.effective_chat.id, text=hintmsg)
     if needcon:
-        context.bot.send_message(chat_id=update.effective_chat.id, text="Use /setcondec to set CON decrease.")
+        context.bot.send_message(
+            chat_id=update.effective_chat.id, text="Use /setcondec to set CON decrease.")
     return True
 
 
@@ -552,14 +529,42 @@ switchcard_handler = CommandHandler('switchcard', switchcard)
 dispatcher.add_handler(switchcard_handler)
 
 
+def tempcheck(update: Update, context: CallbackContext):
+    if len(context.args) == 0:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id, text="No argument found.")
+        return False
+    if update.effective_chat.id > 0:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id, text="Change tempcheck in a group.")
+        return False
+    if not botdice.isint(context.args[0]) or int(context.args[0]) <= 0:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id, text="Temp check should be positive integer.")
+        return False
+    game, ok = findgame(update.effective_chat.id)
+    if not ok:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id, text="No game found.")
+        return False
+    if str(update.effective_chat.id) not in GROUP_KP_DICT or GROUP_KP_DICT[str(update.effective_chat.id)] != update.message.from_user.id:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id, text="Only kp can set temp check.")
+        return False
+    game.tpcheck = int(context.args[0])
+    context.bot.send_message(
+        chat_id=update.effective_chat.id, text="Add temp check successfully.")
+
+
 def roll(update: Update, context: CallbackContext):
     # 只接受第一个空格前的参数。dicename可能是技能名，可能是3d6，可能是1d4+2d10。骰子环境可能是游戏中，游戏外。需要考虑多个情况
-    if context.args == None or len(context.args)==0:
-        pass # 骰1d100
+    if len(context.args) == 0:
+        pass  # 骰1d100
         return True
     dicename = context.args[0]
     if update.effective_chat.id < 0:  # Group msg
         game, ok = findgame()
+        tpcheck, game.tpcheck = game.tpcheck, 0
         if not ok or dicename.find('d') >= 0:
             rttext = botdice.commondice(dicename)
             context.bot.send_message(
@@ -649,5 +654,11 @@ echo_handler = MessageHandler(Filters.text, echo)
 dispatcher.add_handler(echo_handler)
 """
 
+
 if __name__ == "__main__":
-    updater.start_polling()
+    while True:
+        try:
+            updater.start_polling()
+        except:
+            time.sleep(30)
+        updater.bot.send_message(chat_id=USERID, text="Bot restarting.")
