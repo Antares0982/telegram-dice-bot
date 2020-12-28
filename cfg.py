@@ -18,8 +18,11 @@ PATH_GROUP_KP = DATA_PATH+r'groupkplist.json'
 PATH_CARDSLIST = DATA_PATH+r'cards.json'
 PATH_ONGAME=DATA_PATH+r'ongame.json'
 PATH_SKILLDICT=DATA_PATH+r'skilldict.json'
+PATH_JOBDICT=DATA_PATH+r'jobdict.json'
 
 USERID = cfgparser.getint("ID", "USERID")  # BOT控制者的userid
+
+IGNORE_JOB_DICT = cfgparser.getboolean("SETTINGS", "IGNORE_JOB_DICT")
 
 CREATE_CARD_HELP = "This is help message when creating card, which will be added later."
 

@@ -21,10 +21,14 @@ def generateNewCard(userid, groupid) -> Tuple[dict, str]:
         "skill": {
 
         },
+        "suggestskill": {
+
+        },
         "cardcheck": {
             "check1": False,
             "check2": False,
-            "check3": False
+            "check3": False,
+            "check4": False
         },
         "attr": {
 
@@ -302,6 +306,8 @@ def generateOtherAttributes(card: dict) -> Tuple[dict, str]:
 
 
 def choosedec(card: dict, strength: int) -> Tuple[dict, str, bool]:
+    if card["data"]["STR"] <= strength:
+        return card, "输入无效", False
     card["data"]["STR"] -= strength
     needCON = False
     rttext = "力量减"+str(strength)+"点，"
@@ -311,7 +317,7 @@ def choosedec(card: dict, strength: int) -> Tuple[dict, str, bool]:
             return card, "输入无效", False
         card["data"]["SIZ"] += card["data"]["STR_SIZ_M"]+strength
         rttext += "体型减"+str(-card["data"]["STR_SIZ_M"]-strength)+"点。"
-        card["data"]["STR_SIZ_M"] = 0
+        card["data"].pop("STR_SIZ_M")
         card["cardcheck"]["check2"] = True
     elif "STR_CON_M" in card["data"]:
         if strength > -card["data"]["STR_CON_M"]:
@@ -319,20 +325,23 @@ def choosedec(card: dict, strength: int) -> Tuple[dict, str, bool]:
             return card, "输入无效", False
         card["data"]["CON"] += card["data"]["STR_CON_M"]+strength
         rttext += "体质减"+str(-card["data"]["STR_CON_M"]-strength)+"点。"
-        card["data"]["STR_CON_M"] = 0
+        card["data"].pop("STR_SIZ_M")
         card["cardcheck"]["check2"] = True
     elif "STR_CON_DEX_M" in card["data"]:
         if strength > -card["data"]["STR_CON_DEX_M"]:
             card["data"]["STR"] += strength
             return card, "输入无效", False
-        card["data"]["CON_DEX_M"] = card["data"]["STR_CON_DEX_M"]+strength
+        if not strength == -card["data"]["STR_CON_DEX_M"]:
+            needCON = True
+            card["data"]["CON_DEX_M"] = card["data"]["STR_CON_DEX_M"]+strength
         rttext += "体质敏捷合计减"+str(-card["data"]["CON_DEX_M"])+"点。"
-        card["data"]["STR_CON_DEX_M"] = 0
-        needCON = True
+        card["data"].pop("STR_CON_DEX_M")
     return card, rttext, needCON
 
 
 def choosedec2(card: dict, con: int) -> Tuple[dict, str]:
+    if card["data"]["CON"]<=con:
+        return card, "输入无效", False
     card["data"]["CON"] -= con
     rttext = "体质减"+str(con)+"点，"
     if con > -card["data"]["CON_DEX_M"]:
@@ -340,7 +349,7 @@ def choosedec2(card: dict, con: int) -> Tuple[dict, str]:
         return card, "输入无效"
     card["data"]["DEX"] += card["data"]["CON_DEX_M"]+con
     rttext += "敏捷减"+str(-card["data"]["CON_DEX_M"]-con)+"点。"
-    card["data"]["CON_DEX_M"] = 0
+    card["data"].pop("CON_DEX_M")
     card["cardcheck"]["check2"] = True
     return card, rttext
 

@@ -167,25 +167,25 @@ tg跑团用骰子机器人，开发中
 
 消息所在的群/私聊具有几个状态，一些指令必须在某种特定状态下才能使用。参考下表：
 
-|      | 私聊 | KP私聊 | 群消息 | 带KP的群消息 | 带GroupGame对象的群消息 |
-| ---- | ---- | ------ | ------ | ------------ | ----------------------- |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
-|      |      |        |        |              |                         |
+|               | 私聊 | 卡存在时私聊 | KP私聊 | 群消息 | 带KP的群消息 | 带GroupGame对象的群消息 | KP发的群消息 | 需要参数                  |
+| :-----------: | :--: | :----------: | :----: | :----: | :----------: | :---------------------: | :----------: | ------------------------- |
+|    /start     |      |              |        |        |              |                         |              | X                         |
+|    /addkp     |  X   |      X       |   X    |   O    |      X       |            O            |      X       | X                         |
+|    /delkp     |  X   |      X       |   X    |   O    |      O       |                         |      O       | X                         |
+|    /reload    |      |              |        |        |              |                         |              | X                         |
+| /showuserlist |  O   |              |   O    |   X    |      X       |            X            |      X       | X                         |
+|    /getid     |      |              |        |        |              |                         |              | X                         |
+|   /newcard    |  O   |      X       |        |   X    |      X       |            X            |      X       | gpid: int                 |
+|   /discard    |  O   |      O       |        |   X    |      X       |            X            |      X       | X                         |
+|   /details    |      |              |        |        |              |                         |              | X                         |
+|    /setage    |  O   |      O       |        |   X    |      X       |            X            |      X       | AGE: int                  |
+|  /setstrdec   |  O   |      O       |        |   X    |      X       |            X            |      X       | strdec: int               |
+|  /setcondec   |  O   |      O       |        |   X    |      X       |            X            |      X       | condec: int               |
+|    /setjob    |  O   |      O       |        |   X    |      X       |            X            |      X       | job: str                  |
+|   /addskill   |  O   |      O       |        |   X    |      X       |            X            |      X       | X / (skill: str, pt: int) |
+|  /startgame   |  X   |      X       |   X    |   O    |      O       |            X            |      O       | X                         |
+|  /abortgame   |  X   |      X       |   X    |   O    |      O       |            O            |      O       | X                         |
+|   /endgame    |  X   |      X       |   X    |   O    |      O       |            O            |      O       | X                         |
+|  /switchcard  |      |              |   O    |        |      O       |                         |      O       | cardno: int               |
+|     /roll     |      |              |        |        |              |                         |              | X / (dicename: str)       |
 

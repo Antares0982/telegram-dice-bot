@@ -45,3 +45,8 @@ def readskilldict() -> dict:
     with open(PATH_SKILLDICT, 'r', encoding="utf-8") as f:
         d = json.load(f)
     return d
+
+def readjobdict() -> dict:
+    with open(PATH_JOBDICT, 'r', encoding='utf-8') as f:
+        d = json.load(f)
+    return d
