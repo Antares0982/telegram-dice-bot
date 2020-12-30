@@ -1,7 +1,7 @@
 # telegram-dice-bot
 tg跑团用骰子机器人，开发中
 
-使用前先新建`config.ini`，并填入相应参数，具体见模板（还没写）
+使用前先重命名`sample_config.ini`到`config.ini`，并填入相应参数（TOKEN, USERID）。
 
 ## 开发计划
 
@@ -37,7 +37,8 @@ tg跑团用骰子机器人，开发中
           "name":str,
           "job":str,
           "sex":str,
-          "birthplace":str
+          "birthplace":str,
+          "classicaljob":bool
       },
       "skill":
       {
@@ -45,11 +46,16 @@ tg跑团用骰子机器人，开发中
           "points":int,
           "...":strs//etc.
       },
+      "suggestskill":
+      {
+          
+      },
       "cardcheck":
       {
           "check1":bool,
           "check2":bool,
-          "check3":bool
+          "check3":bool,
+          "check4":bool
       },
       "attr":
       {
@@ -57,7 +63,7 @@ tg跑团用骰子机器人，开发中
           "lp":int,
           "SAN":int,
           "MAGIC":int,
-          "dmgincrease":str,
+          "DB":str,
           "physique":int,
           "MOV":int
       },
@@ -82,7 +88,7 @@ tg跑团用骰子机器人，开发中
       },
       "item":str,
       "assets":str,
-      "type":str,
+      "type":str,//PL or NPC
       "discard":bool,
       "status":alive // or dead
   }

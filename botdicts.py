@@ -10,7 +10,10 @@ def writekpinfo(dict1: dict) -> None:
         json.dump(dict1, f, indent=4)
 
 
-def writecards(listofdict) -> None:
+def writecards(listofgamecard: List[GameCard]) -> None:
+    listofdict:List[dict] = []
+    for i in range(len(listofgamecard)):
+        listofdict.append(listofgamecard[i].__dict__)
     with open(PATH_CARDSLIST, "w", encoding="utf-8") as f:
         json.dump(listofdict, f, indent=4)
 
@@ -27,24 +30,28 @@ def writegameinfo(listofobj: List[GroupGame]) -> None:
         json.dump(savelist, f, indent=4)
 
 
-def readinfo() -> Tuple[dict, list, list]:
+def readinfo() -> Tuple[dict[str, int], List[GameCard], List[GroupGame]]:
     with open(PATH_GROUP_KP, "r", encoding="utf-8") as f:
         gpkpdict = json.load(f)
     with open(PATH_CARDSLIST, "r", encoding="utf-8") as f:
         cardslist = json.load(f)
     with open(PATH_ONGAME, "r", encoding="utf-8") as f:
         ongamelistdict = json.load(f)
-    ongamelist = []
+    ongamelist:List[GroupGame] = []
     for i in range(len(ongamelistdict)):
         ongamelistdict.append(GroupGame(
             groupid=ongamelistdict[i]["groupid"], kpid=ongamelist[i]["kpid"], cards=ongamelist[i]["cards"]))
-    return gpkpdict, cardslist, ongamelist
+    gamecardlist:List[GameCard] = []
+    for i in range(len(ongamelistdict)):
+        gamecardlist.append(GameCard(cardslist[i]))
+    return gpkpdict, gamecardlist, ongamelist
 
 
 def readskilldict() -> dict:
     with open(PATH_SKILLDICT, 'r', encoding="utf-8") as f:
         d = json.load(f)
     return d
+
 
 def readjobdict() -> dict:
     with open(PATH_JOBDICT, 'r', encoding='utf-8') as f:
