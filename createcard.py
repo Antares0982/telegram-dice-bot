@@ -63,35 +63,35 @@ def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
     text = ""
     a, b, c = np.random.randint(1, 7, size=3)
     STR = int(5*(a+b+c))
-    text += "STR = 5*(3d6) = " + str(a) + "+" + str(b) + \
-        "+" + str(c) + " = " + str(STR) + "\n"
+    text += "STR = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
+        "+" + str(c) + ") = " + str(STR) + "\n"
     a, b, c = np.random.randint(1, 7, size=3)
     CON = int(5*(a+b+c))
-    text += "CON = 5*(3d6) = " + str(a) + "+" + str(b) + \
-        "+" + str(c) + " = " + str(CON) + "\n"
+    text += "CON = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
+        "+" + str(c) + ") = " + str(CON) + "\n"
     a, b = np.random.randint(1, 7, size=2)
     SIZ = int(5*(a+b+6))
-    text += "SIZ = 5*(2d6+6) = " + str(a) + "+" + \
-        str(b) + "+6 = " + str(SIZ) + "\n"
+    text += "SIZ = 5*(2d6+6) = 5*(" + str(a) + "+" + \
+        str(b) + "+6) = " + str(SIZ) + "\n"
     a, b, c = np.random.randint(1, 7, size=3)
     DEX = int(5*(a+b+c))
-    text += "DEX = 5*(3d6) = " + str(a) + "+" + str(b) + \
-        "+" + str(c) + " = " + str(DEX) + "\n"
+    text += "DEX = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
+        "+" + str(c) + ") = " + str(DEX) + "\n"
     a, b, c = np.random.randint(1, 7, size=3)
     APP = int(5*(a+b+c))
-    text += "APP = 5*(3d6) = " + str(a) + "+" + str(b) + \
-        "+" + str(c) + " = " + str(APP) + "\n"
+    text += "APP = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
+        "+" + str(c) + ") = " + str(APP) + "\n"
     a, b = np.random.randint(1, 7, size=2)
     INT = int(5*(a+b+6))
-    text += "INT = 5*(2d6+6) = " + str(a) + "+" + \
-        str(b) + "+6 = " + str(INT) + "\n"
+    text += "INT = 5*(2d6+6) = 5*(" + str(a) + "+" + \
+        str(b) + "+6) = " + str(INT) + "\n"
     a, b, c = np.random.randint(1, 7, size=3)
     POW = int(5*(a+b+c))
-    text += "POW = 5*(3d6) = " + str(a) + "+" + str(b) + \
-        "+" + str(c) + " = " + str(POW) + "\n"
+    text += "POW = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
+        "+" + str(c) + ") = " + str(POW) + "\n"
     a, b = np.random.randint(1, 7, size=2)
     EDU = int(5*(a+b+6))
-    text += "EDU = 5*(2d6+6) = " + str(a) + "+" + str(b) + "+6 = " + str(EDU)
+    text += "EDU = 5*(2d6+6) = 5*(" + str(a) + "+" + str(b) + "+6) = " + str(EDU)
     card.data["STR"] = STR
     card.data["CON"] = CON
     card.data["SIZ"] = SIZ
@@ -116,7 +116,7 @@ def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
             card.data["LUCK"] = luck2
         else:
             card.data["LUCK"] = luck
-        rttext += "年龄低于20，幸运得到奖励骰。结果分别为"+luck+", "+luck2+"。教育减5，力量体型合计减5。"
+        rttext += "年龄低于20，幸运得到奖励骰。结果分别为"+str(luck)+", "+str(luck2)+"。教育减5，力量体型合计减5。"
         card.data["STR_SIZ_M"] = -5
         card.data["EDU"] -= 5
     elif AGE < 40:
