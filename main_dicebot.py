@@ -14,6 +14,8 @@ from telegram.ext import CommandHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import logging
 
+from telegram.games.game import Game
+
 from gameclass import *
 from botdicts import *
 import botdice
@@ -426,6 +428,16 @@ setcondec_handler = CommandHandler('setcondec', setcondec)
 dispatcher.add_handler(setcondec_handler)
 
 
+def getskilllevelfromdict(card1: GameCard, keys: str) -> int:
+    if keys in SKILL_DICT:
+        return SKILL_DICT[keys]
+    if keys == "母语":
+        return card1.data["EDU"]
+    if keys == "闪避":
+        return card1.data["DEX"]//2
+    return -1
+
+
 # Button. need 0-1 args, if len(args)==0, show button and listen
 def setjob(update: Update, context: CallbackContext) -> bool:
     if isgroupmsg(update):
@@ -457,17 +469,15 @@ def setjob(update: Update, context: CallbackContext) -> bool:
         return False
     if jobname not in JOB_DICT:
         update.message.reply_text(
-            "This job is not in joblist, you can use '/addskill skillname points (interest)' to choose skills you like! If interest is appended, the skill will cost interest points.")
+            "This job is not in joblist, you can use '/addskill skillname points (main/interest)' to choose skills you like! If interest is appended, the skill will cost interest points.")
         card1.skill["points"] = int(card1.data["EDU"]*4)
-        card1.interest["points"] = int(card1.data["INT"]*2)
         writecards(CARDS_LIST)
         return True
-    for i in range(3, len(JOB_DICT[jobname])):  # Classical jobs
-        card1.suggestskill[JOB_DICT[jobname][i]
-                           ] = SKILL_DICT[JOB_DICT[jobname][i]]  # int
+    for i in range(3, len(JOB_DICT[jobname])): # Classical jobs
+        card1.suggestskill[JOB_DICT[jobname][i]] = getskilllevelfromdict(card1, JOB_DICT[jobname][i])  # int
     update.message.reply_text(
         "Skill suggestions generated. Use /addskill to add skills.")
-    if not createcard.generatePoints(card1, jobname):
+    if not createcard.generatePoints(card1, jobname): # This trap should not be hit
         update.message.reply_text(
             "Some error occured when generating skill points!")
         return False
@@ -483,21 +493,24 @@ def addmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Updat
     if card1.skill["points"] == 0:
         update.message.reply_text("You don't have any main skill points left!")
         return False
-    if skillvalue < SKILL_DICT[skillname] or skillvalue > min(SKILL_DICT[skillname]+card1.skill["points"], 99):
+    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > min(getskilllevelfromdict(card1, skillname)+card1.skill["points"], 99):
         update.message.reply_text("Skill value is too high or too low.")
         return False
-    card1.skill["points"] -= skillvalue - SKILL_DICT[skillname]
+    card1.skill["points"] -= skillvalue - getskilllevelfromdict(card1, skillname)
     update.message.reply_text("Skill is set: "+skillname+" "+str(
-        skillvalue)+", cost points: "+str(skillvalue - SKILL_DICT[skillname]))
+        skillvalue)+", cost points: "+str(skillvalue - getskilllevelfromdict(card1, skillname)))
     card1.skill[skillname] = skillvalue
+    writecards(CARDS_LIST)
     return True
 
 
 def addsgskill(skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
     if not addmainskill(skillname, skillvalue, card1, update):
         return False
-    card1.suggestskill.pop[skillname]
+    card1.suggestskill.pop(skillname)
+    writecards(CARDS_LIST)
     return True
+
 
 
 def addintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
@@ -505,37 +518,52 @@ def addintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update
         update.message.reply_text(
             "You don't have any interest skill points left!")
         return False
-    if skillvalue < SKILL_DICT[skillname] or skillvalue > min(SKILL_DICT[skillname]+card1.interest["points"], 99):
+    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > min(getskilllevelfromdict(card1, skillname)+card1.interest["points"], 99):
         update.message.reply_text("Skill value is too high or too low.")
         return False
-    card1.interest["points"] -= skillvalue - SKILL_DICT[skillname]
+    card1.interest["points"] -= skillvalue - getskilllevelfromdict(card1, skillname)
     update.message.reply_text("Skill is set: "+skillname+" "+str(
-        skillvalue)+", cost points: "+str(skillvalue - SKILL_DICT[skillname]))
+        skillvalue)+", cost points: "+str(skillvalue - getskilllevelfromdict(card1, skillname)))
     card1.interest[skillname] = skillvalue
+    writecards(CARDS_LIST)
     return True
 
 
 def cgmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool: # Change main skill level
-    if skillvalue < SKILL_DICT[skillname] or skillvalue > min(card1.skill[skillname]+card1.skill["points"], 99):
+    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > min(card1.skill[skillname]+card1.skill["points"], 99):
         update.message.reply_text("Skill value is too high or too low.")
         return False
     card1.skill["points"] -= skillvalue - card1.skill[skillname]
     update.message.reply_text("Skill is set: "+skillname+" "+str(
         skillvalue)+", cost points: "+str(skillvalue - card1.skill[skillname]))
     card1.skill[skillname] = skillvalue
+    writecards(CARDS_LIST)
     return True
 
 
 def cgintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool: # Change interest skill level
-    if skillvalue < SKILL_DICT[skillname] or skillvalue > min(card1.interest[skillname]+card1.interest["points"], 99):
+    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > min(card1.interest[skillname]+card1.interest["points"], 99):
         update.message.reply_text("Skill value is too high or too low.")
         return False
     card1.interest["points"] -= skillvalue - card1.interest[skillname]
     update.message.reply_text("Skill is set: "+skillname+" "+str(
         skillvalue)+", cost points: "+str(skillvalue - card1.interest[skillname]))
     card1.interest[skillname] = skillvalue
+    writecards(CARDS_LIST)
     return True
 
+def addcredit(update: Update, context: CallbackContext, card1: GameCard) -> bool:
+    update.message.reply_text("Please set 信用 first!")
+    if card1.info["job"] in JOB_DICT:
+        m = JOB_DICT[card1.info["job"]][0]
+        mm = JOB_DICT[card1.info["job"]][1]
+    else:
+        m = 5
+        mm = 99
+    rtbuttons = makeIntButtons(m, mm, "addmainskill", "信用")
+    rp_markup = InlineKeyboardMarkup(rtbuttons)
+    update.message.reply_text("Add main skill, skill name is: 信用", reply_markup=rp_markup)
+    return True
 
 def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool:
     rtbuttons = [[]]
@@ -568,27 +596,37 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
     if card1.interest["points"] <= 0: # HIT BAD TRAP
         update.message.reply_text("You don't have any points left!")
         return False
-    # GOOD TRAP: 
+    # GOOD TRAP: add interest skill. 
+    if "母语" not in card1.skill:
+        if "母语" in card1.interest:
+            rtbuttons[0].append(InlineKeyboardButton("母语: "+str(card1.interest["母语"]), callback_data="cgintskill "+"母语"))
+        else:
+            rtbuttons[0].append(InlineKeyboardButton("母语: "+str(getskilllevelfromdict(card1, "母语")), callback_data="cgintskill "+"母语"))
+    if "闪避" not in card1.skill:
+        if "闪避" in card1.interest:
+            rtbuttons[0].append(InlineKeyboardButton("闪避: "+str(card1.interest["闪避"]), callback_data="cgintskill "+"闪避"))
+        else:
+            rtbuttons[0].append(InlineKeyboardButton("闪避: "+str(getskilllevelfromdict(card1, "闪避")), callback_data="cgintskill "+"闪避"))
     for keys in SKILL_DICT:
-        if keys in card1.skill or keys in card1.suggestskill:
+        if keys in card1.skill or keys in card1.suggestskill or keys == "克苏鲁神话":
             continue
         if len(rtbuttons[len(rtbuttons)-1]) == 4:
             rtbuttons.append([])
         if keys in card1.interest:
-            rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys+": "+str(SKILL_DICT[keys]), callback_data="cgintskill "+keys))
+            rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys+": "+str(card1.interest[keys]), callback_data="cgintskill "+keys))
         else:
-            rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys+": "+str(SKILL_DICT[keys]), callback_data="addintskill "+keys))
+            rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys+": "+str(getskilllevelfromdict(card1, keys)), callback_data="addintskill "+keys))
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     update.message.reply_text("You have points:"+str(
         card1.interest["points"])+"\nPlease choose a interest skill:", reply_markup=rp_markup)
     return True
 
-def makeIntButtons(lower: int, upper: int,keystr1: str, keystr2: str, step: int = 10, column: int = 4) -> list[list]:
+def makeIntButtons(lower: int, upper: int,keystr1: str, keystr2: str, step: int = 10, column: int = 4) -> List[list]:
     rtbuttons = [[]]
     if (lower//step)*step != lower:
         rtbuttons[0].append(InlineKeyboardButton(str(lower), callback_data=keystr1+" "+keystr2+" "+str(lower)))
     t = step+(lower//step)*step
-    for i in range(t, upper, step=step):
+    for i in range(t, upper, step):
         if len(rtbuttons[len(rtbuttons)-1]) == column:
             rtbuttons.append([])
         rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(str(i), callback_data=keystr1+" "+keystr2+" "+str(i)))
@@ -604,7 +642,7 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
     # Otherwise, if (not suggestskill) and main points>0, should add main skill. Else should add Interest skill
     # Show button for numbers
     skillname = context.args[0]
-    m = SKILL_DICT[skillname]
+    m = getskilllevelfromdict(card1, skillname)
     if skillname in card1.skill: # GOOD TRAP: cgmainskill
         mm = card1.skill["points"]+card1.skill[skillname]
         rtbuttons = makeIntButtons(m, min(99, mm), "cgmainskill", skillname)
@@ -712,9 +750,25 @@ def addskill3(update: Update, context: CallbackContext, card1: GameCard) -> bool
     writecards(CARDS_LIST)
     return True
 
+def basicskillcheck(card1: GameCard) -> int:
+    if "母语" in card1.suggestskill:
+        return 1
+    if "母语" not in card1.skill and "母语" not in card1.interest:
+        return 2
+    if "闪避" in card1.suggestskill:
+        return 3
+    if "闪避" not in card1.skill and "闪避" not in card1.interest:
+        return 4
+    return 0
+
+
+def setbasicskill(update: Update, context: CallbackContext, card1: GameCard, skillchecktype: int) -> bool:
+    if skillchecktype == 1:
+        update.message.reply_text("Please add suggested skill '母语' first!")
+
+
 # Button. need 0-3 args, if len(args)==0 or 1, show button and listen; if len(args)==3, the third should be "interest/main" to give interest skills
-
-
+# Compicated
 def addskill(update: Update, context: CallbackContext) -> bool:
     if isgroupmsg(update):
         update.message.reply_text("Send private message to add skill.")
@@ -735,12 +789,16 @@ def addskill(update: Update, context: CallbackContext) -> bool:
     if "job" not in card1.info:
         update.message.reply_text("Please set job first.")
         return False
+    if "信用" not in card1.skill:
+        if addcredit(update, context, card1):
+            return True
+        return False
     if len(context.args) == 0:  # HIT GOOD TRAP
         if addskill0(update, context, card1):
             return True
         return False
     skillname = context.args[0]
-    if skillname not in SKILL_DICT or skillname == "克苏鲁神话":  # HIT BAD TRAP
+    if skillname != "母语" and skillname != "闪避" and (skillname not in SKILL_DICT or skillname == "克苏鲁神话"):  # HIT BAD TRAP
         update.message.reply_text("This skill is not allowed.")
         return False
     if len(context.args) == 1:  # HIT GOOD TRAP
@@ -786,68 +844,139 @@ def button(update: Update, context: CallbackContext):
             return False
         for i in range(3, len(JOB_DICT[jobname])):  # Classical jobs
             card1.suggestskill[JOB_DICT[jobname][i]
-                               ] = SKILL_DICT[JOB_DICT[jobname][i]]  # int
+                               ] = getskilllevelfromdict(card1, JOB_DICT[jobname][i])  # int
         writecards(CARDS_LIST)
         return True
     # Increase skills already added, because sgskill is none. second arg is skillname
     if args[0]=="addmainskill":
         if len(args)==3:
             skvalue = int(args[2])
-            needpt = skvalue - SKILL_DICT[args[1]]
+            needpt = skvalue - getskilllevelfromdict(card1, args[1])
             card1.skill[args[1]] = skvalue
             card1.skill["points"] -= needpt
-            query.edit_message_text(text="Main skill "+args[2]+" set to "+str(skvalue)+".")
+            query.edit_message_text(text="Main skill "+args[1]+" set to "+str(skvalue)+".")
+            writecards(CARDS_LIST)
             return True
-        pass
+        m = getskilllevelfromdict(card1, args[1])
+        mm = card1.skill["points"]+m
+        rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        query.edit_message_text("Add main skill, skill name is: "+args[1], reply_markup=rp_markup)
+        return True
     if args[0]=="cgmainskill":
-        pass
+        if len(args)==3:
+            skvalue = int(args[2])
+            needpt = skvalue - card1.skill[args[1]]
+            card1.skill[args[1]] = skvalue
+            card1.skill["points"] -= needpt
+            query.edit_message_text(text="Main skill "+args[1]+" set to "+str(skvalue)+".")
+            writecards(CARDS_LIST)
+            return True
+        m = getskilllevelfromdict(card1, args[1])
+        mm = card1.skill["points"]+card1.skill[args[1]]
+        rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        query.edit_message_text("Change main skill level, skill name is: "+args[1], reply_markup=rp_markup)
+        return True
     if args[0]=="addsgskill":
         if len(args)==3:
             skvalue = int(args[2])
-            needpt = skvalue - SKILL_DICT[args[1]]
+            needpt = skvalue - getskilllevelfromdict(card1, args[1])
             card1.skill[args[1]] = skvalue
             card1.skill["points"] -= needpt
-            query.edit_message_text(text="Main skill "+args[2]+" set to "+str(skvalue)+".")
-            card1.suggestskill.pop[args[2]]
+            query.edit_message_text(text="Main skill "+args[1]+" set to "+str(skvalue)+".")
+            card1.suggestskill.pop(args[1])
+            writecards(CARDS_LIST)
             return True
-        pass
+        m = getskilllevelfromdict(card1, args[1])
+        mm = card1.skill["points"]+m
+        rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        query.edit_message_text("Add suggested skill, skill name is: "+args[1], reply_markup=rp_markup)
+        return True
     if args[0]=="addintskill":
         if len(args)==3:
             skvalue = int(args[2])
-            needpt = skvalue - SKILL_DICT[args[1]]
+            needpt = skvalue - getskilllevelfromdict(card1, args[1])
             card1.interest[args[1]] = skvalue
             card1.interest["points"] -= needpt
-            query.edit_message_text(text="Interest skill "+args[2]+" set to "+str(skvalue)+".")
+            query.edit_message_text(text="Interest skill "+args[1]+" set to "+str(skvalue)+".")
+            writecards(CARDS_LIST)
             return True
-        pass
+        m = getskilllevelfromdict(card1, args[1])
+        mm = card1.interest["points"]+m
+        rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        query.edit_message_text("Add interest skill, skill name is: "+args[1], reply_markup=rp_markup)
+        return True
     if args[0]=="cgintskill":
-        pass
-    else: # HIT BAD TRAP
-        return False
-    # query.edit_message_text(text=f"Selected option: {query.data}")
+        if len(args)==3:
+            skvalue = int(args[2])
+            needpt = skvalue - card1.interest[args[1]]
+            card1.interest[args[1]] = skvalue
+            card1.interest["points"] -= needpt
+            query.edit_message_text(text="Interest skill "+args[1]+" set to "+str(skvalue)+".")
+            writecards(CARDS_LIST)
+            return True
+        m = getskilllevelfromdict(card1, args[1])
+        try:
+            mm = card1.interest["points"]+card1.interest[args[1]]
+        except:
+            card1.interest[args[1]] = m
+            mm = card1.interest["points"]+m
+            writecards(CARDS_LIST)
+        rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        query.edit_message_text("Change interest skill level, skill name is: "+args[1], reply_markup=rp_markup)
+        return True
+    # HIT BAD TRAP
+    return False
 
 
 dispatcher.add_handler(CallbackQueryHandler(button))
 
-# game
 
+def setname(update: Update, context: CallbackContext) -> bool:
+    if isgroupmsg(update):
+        update.message.reply_text("Please send private message to set name.")
+        return False
+    plid = update.effective_chat.id
+    if len(context.args) == 0:
+        update.message.reply_text("Please use '/setname NAME' to set name.")
+        return False
+    card1, ok = getcard(plid)
+    if not ok:
+        update.message.reply_text("Can't find card.")
+        return False
+    card1.info["name"] = context.args[0]
+    update.message.reply_text("Name is set to: "+context.args[0]+".")
+    card1.cardcheck["check5"] = True
+    writecards(CARDS_LIST)
+    return True
+
+setname_handler = CommandHandler('setname', setname)
+dispatcher.add_handler(setname_handler)
+
+
+# game
 # 有KP，且所有卡准备完成时，由KP开始游戏。如果需要更改一些信息，用/abortgame
 
 
 def startgame(update: Update, context: CallbackContext) -> bool:
-    if update.effective_chat.id > 0:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id, text="Game can only be started in a group.")
+    if isprivatemsg(update):
+        update.message.reply_text("Game can only be started in a group.")
         return False
     if str(update.effective_chat.id) not in GROUP_KP_DICT:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id, text="This group does not have a KP.")
+        update.message.reply_text("This group does not have a KP.")
         return False
     if update.message.from_user.id != GROUP_KP_DICT[str(update.effective_chat.id)]:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id, text="Only KP can start a game.")
+        update.message.reply_text("Only KP can start a game.")
         return False
+    kpid = update.message.from_user.id
     global CARDS_LIST, ON_GAME
+    for games in ON_GAME:
+        if games.kpid == kpid:
+            update.message.reply_text("A KP can only start ONE game at the same time.")
     gamecards = []
     for i in range(len(CARDS_LIST)):
         if CARDS_LIST[i].groupid == update.effective_chat.id:
@@ -859,6 +988,7 @@ def startgame(update: Update, context: CallbackContext) -> bool:
             gamecards.append(copy.deepcopy(CARDS_LIST[i]))
     ON_GAME.append(GroupGame(groupid=update.effective_chat.id,
                              kpid=GROUP_KP_DICT[str(update.effective_chat.id)], cards=gamecards))
+    writegameinfo(ON_GAME)
     return True
 
 
@@ -883,6 +1013,7 @@ def abortgame(update: Update, context: CallbackContext) -> bool:
             del t
             context.bot.send_message(
                 chat_id=update.effective_chat.id, text="Game aborted.")
+            writegameinfo(ON_GAME)
             return True
     context.bot.send_message(
         chat_id=update.effective_chat.id, text="Game not found.")
@@ -916,12 +1047,15 @@ def endgame(update: Update, context: CallbackContext) -> bool:
                 for j in range(len(CARDS_LIST)):
                     if gamecards[i].playerid == CARDS_LIST[j].playerid:
                         CARDS_LIST[j] = gamecards[i]
-                        CARDS_LIST[j].player = 0  # 解绑
-                        CARDS_LIST[j].group = 0  # 解绑
+                        CARDS_LIST[j].formerplayerid = CARDS_LIST[j].playerid
+                        CARDS_LIST[j].playerid=0  # 解绑
+                        CARDS_LIST[j].formergroupid = CARDS_LIST[j].groupid
+                        CARDS_LIST[j].groupid=0  # 解绑
                         break
             del t
             context.bot.send_message(
                 chat_id=update.effective_chat.id, text="Game end!")
+            writegameinfo(ON_GAME)
             return True
     context.bot.send_message(
         chat_id=update.effective_chat.id, text="Game not found.")
@@ -1006,15 +1140,21 @@ def tempcheck(update: Update, context: CallbackContext):
     game.tpcheck = int(context.args[0])
     context.bot.send_message(
         chat_id=update.effective_chat.id, text="Add temp check successfully.")
+    writegameinfo(ON_GAME)
+    return True
+
+
+tempcheck_handler = CommandHandler('tempcheck', tempcheck)
+dispatcher.add_handler(tempcheck_handler)
 
 
 def roll(update: Update, context: CallbackContext):
     # 只接受第一个空格前的参数。dicename可能是技能名，可能是3d6，可能是1d4+2d10。骰子环境可能是游戏中，游戏外。需要考虑多个情况
     if len(context.args) == 0:
-        pass  # 骰1d100
+        update.message.reply_text(botdice.commondice("1d100"))  # 骰1d100
         return True
     dicename = context.args[0]
-    if update.effective_chat.id < 0:  # Group msg
+    if isgroupmsg(update): # Group msg
         game, ok = findgame()
         tpcheck, game.tpcheck = game.tpcheck, 0
         if not ok or dicename.find('d') >= 0:
@@ -1040,6 +1180,10 @@ def roll(update: Update, context: CallbackContext):
         test = 0
         if dicename in gamecard["skill"]:
             test = gamecard.skill[dicename]
+        elif dicename == "母语":
+            test = gamecard.data["EDU"]
+        elif dicename == "闪避":
+            test = gamecard.data["DEX"]//2
         elif dicename in gamecard.data:
             test = gamecard.data[dicename]
         elif dicename == "力量":
@@ -1069,14 +1213,29 @@ def roll(update: Update, context: CallbackContext):
         elif dicename == "幸运":
             dicename = "LUCK"
             test = gamecard.data[dicename]
-        else:
-            pass
+        else: # HIT BAD TRAP
+            update.message.reply_text("Invalid input.")
             return False
         if "global" in gamecard["tempstatus"]:
             test += gamecard.tempstatus["global"]
         if dicename in gamecard["tempstatus"]:
             test += gamecard.tempstatus["global"]
-        pass
+        test += tpcheck
+        testval = botdice.dicemdn(1,100)
+        rttext = "检定："+dicename+" "+str(testval)+"/"+str(test)+" "
+        if (test<50 and testval>95) or (test>=50 and testval==100):
+            rttext += "大失败"
+        elif testval ==1:
+            rttext += "大成功"
+        elif testval > test:
+            rttext += "失败"
+        elif testval > test//2:
+            rttext += "普通成功"
+        elif testval > test//5:
+            rttext += "困难成功"
+        else:
+            rttext += "极难成功"
+        update.message.reply_text(rttext)
         return True
     rttext = botdice.commondice(dicename)  # private msg
     context.bot.send_message(chat_id=update.effective_chat.id, text=rttext)
@@ -1087,6 +1246,249 @@ def roll(update: Update, context: CallbackContext):
 
 roll_handler = CommandHandler('roll', roll)
 dispatcher.add_handler(roll_handler)
+
+def showcardinfo(card1:GameCard) -> str:
+    rttext = json.dumps(card1.__dict__, separators=("\n",":"))
+    rttext=rttext[1:-1]
+    rttext.replace("{","\n")
+    rttext.replace("}","\n")
+    return rttext
+
+
+def findkpcards(kpid) -> List[GameCard]:
+    ans = []
+    for i in range(len(CARDS_LIST)):
+        if CARDS_LIST[i].playerid == kpid and GROUP_KP_DICT[str(CARDS_LIST[i].groupid)]==kpid:
+            ans.append(CARDS_LIST[i])
+    return ans
+
+def showattrinfo(update: Update, card1: GameCard, attrname: str) -> bool:
+    if attrname in card1.__dict__:
+        ans = card1.__dict__[attrname]
+        rttext = ""
+        if isinstance(ans, dict):
+            for keys in ans:
+                rttext += keys+": "+str(ans[keys])
+        else:
+            rttext = str(ans)
+        update.message.reply_text(rttext)
+        return True
+    for keys in card1.__dict__:
+        if isinstance(card1.__dict__[keys], dict):
+            if attrname in card1.__dict__[keys]:
+                update.message.reply_text(str(card1.__dict__[keys][attrname]))
+                return True
+    update.message.reply_text("Can't find this attribute of card!")
+    return False
+
+
+def show(update: Update, context: CallbackContext) -> bool:
+    if isprivatemsg(update): # Should not return game info
+        if len(context.args) == 0:
+            plid = update.effective_chat.id
+            card1, ok = getcard(plid)
+            if not ok:
+                update.message.reply_text("Can't find card. If you are kp, please use '/show kp'.")
+                return False
+            update.message.reply_text(showcardinfo(card1))
+            return True
+        attrname = context.args[0]
+        if attrname == "kp":
+            kpid = update.effective_chat.id
+            cards = findkpcards(kpid)
+            if len(cards) == 0:
+                update.message.reply_text("You have no cards as a kp.")
+                return False
+            for i in range(len(cards)):
+                update.message.reply_text(showcardinfo(cards[i]))
+            return True
+        plid = update.effective_chat.id
+        card1, ok = getcard(plid)
+        if not ok:
+            update.message.reply_text("Can't find card.")
+            return False
+        if not showattrinfo(update, card1, attrname):
+            return False
+        return True
+    # Group msg, ON_GAME is needed
+    gpid = update.effective_chat.id
+    senderid = update.message.from_user.id
+    game,ok = findgame(gpid)
+    if not ok:
+        update.message.reply_text("Can't find game, please send private message to show card info.")
+        return False
+    if GROUP_KP_DICT[str(gpid)] == senderid: # KP
+        if len(context.args)==0:
+            update.message.reply_text("Cannot show all info in a group.")
+            return False
+        attrname = context.args[0]
+        if game.kpctrl == -1:
+            update.message.reply_text("No card choosen. Use /switchcard to switch card.")
+            return False
+        if not showattrinfo(update, game.kpcards[game.kpctrl], attrname):
+            return False
+        return True
+    card1, ok = findcardfromgame(game, senderid)
+    if not ok:
+        update.message.reply_text("Can't find card.")
+        return False
+    if len(context.args) == 0:
+        update.message.reply_text(showcardinfo(card1))
+        return True
+    attrname = context.args[0]
+    if not showattrinfo(update, game.kpcards[game.kpctrl], attrname):
+        return False
+    return True
+
+
+show_handler = CommandHandler('show', show)
+dispatcher.add_handler(show_handler)
+
+
+# def showgamecard(update: Update, context: CallbackContext) -> bool:
+#     pass
+
+
+# showgamecard_handler = CommandHandler('showgamecard', showgamecard)
+# dispatcher.add_handler(showgamecard_handler)
+
+def showids(update: Update, context: CallbackContext) -> bool:
+    if isgroupmsg(update):
+        update.message.reply_text("Send private message to see IDs.")
+        return False
+    if not isfromkp(update):
+        update.message.reply_text("Not authorized.")
+        return False
+    kpid = update.effective_chat.id
+    game, ok = findgamewithkpid(kpid)
+    if not ok:
+        cards = CARDS_LIST
+    else:
+        cards = game.cards
+    rttext = ""
+    for cardi in cards:
+        if GROUP_KP_DICT[str(cardi.groupid)] == kpid:
+            rttext += cardi.info["name"]+": "+str(cardi.id)
+    update.message.reply_text(rttext)
+    return True
+
+
+showids_handler = CommandHandler('showids', showids)
+dispatcher.add_handler(showids_handler)
+
+
+def modify(update: Update, context: CallbackContext) -> bool:
+    if not isfromkp(update):
+        update.message.reply_text("Not authorized.")
+        return False
+    # need 3 args, first: card id, second: attrname, third: value
+    if len(context.args)<3:
+        update.message.reply_text("Need more arguments.")
+        return False
+    card_id = context.args[0]
+    if not botdice.isint(card_id):
+        update.message.reply_text("Invalid id.")
+        return False
+    card_id = int(card_id)
+    kpid = update.message.from_user.id
+    game, ok = findgamewithkpid(kpid)
+    if not ok:
+        if card_id>=len(CARDS_LIST):
+            update.message.reply_text("Invalid id.")
+            return False
+        card1 = CARDS_LIST[card_id]
+        if str(card1.groupid) not in GROUP_KP_DICT or GROUP_KP_DICT[str(card1.groupid)]!=kpid:
+            update.message.reply_text("Invalid id.")
+            return False
+    else:
+        cards = game.cards
+        card1 = ""
+        for cardi in cards:
+            if cardi.id == card_id:
+                card1 = cardi
+                break
+        if isinstance(card1, str):
+            update.message.reply_text("Invalid id.")
+            return False
+    # Now the valid card is found
+    attrname = context.args[1]
+    if attrname in card1.__dict__:
+        if isinstance(card1.__dict__[attrname], dict):
+            update.message.reply_text("Cannot edit dict.")
+            return False
+        if isinstance(card1.__dict__[attrname], bool):
+            if context.args[2] in ["F", "false", "False"]:
+                card1.__dict__[attrname] = False
+            elif context.args[2] in ["T", "true", "True"]:
+                card1.__dict__[attrname] = True
+            else:
+                update.message.reply_text("Invalid argument.")
+                return False
+            if ok:
+                writegameinfo(ON_GAME)
+            else:
+                writecards(CARDS_LIST)
+            return True
+        if isinstance(card1.__dict__[attrname], int):
+            if not botdice.isint(context.args[2]):
+                update.message.reply_text("Invalid argument.")
+                return False
+            card1.__dict__[attrname] = int(context.args[2])
+            if ok:
+                writegameinfo(ON_GAME)
+            else:
+                writecards(CARDS_LIST)
+            return True
+        if isinstance(card1.__dict__[attrname], str):
+            card1.__dict__[attrname] = context.args[2]
+            if ok:
+                writegameinfo(ON_GAME)
+            else:
+                writecards(CARDS_LIST)
+            return True
+        update.message.reply_text("Type error!!!")
+        return False
+    for keys in card1.__dict__:
+        if isinstance(card1.__dict__[keys], dict):
+            if attrname in card1.__dict__[keys]:
+                getdict = card1.__dict__[keys]
+                if isinstance(getdict[attrname], dict):
+                    update.message.reply_text("Cannot edit dict.")
+                    return False
+                if isinstance(getdict[attrname], bool):
+                    if context.args[2] in ["F", "false", "False"]:
+                        getdict[attrname] = False
+                    elif context.args[2] in ["T", "true", "True"]:
+                        getdict[attrname] = True
+                    else:
+                        update.message.reply_text("Invalid argument.")
+                        return False
+                    if ok:
+                        writegameinfo(ON_GAME)
+                    else:
+                        writecards(CARDS_LIST)
+                    return True
+                if isinstance(getdict[attrname], int):
+                    if not botdice.isint(context.args[2]):
+                        update.message.reply_text("Invalid argument.")
+                        return False
+                    getdict[attrname] = int(context.args[2])
+                    if ok:
+                        writegameinfo(ON_GAME)
+                    else:
+                        writecards(CARDS_LIST)
+                    return True
+                if isinstance(getdict[attrname], str):
+                    getdict[attrname] = context.args[2]
+                    if ok:
+                        writegameinfo(ON_GAME)
+                    else:
+                        writecards(CARDS_LIST)
+                    return True
+                update.message.reply_text("Type error!!!")
+                return False
+    update.message.reply_text("Cannot find this attribute.")
+    return False
 
 
 def unknown(update: Update, context: CallbackContext) -> None:

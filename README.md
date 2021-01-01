@@ -38,7 +38,6 @@ tg跑团用骰子机器人，开发中
           "job":str,
           "sex":str,
           "birthplace":str,
-          "classicaljob":bool
       },
       "skill":
       {
@@ -55,7 +54,8 @@ tg跑团用骰子机器人，开发中
           "check1":bool,
           "check2":bool,
           "check3":bool,
-          "check4":bool
+          "check4":bool,
+          "check5":bool
       },
       "attr":
       {

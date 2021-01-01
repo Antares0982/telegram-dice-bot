@@ -33,7 +33,8 @@ def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
             "check1": False,  # 年龄是否设定
             "check2": False,  # str, con, dex等设定是否完成
             "check3": False,  # job是否设定完成
-            "check4": False  # skill是否设定完成
+            "check4": False,  # skill是否设定完成
+            "check5": False # 名字等是否设定完成
         },
         "attr": {
 
@@ -397,6 +398,8 @@ def generatePoints(card: GameCard, job: str):
     for keys in ptrule:
         if keys in card.data:
             pt += card.data[keys]*ptrule[keys]
+        elif len(keys)==11:
+            pt += max(card.data[keys[:3]], card.data[keys[4:7]], card.data[keys[8:]])*ptrule[keys]
         elif keys[:3] in card.data and keys[4:] in card.data:
             pt += max(card.data[keys[:3]], card.data[keys[4:]])*ptrule[keys]
         else:
@@ -421,6 +424,9 @@ def checkcard(card: GameCard) -> bool:
     if card.interest["points"] != 0:
         return False
     card.cardcheck["check4"] = True
+    if card.info["name"] == "":
+        return False
+    card.cardcheck["check5"] = True
     return True
 
 

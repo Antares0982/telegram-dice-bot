@@ -19,13 +19,14 @@ def writecards(listofgamecard: List[GameCard]) -> None:
 
 
 def writegameinfo(listofobj: List[GroupGame]) -> None:
-    savelist = []
+    savelist:List[dict] = []
     for i in range(len(listofobj)):
-        newdict = {}
-        newdict["groupid"] = listofobj[i].groupid
-        newdict["kpid"] = listofobj[i].kpid
-        newdict["cards"] = listofobj[i].cards
-        savelist.append(newdict)
+        savelist.append(listofobj[i].__dict__)
+        tpcards:List[GameCard] = savelist[-1]["cards"]
+        savelist[-1]["cards"] = []
+        savelist[-1].pop("kpcards")
+        for i in tpcards:
+            savelist[-1]["cards"].append(i.__dict__)
     with open(PATH_ONGAME, "w", encoding="utf-8") as f:
         json.dump(savelist, f, indent=4, ensure_ascii=False)
 
@@ -42,8 +43,7 @@ def readinfo() -> Tuple[Dict[str, int], List[GameCard], List[GroupGame]]:
         ongamelistdict = json.load(f)
     ongamelist:List[GroupGame] = []
     for i in range(len(ongamelistdict)):
-        ongamelistdict.append(GroupGame(
-            groupid=ongamelistdict[i]["groupid"], kpid=ongamelist[i]["kpid"], cards=ongamelist[i]["cards"]))
+        ongamelist.append(GroupGame(ongamelistdict[i]))
     return gpkpdict, gamecardlist, ongamelist
 
 
