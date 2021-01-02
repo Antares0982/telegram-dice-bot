@@ -5,7 +5,7 @@ from typing import List
 def isint(a: str) -> bool:
     try:
         int(a)
-    except Exception():
+    except:
         return False
     return True
 

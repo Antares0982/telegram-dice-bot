@@ -24,7 +24,7 @@ class GameCard:
 
 
 class GroupGame:  # If defined, game is started.
-    def __init__(self, groupid, cards: List[GameCard] = None, kpid: int = None):
+    def __init__(self, groupid, cards: List[dict] = None, kpid: int = None):
         if isinstance(groupid, dict):
             self.groupid: int = groupid["groupid"]
             self.kpid: int = groupid["kpid"]
@@ -38,11 +38,13 @@ class GroupGame:  # If defined, game is started.
         else:
             self.groupid: int = groupid  # Unique, should not be edited after initializing
             self.kpid: int = kpid  # Can be edited
-            self.cards: List[GameCard] = cards  # list of GameCard
+            self.cards: List[GameCard] = [] # list of GameCard
+            for i in cards:
+                self.cards.append(GameCard(i))
             self.kpctrl: int = -1
             self.tpcheck: int = 0
         self.kpcards: List[GameCard] = []
-        for i in range(len(self.cards)):
-            if self.cards[i].playerid == kpid:
-                self.kpcards.append(cards[i])
+        for i in self.cards:
+            if i.playerid == self.kpid:
+                self.kpcards.append(i)
         

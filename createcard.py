@@ -9,6 +9,16 @@ from botdicts import readjobdict
 JOB_DICT = readjobdict()
 
 
+def get3d6str(dtname: str, a: int, b: int, c: int) -> str:
+    return dtname+" = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
+        "+" + str(c) + ") = " + str(5*(a+b+c)) + "\n"
+
+
+def get2d6_6str(dtname: str, a: int, b: int) -> str:
+    return dtname+" = 5*(2d6+6) = 5*(" + str(a) + "+" + \
+        str(b) + "+6) = " + str(5*(a+b+6)) + "\n"
+
+
 def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
     newcard = {
         "id": -1,
@@ -24,7 +34,7 @@ def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
             "points": -1
         },
         "interest": {
-            
+
         },
         "suggestskill": {
 
@@ -34,7 +44,7 @@ def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
             "check2": False,  # str, con, dex等设定是否完成
             "check3": False,  # job是否设定完成
             "check4": False,  # skill是否设定完成
-            "check5": False # 名字等是否设定完成
+            "check5": False  # 名字等是否设定完成
         },
         "attr": {
 
@@ -64,35 +74,28 @@ def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
     text = ""
     a, b, c = np.random.randint(1, 7, size=3)
     STR = int(5*(a+b+c))
-    text += "STR = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
-        "+" + str(c) + ") = " + str(STR) + "\n"
+    text += get3d6str("STR", a, b, c)
     a, b, c = np.random.randint(1, 7, size=3)
     CON = int(5*(a+b+c))
-    text += "CON = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
-        "+" + str(c) + ") = " + str(CON) + "\n"
+    text += get3d6str("CON", a, b, c)
     a, b = np.random.randint(1, 7, size=2)
     SIZ = int(5*(a+b+6))
-    text += "SIZ = 5*(2d6+6) = 5*(" + str(a) + "+" + \
-        str(b) + "+6) = " + str(SIZ) + "\n"
+    text += get2d6_6str("SIZ", a, b)
     a, b, c = np.random.randint(1, 7, size=3)
     DEX = int(5*(a+b+c))
-    text += "DEX = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
-        "+" + str(c) + ") = " + str(DEX) + "\n"
+    text += get3d6str("DEX", a, b, c)
     a, b, c = np.random.randint(1, 7, size=3)
     APP = int(5*(a+b+c))
-    text += "APP = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
-        "+" + str(c) + ") = " + str(APP) + "\n"
+    text += get3d6str("APP", a, b, c)
     a, b = np.random.randint(1, 7, size=2)
     INT = int(5*(a+b+6))
-    text += "INT = 5*(2d6+6) = 5*(" + str(a) + "+" + \
-        str(b) + "+6) = " + str(INT) + "\n"
+    text += get2d6_6str("INT", a, b)
     a, b, c = np.random.randint(1, 7, size=3)
     POW = int(5*(a+b+c))
-    text += "POW = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
-        "+" + str(c) + ") = " + str(POW) + "\n"
+    text += get3d6str("POW", a, b, c)
     a, b = np.random.randint(1, 7, size=2)
     EDU = int(5*(a+b+6))
-    text += "EDU = 5*(2d6+6) = 5*(" + str(a) + "+" + str(b) + "+6) = " + str(EDU)
+    text += get2d6_6str("EDU", a, b)
     card.data["STR"] = STR
     card.data["CON"] = CON
     card.data["SIZ"] = SIZ
@@ -104,6 +107,22 @@ def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
     card.interest["points"] = INT*2
     return card, text
 
+
+def EDUenhance(card: GameCard, times: int) -> str:
+    if times > 4:
+        return ""
+    rttext = ""
+    timelist = ["一", "二", "三", "四"]
+    for j in range(times):
+        a, b = np.random.randint(1, 7, size=2)
+        if int(5*(a+b+6)) > card.data["EDU"]:
+            rttext += "第"+timelist[j]+"次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
+            a = min(99-card.data["EDU"], np.random.randint(1, 11))
+            rttext += str(a)+"点提升。\n"
+            card.data["EDU"] += a
+        else:
+            rttext += "第"+timelist[j]+"次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
+    return rttext
 
 def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
     if "AGE" not in card.info:  # This trap should not be hit
@@ -117,184 +136,46 @@ def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
             card.data["LUCK"] = luck2
         else:
             card.data["LUCK"] = luck
-        rttext += "年龄低于20，幸运得到奖励骰。结果分别为"+str(luck)+", "+str(luck2)+"。教育减5，力量体型合计减5。"
+        rttext += "年龄低于20，幸运得到奖励骰。结果分别为" + \
+            str(luck)+", "+str(luck2)+"。教育减5，力量体型合计减5。"
         card.data["STR_SIZ_M"] = -5
         card.data["EDU"] -= 5
     elif AGE < 40:
         card.cardcheck["check2"] = True  # No STR decrease, check2 passes
         rttext += "年龄20-39，得到一次教育增强。"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升，现在教育："
-            card.data["EDU"] += a
-            rttext += str(card.data["EDU"])+"。"
-        else:
-            rttext += "检定增强："+str(int(5*(a+b+6)))+"失败，现在教育：" + \
-                str(card.data["EDU"])+"。"
+        rttext += EDUenhance(card, 1)
+        rttext += "现在教育：" + str(card.data["EDU"])+"。"
     elif AGE < 50:
         rttext += "年龄40-49，得到两次教育增强。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第一次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第一次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第二次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第二次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
+        rttext += EDUenhance(card, 2)
         rttext += "现在教育："+str(card.data["EDU"])+"。\n"
         card.data["STR_CON_M"] = -5
         card.data["APP"] -= 5
         rttext += "力量体质合计减5，外貌减5。\n"
     elif AGE < 60:
         rttext += "年龄50-59，得到三次教育增强。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第一次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第一次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第二次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第二次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第三次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第三次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
+        rttext += EDUenhance(card, 3)
         rttext += "现在教育："+str(card.data["EDU"])+"。\n"
         card.data["STR_CON_DEX_M"] = -10
         card.data["APP"] -= 10
         rttext += "力量体质敏捷合计减10，外貌减10。\n"
     elif AGE < 70:
         rttext += "年龄60-69，得到四次教育增强。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第一次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第一次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第二次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第二次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第三次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第三次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第四次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第四次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
+        rttext += EDUenhance(card, 4)
         rttext += "现在教育："+str(card.data["EDU"])+"。\n"
         card.data["STR_CON_DEX_M"] = -20
         card.data["APP"] -= 15
         rttext += "力量体质敏捷合计减20，外貌减15。\n"
     elif AGE < 80:
         rttext += "年龄70-79，得到四次教育增强。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第一次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第一次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第二次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第二次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第三次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第三次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第四次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第四次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
+        rttext += EDUenhance(card, 4)
         rttext += "现在教育："+str(card.data["EDU"])+"。\n"
         card.data["STR_CON_DEX_M"] = -40
         card.data["APP"] -= 20
         rttext += "力量体质敏捷合计减40，外貌减20。\n"
     else:
         rttext += "年龄80以上，得到四次教育增强。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第一次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第一次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第二次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第二次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第三次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第三次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第四次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
-            rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
-        else:
-            rttext += "第四次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
+        rttext += EDUenhance(card, 4)
         rttext += "现在教育："+str(card.data["EDU"])+"。\n"
         card.data["STR_CON_DEX_M"] = -80
         card.data["APP"] -= 25
@@ -302,14 +183,19 @@ def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
     if AGE >= 20:
         card.data["LUCK"] = luck
         rttext += "幸运："+str(luck)+"\n"
+    for keys in card.data:
+        if len(keys)>6:
+            rttext += "使用' /setstrdec STRDEC '来设置因为年龄设定导致的STR减少值，根据所设定的年龄可能还需要设置CON减少值。根据上面的提示减少的数值进行设置。\n"
+            break
     rttext += "使用 /setjob 进行职业设定。完成职业设定之后，用'/addskill 技能名 技能点数' 来分配技能点，用空格分隔。"
     return card, rttext
 
 
-def choosedec(card: GameCard, strength: int) -> Tuple[GameCard, str, bool]: # If returns "输入无效", card should not be edited
+# If returns "输入无效", card should not be edited
+def choosedec(card: GameCard, strength: int) -> Tuple[GameCard, str, bool]:
     if card.data["STR"] <= strength:
         return card, "输入无效", False
-    card.data["STR"] -= strength # Add it back if "HIT BAD TRAP"
+    card.data["STR"] -= strength  # Add it back if "HIT BAD TRAP"
     needCON = False
     rttext = "力量减"+str(strength)+"点，"
     if "STR_SIZ_M" in card.data:  # AGE less than 20
@@ -326,7 +212,7 @@ def choosedec(card: GameCard, strength: int) -> Tuple[GameCard, str, bool]: # If
             return card, "输入无效", False
         card.data["CON"] += card.data["STR_CON_M"]+strength
         rttext += "体质减"+str(-card.data["STR_CON_M"]-strength)+"点。"
-        card.data.pop("STR_SIZ_M")
+        card.data.pop("STR_CON_M")
         card.cardcheck["check2"] = True  # No other decrease, check2 passes
     elif "STR_CON_DEX_M" in card.data:
         if strength > -card.data["STR_CON_DEX_M"]:
@@ -361,7 +247,7 @@ def generateOtherAttributes(card: GameCard) -> Tuple[GameCard, str]:
     if not card.cardcheck["check2"]:  # This trap should not be hit
         return card, "Please set DATA decrease first"
     card.attr["SAN"] = card.data["POW"]
-    card.attr["MAXSAN"] = card.data["POW"]
+    card.attr["MAXSAN"] = 99
     card.attr["MAGIC"] = card.data["POW"]//5
     card.attr["MAXLP"] = (card.data["SIZ"]+card.data["CON"])//10
     card.attr["LP"] = card.attr["MAXLP"]
@@ -398,8 +284,9 @@ def generatePoints(card: GameCard, job: str):
     for keys in ptrule:
         if keys in card.data:
             pt += card.data[keys]*ptrule[keys]
-        elif len(keys)==11:
-            pt += max(card.data[keys[:3]], card.data[keys[4:7]], card.data[keys[8:]])*ptrule[keys]
+        elif len(keys) == 11:
+            pt += max(card.data[keys[:3]], card.data[keys[4:7]],
+                      card.data[keys[8:]])*ptrule[keys]
         elif keys[:3] in card.data and keys[4:] in card.data:
             pt += max(card.data[keys[:3]], card.data[keys[4:]])*ptrule[keys]
         else:
@@ -424,7 +311,7 @@ def checkcard(card: GameCard) -> bool:
     if card.interest["points"] != 0:
         return False
     card.cardcheck["check4"] = True
-    if card.info["name"] == "":
+    if "name" not in card.info or card.info["name"] == "":
         return False
     card.cardcheck["check5"] = True
     return True

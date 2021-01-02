@@ -1,6 +1,7 @@
 config.ini
 test.py
 tp/*
+data/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

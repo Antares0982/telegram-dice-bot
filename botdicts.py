@@ -1,4 +1,5 @@
 # -*- coding:utf-8 -*-
+import copy
 import json
 from typing import Tuple, List, Dict
 from cfg import *
@@ -21,7 +22,7 @@ def writecards(listofgamecard: List[GameCard]) -> None:
 def writegameinfo(listofobj: List[GroupGame]) -> None:
     savelist:List[dict] = []
     for i in range(len(listofobj)):
-        savelist.append(listofobj[i].__dict__)
+        savelist.append(copy.deepcopy(listofobj[i].__dict__))
         tpcards:List[GameCard] = savelist[-1]["cards"]
         savelist[-1]["cards"] = []
         savelist[-1].pop("kpcards")
@@ -34,16 +35,19 @@ def writegameinfo(listofobj: List[GroupGame]) -> None:
 def readinfo() -> Tuple[Dict[str, int], List[GameCard], List[GroupGame]]:
     with open(PATH_GROUP_KP, "r", encoding="utf-8") as f:
         gpkpdict = json.load(f)
+    print("kp info: passed")
     with open(PATH_CARDSLIST, "r", encoding="utf-8") as f:
         cardslist = json.load(f)
     gamecardlist:List[GameCard] = []
     for i in range(len(cardslist)):
         gamecardlist.append(GameCard(cardslist[i]))
+    print("card info: passed")
     with open(PATH_ONGAME, "r", encoding="utf-8") as f:
         ongamelistdict = json.load(f)
     ongamelist:List[GroupGame] = []
     for i in range(len(ongamelistdict)):
         ongamelist.append(GroupGame(ongamelistdict[i]))
+    print("game info: passed")
     return gpkpdict, gamecardlist, ongamelist
 
 
