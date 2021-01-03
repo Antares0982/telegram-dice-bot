@@ -1177,6 +1177,8 @@ def roll(update: Update, context: CallbackContext):
             test = gamecard.data[dicename]
         elif dicename in SKILL_DICT:
             test = SKILL_DICT[dicename]
+        elif len(dicename)>2 and dicename[:2] == "暗骰" and botdice.isint(dicename[2:]):
+            test = int(dicename[2:])
         else:  # HIT BAD TRAP
             update.message.reply_text("Invalid input.")
             return False
@@ -1199,7 +1201,11 @@ def roll(update: Update, context: CallbackContext):
             rttext += "困难成功"
         else:
             rttext += "极难成功"
-        update.message.reply_text(rttext)
+        if dicename == "心理学" or dicename[:2] == "暗骰":
+            update.message.reply_text("检定："+dicename+" ???/"+str(test))
+            update.message.reply_text(GROUP_KP_DICT[str(gpid)])
+        else:
+            update.message.reply_text(rttext)
         return True
     rttext = botdice.commondice(dicename)  # private msg
     context.bot.send_message(chat_id=update.effective_chat.id, text=rttext)
