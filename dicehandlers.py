@@ -1101,8 +1101,9 @@ def tempcheck(update: Update, context: CallbackContext):
         context.bot.send_message(
             chat_id=update.effective_chat.id, text="Only kp can set temp check.")
         return False
-    if len(context.args)>=3 and botdice.isint(context.args[1]) and 0<=int(context.args[1]) and int(context.args[1])<len(game.cards):
-        game.cards[int(context.args[1])].tempstatus[context.args[2]] = int(context.args[0])
+    if len(context.args) >= 3 and botdice.isint(context.args[1]) and 0 <= int(context.args[1]) and int(context.args[1]) < len(game.cards):
+        game.cards[int(context.args[1])].tempstatus[context.args[2]] = int(
+            context.args[0])
     else:
         game.tpcheck = int(context.args[0])
     context.bot.send_message(
@@ -1181,8 +1182,8 @@ def roll(update: Update, context: CallbackContext):
             test = gamecard.data[dicename]
         elif dicename in SKILL_DICT:
             test = SKILL_DICT[dicename]
-        elif dicename[:2] == "暗骰" and ( botdice.isint(dicename[2:]) or len(dicename)==2 ):
-            if len(dicename)!=2:
+        elif dicename[:2] == "暗骰" and (botdice.isint(dicename[2:]) or len(dicename) == 2):
+            if len(dicename) != 2:
                 test = int(dicename[2:])
             else:
                 test = 50
@@ -1211,7 +1212,8 @@ def roll(update: Update, context: CallbackContext):
             rttext += "极难成功"
         if dicename == "心理学" or dicename[:2] == "暗骰":
             update.message.reply_text("检定："+dicename+" ???/"+str(test))
-            context.bot.sendMessage(chat_id=GROUP_KP_DICT[str(gpid)], text=rttext)
+            context.bot.sendMessage(
+                chat_id=GROUP_KP_DICT[str(gpid)], text=rttext)
         else:
             update.message.reply_text(rttext)
         return True
@@ -1254,7 +1256,7 @@ def showattrinfo(update: Update, card1: GameCard, attrname: str) -> bool:
         update.message.reply_text(rttext)
         return True
     for keys in card1.__dict__:
-        if keys == "tempstatus" and attrname!="global":
+        if keys == "tempstatus" and attrname != "global":
             continue
         if isinstance(card1.__dict__[keys], dict):
             if attrname in card1.__dict__[keys]:
@@ -1381,7 +1383,7 @@ def showids(update: Update, context: CallbackContext) -> bool:
         cards = CARDS_LIST
     else:
         cards = game.cards
-    if len(context.args)>=1 and context.args[0] == "kp":
+    if len(context.args) >= 1 and context.args[0] == "kp":
         if not ok:
             update.message.reply_text("Should be in a game.")
             return False
@@ -1394,7 +1396,7 @@ def showids(update: Update, context: CallbackContext) -> bool:
     for cardi in cards:
         if GROUP_KP_DICT[str(cardi.groupid)] == kpid:
             if cardi.playerid == kpid:
-                rttext+= "(KP) "
+                rttext += "(KP) "
             rttext += cardi.info["name"]+": "+str(cardi.id)+"\n"
     update.message.reply_text(rttext)
     return True
@@ -1730,7 +1732,8 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
         if botdice.isint(checkfail):
             sanloss = int(checkfail)
         else:
-            sanloss = int(checkfail.split("d", maxsplit=1)[0])*int(checkfail.split("d", maxsplit=1)[1])
+            sanloss = int(checkfail.split("d", maxsplit=1)[
+                          0])*int(checkfail.split("d", maxsplit=1)[1])
     elif anstype == "失败":
         if botdice.isint(checkfail):
             sanloss = int(checkfail)
@@ -1764,12 +1767,3 @@ def unknown(update: Update, context: CallbackContext) -> None:
     if update.effective_chat.id > 0:
         context.bot.send_message(
             chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")
-
-
-"""
-def echo(update, context):
-    context.bot.send_message(chat_id = update.effective_chat.id, text = update.message.text)
-
-echo_handler = MessageHandler(Filters.text, echo)
-dispatcher.add_handler(echo_handler)
-"""

@@ -38,7 +38,7 @@ class GroupGame:  # If defined, game is started.
         else:
             self.groupid: int = groupid  # Unique, should not be edited after initializing
             self.kpid: int = kpid  # Can be edited
-            self.cards: List[GameCard] = [] # list of GameCard
+            self.cards: List[GameCard] = []  # list of GameCard
             for i in cards:
                 self.cards.append(GameCard(i))
             self.kpctrl: int = -1
@@ -47,4 +47,3 @@ class GroupGame:  # If defined, game is started.
         for i in self.cards:
             if i.playerid == self.kpid:
                 self.kpcards.append(i)
-        

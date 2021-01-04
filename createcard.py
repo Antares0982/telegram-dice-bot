@@ -124,6 +124,7 @@ def EDUenhance(card: GameCard, times: int) -> str:
             rttext += "第"+timelist[j]+"次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
     return rttext
 
+
 def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
     if "AGE" not in card.info:  # This trap should not be hit
         return card, "Attribute: AGE is NONE, please set AGE first"
@@ -184,7 +185,7 @@ def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
         card.data["LUCK"] = luck
         rttext += "幸运："+str(luck)+"\n"
     for keys in card.data:
-        if len(keys)>6:
+        if len(keys) > 6:
             rttext += "使用' /setstrdec STRDEC '来设置因为年龄设定导致的STR减少值，根据所设定的年龄可能还需要设置CON减少值。根据上面的提示减少的数值进行设置。\n"
             break
     rttext += "使用 /setjob 进行职业设定。完成职业设定之后，用'/addskill 技能名 技能点数' 来分配技能点，用空格分隔。"
