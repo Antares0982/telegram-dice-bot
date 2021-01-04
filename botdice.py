@@ -41,14 +41,17 @@ def commondice(dicename) -> str:
         ans += " = "+str(int(sum(ansint)))
         return ans
     dicess = dicename.split('+')
-    ansint = []
+    ansint:List[int] = []
     for i in range(len(dicess)):
-        if dicess[i].find('d') < 0:
+        if dicess[i].find('d') < 0 and not isint(dicess[i]):
             return "Invalid input."
-        dices = dicess[i].split('d')
-        if len(dices) != 2 or not isint(dices[0]) or not isint(dices[1]) or int(dices[0]) > 20:
-            return "Invalid input."
-        ansint += dicemdn(int(dices[0]), int(dices[1]))
+        if isint(dicess[i]):
+            ansint.append(int(dicess[i]))
+        else:
+            dices = dicess[i].split('d')
+            if len(dices) != 2 or not isint(dices[0]) or not isint(dices[1]) or int(dices[0]) > 20:
+                return "Invalid input."
+            ansint += dicemdn(int(dices[0]), int(dices[1]))
     ans = dicename + " = "
     for i in range(len(ansint)):
         if i < len(ansint)-1:

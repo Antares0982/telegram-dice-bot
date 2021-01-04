@@ -33,17 +33,45 @@ def writegameinfo(listofobj: List[GroupGame]) -> None:
 
 
 def readinfo() -> Tuple[Dict[str, int], List[GameCard], List[GroupGame]]:
-    with open(PATH_GROUP_KP, "r", encoding="utf-8") as f:
-        gpkpdict = json.load(f)
+    # create file if not exist
+    try:
+        f = open(PATH_GROUP_KP, "r", encoding="utf-8")
+        f.close()
+    except FileNotFoundError:
+        with open(PATH_GROUP_KP, "w", encoding="utf-8") as f:
+            json.dump({}, f, indent=4, ensure_ascii=False)
+        print("File does not exist, create new file")
+        gpkpdict = {}
+    else:
+        with open(PATH_GROUP_KP, "r", encoding="utf-8") as f:
+            gpkpdict = json.load(f)
     print("kp info: passed")
-    with open(PATH_CARDSLIST, "r", encoding="utf-8") as f:
-        cardslist = json.load(f)
+    try:
+        f = open(PATH_CARDSLIST, "r", encoding="utf-8")
+        f.close()
+    except FileNotFoundError:
+        with open(PATH_CARDSLIST, "w", encoding="utf-8") as f:
+            json.dump([], f, indent=4, ensure_ascii=False)
+        print("File does not exist, create new file")
+        cardslist = []
+    else:
+        with open(PATH_CARDSLIST, "r", encoding="utf-8") as f:
+            cardslist = json.load(f)
     gamecardlist:List[GameCard] = []
     for i in range(len(cardslist)):
         gamecardlist.append(GameCard(cardslist[i]))
     print("card info: passed")
-    with open(PATH_ONGAME, "r", encoding="utf-8") as f:
-        ongamelistdict = json.load(f)
+    try:
+        f = open(PATH_ONGAME, "r", encoding="utf-8")
+        f.close()
+    except FileNotFoundError:
+        with open(PATH_ONGAME, "w", encoding="utf-8") as f:
+            json.dump([], f, indent=4, ensure_ascii=False)
+        print("File does not exist, create new file")
+        ongamelistdict = []
+    else:
+        with open(PATH_ONGAME, "r", encoding="utf-8") as f:
+            ongamelistdict = json.load(f)
     ongamelist:List[GroupGame] = []
     for i in range(len(ongamelistdict)):
         ongamelist.append(GroupGame(ongamelistdict[i]))

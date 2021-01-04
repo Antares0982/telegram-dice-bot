@@ -14,7 +14,7 @@ TOKEN = cfgparser.get("TOKEN", "TOKEN")  # BOT TOKEN
 
 DATA_PATH = cfgparser.get("PATH", "DATA_PATH")
 
-PATH_GROUP_KP = DATA_PATH+r'groupkplist.json'
+PATH_GROUP_KP = DATA_PATH+r'groupkpdict.json'
 PATH_CARDSLIST = DATA_PATH+r'cards.json'
 PATH_ONGAME=DATA_PATH+r'ongame.json'
 PATH_SKILLDICT=DATA_PATH+r'skilldict.json'

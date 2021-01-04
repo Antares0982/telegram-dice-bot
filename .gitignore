@@ -1,7 +1,9 @@
 config.ini
 test.py
 tp/*
-data/*
+data/cards.json
+data/ongame.json
+data/groupkpdict.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

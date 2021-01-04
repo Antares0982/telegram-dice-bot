@@ -1116,7 +1116,6 @@ def roll(update: Update, context: CallbackContext):
     gpid = update.effective_chat.id
     if isgroupmsg(update):  # Group msg
         game, ok = findgame(gpid)
-        tpcheck, game.tpcheck = game.tpcheck, 0
         if not ok or dicename.find('d') >= 0:
             rttext = botdice.commondice(dicename)
             context.bot.send_message(
@@ -1124,6 +1123,7 @@ def roll(update: Update, context: CallbackContext):
             if rttext == "Invalid input.":
                 return False
             return True
+        tpcheck, game.tpcheck = game.tpcheck, 0
         senderid = update.message.from_user.id
         gpid = update.effective_chat.id
         if senderid != GROUP_KP_DICT[str(update.effective_chat.id)]:
@@ -1177,11 +1177,16 @@ def roll(update: Update, context: CallbackContext):
             test = gamecard.data[dicename]
         elif dicename in SKILL_DICT:
             test = SKILL_DICT[dicename]
-        elif len(dicename)>2 and dicename[:2] == "暗骰" and botdice.isint(dicename[2:]):
-            test = int(dicename[2:])
+        elif dicename[:2] == "暗骰" and ( botdice.isint(dicename[2:]) or len(dicename)==2 ):
+            if len(dicename)!=2:
+                test = int(dicename[2:])
+            else:
+                test = 50
         else:  # HIT BAD TRAP
+            print(len(dicename))
             update.message.reply_text("Invalid input.")
             return False
+        
         if "global" in gamecard.tempstatus:
             test += gamecard.tempstatus["global"]
         if dicename in gamecard.tempstatus:
@@ -1203,7 +1208,7 @@ def roll(update: Update, context: CallbackContext):
             rttext += "极难成功"
         if dicename == "心理学" or dicename[:2] == "暗骰":
             update.message.reply_text("检定："+dicename+" ???/"+str(test))
-            update.message.reply_text(GROUP_KP_DICT[str(gpid)])
+            context.bot.sendMessage(chat_id=GROUP_KP_DICT[str(gpid)], text=rttext)
         else:
             update.message.reply_text(rttext)
         return True
