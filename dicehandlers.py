@@ -1078,6 +1078,7 @@ def switchcard(update: Update, context: CallbackContext):
 
 
 # /tempcheck <tpcheck:int>: add temp check
+# /tempcheck <tpcheck:int> (<cardid> <dicename>): add temp check for one card in a game
 def tempcheck(update: Update, context: CallbackContext):
     if len(context.args) == 0:
         context.bot.send_message(
@@ -1100,7 +1101,10 @@ def tempcheck(update: Update, context: CallbackContext):
         context.bot.send_message(
             chat_id=update.effective_chat.id, text="Only kp can set temp check.")
         return False
-    game.tpcheck = int(context.args[0])
+    if len(context.args)>=3 and botdice.isint(context.args[1]) and 0<=int(context.args[1]) and int(context.args[1])<len(game.cards):
+        game.cards[int(context.args[1])].tempstatus[context.args[2]] = int(context.args[0])
+    else:
+        game.tpcheck = int(context.args[0])
     context.bot.send_message(
         chat_id=update.effective_chat.id, text="Add temp check successfully.")
     writegameinfo(ON_GAME)
@@ -1186,7 +1190,6 @@ def roll(update: Update, context: CallbackContext):
             print(len(dicename))
             update.message.reply_text("Invalid input.")
             return False
-        
         if "global" in gamecard.tempstatus:
             test += gamecard.tempstatus["global"]
         if dicename in gamecard.tempstatus:
@@ -1243,7 +1246,7 @@ def showattrinfo(update: Update, card1: GameCard, attrname: str) -> bool:
         rttext = ""
         if isinstance(ans, dict):
             for keys in ans:
-                rttext += keys+": "+str(ans[keys])
+                rttext += keys+": "+str(ans[keys])+"\n"
         else:
             rttext = str(ans)
         if rttext == "":
@@ -1251,6 +1254,8 @@ def showattrinfo(update: Update, card1: GameCard, attrname: str) -> bool:
         update.message.reply_text(rttext)
         return True
     for keys in card1.__dict__:
+        if keys == "tempstatus" and attrname!="global":
+            continue
         if isinstance(card1.__dict__[keys], dict):
             if attrname in card1.__dict__[keys]:
                 rttext = str(card1.__dict__[keys][attrname])
@@ -1361,14 +1366,8 @@ def show(update: Update, context: CallbackContext) -> bool:
     return True
 
 
-# def showgamecard(update: Update, context: CallbackContext) -> bool:
-#     pass
-
-
-# showgamecard_handler = CommandHandler('showgamecard', showgamecard)
-# dispatcher.add_handler(showgamecard_handler)
-
 # (private)showids: return all card ids in a game/ out of a game
+# (private)showids kp: return all card ids kp controlling
 def showids(update: Update, context: CallbackContext) -> bool:
     if isgroupmsg(update):
         update.message.reply_text("Send private message to see IDs.")
@@ -1382,6 +1381,15 @@ def showids(update: Update, context: CallbackContext) -> bool:
         cards = CARDS_LIST
     else:
         cards = game.cards
+    if len(context.args)>=1 and context.args[0] == "kp":
+        if not ok:
+            update.message.reply_text("Should be in a game.")
+            return False
+        rttext = ""
+        for i in range(len(game.kpcards)):
+            rttext += game.kpcards[i].info["name"]+": "+str(i)+"\n"
+        update.message.reply_text(rttext)
+        return True
     rttext = ""
     for cardi in cards:
         if GROUP_KP_DICT[str(cardi.groupid)] == kpid:
@@ -1653,7 +1661,7 @@ def setbkground(update: Update, context: CallbackContext) -> bool:
         update.message.reply_text("Can't find card.")
         return False
     if context.args[0] not in card1.background:
-        rttext = "Cannot find this background. The background name should be:\n"
+        rttext = "Cannot find this background name. The background name should be one of:\n"
         for keys in card1.background:
             rttext += keys+"\n"
         update.message.reply_text(rttext)
