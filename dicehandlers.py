@@ -1021,7 +1021,6 @@ def endgame(update: Update, context: CallbackContext) -> bool:
                         CARDS_LIST[j].formerplayerid = CARDS_LIST[j].playerid
                         CARDS_LIST[j].playerid = 0  # 解绑
                         CARDS_LIST[j].formergroupid = CARDS_LIST[j].groupid
-                        CARDS_LIST[j].groupid = 0  # 解绑
                         break
             del t
             context.bot.send_message(
