@@ -1162,7 +1162,7 @@ def roll(update: Update, context: CallbackContext):
                 return False
             return True
         else:
-            gamecard = game.cards[game.kpctrl]
+            gamecard = game.kpcards[game.kpctrl]
         test = 0
         if dicename in gamecard.skill:
             test = gamecard.skill[dicename]
@@ -1293,7 +1293,6 @@ def show(update: Update, context: CallbackContext) -> bool:
             update.message.reply_text(showcardinfo(card1))
             return True
         attrname = context.args[0]
-
         if attrname == "group":
             kpid = update.effective_chat.id
             # args[1] should be group id
@@ -1304,6 +1303,7 @@ def show(update: Update, context: CallbackContext) -> bool:
             if not botdice.isint(gpid):
                 update.message.reply_text("Invalid groupid.")
                 return False
+            gpid = int(gpid)
             ans = []
             for i in CARDS_LIST:
                 if i.groupid == gpid:
@@ -1770,7 +1770,7 @@ def addcard(update: Update, context: CallbackContext) -> bool:
     if (len(context.args)//2)*2!=len(context.args):
         update.message.reply_text("Argument length should be even.")
     t = createcard.templateNewCard()
-    for i in range(0,len(context.args), step=2):
+    for i in range(0, len(context.args), 2):
         argname = context.args[i]
         argval = context.args[i+1]
         if argname in t and not isinstance(t[argname], dict):
@@ -1796,7 +1796,7 @@ def addcard(update: Update, context: CallbackContext) -> bool:
         else:
             notattr = True
             for keys in t:
-                if not isinstance(keys, dict) or argname not in t[keys]:
+                if not isinstance(t[keys], dict) or argname not in t[keys]:
                     continue
                 notattr = False
                 if isinstance(t[keys][argname], bool):
@@ -1816,8 +1816,13 @@ def addcard(update: Update, context: CallbackContext) -> bool:
                 else:
                     t[keys][argname] = argval
             if notattr:
-                update.message.reply_text(argname+" not found in card template.")
-                return False
+                if argname not in SKILL_DICT and argname !="闪避" and argname !="母语":
+                    update.message.reply_text(argname+" not found in card template.")
+                    return False
+                if not botdice.isint(argval):
+                    update.message.reply_text(argname+" should be int type.")
+                    return False
+                t["skill"][argname] = int(argval)
     if t["groupid"] == 0:
         update.message.reply_text("Need groupid!")
         return False

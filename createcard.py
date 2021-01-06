@@ -81,6 +81,7 @@ def templateNewCard() -> dict:
             "INT":0,
             "POW":0,
             "EDU":0,
+            "LUCK":0
         },
         "info": {
             "AGE":0,
@@ -105,7 +106,14 @@ def templateNewCard() -> dict:
             "check5": False  # 名字等是否设定完成
         },
         "attr": {
-
+            "SAN":0,
+            "MAXSAN":99,
+            "MAGIC":0,
+            "MAXLP":0,
+            "LP":0,
+            "physique":0,
+            "DB":"",
+            "MOV":0
         },
         "background": {
             "description": "",
