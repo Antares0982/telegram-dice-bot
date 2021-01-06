@@ -5,36 +5,94 @@ from cfg import *
 import numpy as np
 from typing import Tuple
 from botdicts import readjobdict
+import copy
+
 
 JOB_DICT = readjobdict()
 
-
-def get3d6str(dtname: str, a: int, b: int, c: int) -> str:
-    return dtname+" = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
-        "+" + str(c) + ") = " + str(5*(a+b+c)) + "\n"
-
-
-def get2d6_6str(dtname: str, a: int, b: int) -> str:
-    return dtname+" = 5*(2d6+6) = 5*(" + str(a) + "+" + \
-        str(b) + "+6) = " + str(5*(a+b+6)) + "\n"
-
-
-def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
-    newcard = {
+def plainNewCard() -> dict:
+    t = {
         "id": -1,
-        "playerid": userid,
-        "groupid": groupid,
+        "playerid": 0,
+        "groupid": 0,
         "data": {
-
+            
         },
         "info": {
-            "classicaljob": True
         },
         "skill": {
             "points": -1
         },
         "interest": {
 
+        },
+        "suggestskill": {
+
+        },
+        "cardcheck": {
+            "check1": False,  # 年龄是否设定
+            "check2": False,  # str, con, dex等设定是否完成
+            "check3": False,  # job是否设定完成
+            "check4": False,  # skill是否设定完成
+            "check5": False  # 名字等是否设定完成
+        },
+        "attr": {
+            "physique":0,
+            "DB":"",
+            "MOV":0,
+            "atktimes":1,
+            "sandown":"1/1d6",
+            "Armor":""
+        },
+        "background": {
+            "description": "",
+            "faith": "",
+            "vip": "",
+            "exsigplace": "",
+            "precious": "",
+            "speciality": "",
+            "dmg": "",
+            "terror": "",
+            "myth": "",
+            "thirdencounter": ""
+        },
+        "tempstatus": {
+            "global": 0
+        },
+        "item": "",
+        "assets": "",
+        "type": "PL",
+        "discard": False,
+        "status": "alive"
+    }
+    return t
+
+def templateNewCard() -> dict:
+    t = {
+        "id": -1,
+        "playerid": 0,
+        "groupid": 0,
+        "data": {
+            "STR":0,
+            "CON":0,
+            "SIZ":0,
+            "DEX":0,
+            "APP":0,
+            "INT":0,
+            "POW":0,
+            "EDU":0,
+        },
+        "info": {
+            "AGE":0,
+            "job":"",
+            "name":"",
+            "sex":""
+        },
+        "skill": {
+            "points": 0
+        },
+        "interest": {
+            "points": 0
         },
         "suggestskill": {
 
@@ -70,6 +128,25 @@ def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
         "discard": False,
         "status": "alive"
     }
+    return t
+
+
+
+
+def get3d6str(dtname: str, a: int, b: int, c: int) -> str:
+    return dtname+" = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
+        "+" + str(c) + ") = " + str(5*(a+b+c)) + "\n"
+
+
+def get2d6_6str(dtname: str, a: int, b: int) -> str:
+    return dtname+" = 5*(2d6+6) = 5*(" + str(a) + "+" + \
+        str(b) + "+6) = " + str(5*(a+b+6)) + "\n"
+
+
+def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
+    newcard = plainNewCard()
+    newcard["playerid"] = userid
+    newcard["groupid"] = groupid
     card = GameCard(newcard)
     text = ""
     a, b, c = np.random.randint(1, 7, size=3)
@@ -309,7 +386,7 @@ def checkcard(card: GameCard) -> bool:
     card.cardcheck["check3"] = True
     if card.skill["points"] != 0:
         return False
-    if card.interest["points"] != 0:
+    if card.interest["points"] != 0: # "points" must be in card.interest
         return False
     card.cardcheck["check4"] = True
     if "name" not in card.info or card.info["name"] == "":

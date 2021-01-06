@@ -63,7 +63,7 @@ def isfromkp(update: Update) -> bool:
         return False
     return True
 
-
+# returns all groupid in which kpid is a kp
 def getkpgroup(kpid: int) -> List[int]:
     ans = []
     for keys in GROUP_KP_DICT:  # key is str(groupid)
@@ -71,6 +71,90 @@ def getkpgroup(kpid: int) -> List[int]:
             ans.append(int(keys))
     return ans
 
+
+def getcard(plid: int) -> Tuple[GameCard, bool]:
+    global CARDS_LIST
+    for i in range(len(CARDS_LIST)):
+        if CARDS_LIST[i].playerid == plid:
+            return CARDS_LIST[i], True
+    return None, False
+
+
+def getskilllevelfromdict(card1: GameCard, keys: str) -> int:
+    if keys in SKILL_DICT:
+        return SKILL_DICT[keys]
+    if keys == "母语":
+        return card1.data["EDU"]
+    if keys == "闪避":
+        return card1.data["DEX"]//2
+    return -1
+
+
+def makeIntButtons(lower: int, upper: int, keystr1: str, keystr2: str, step: int = 10, column: int = 4) -> List[list]:
+    rtbuttons = [[]]
+    if (lower//step)*step != lower:
+        rtbuttons[0].append(InlineKeyboardButton(
+            str(lower), callback_data=keystr1+" "+keystr2+" "+str(lower)))
+    t = step+(lower//step)*step
+    for i in range(t, upper, step):
+        if len(rtbuttons[len(rtbuttons)-1]) == column:
+            rtbuttons.append([])
+        rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(str(i),
+                                                                callback_data=keystr1+" "+keystr2+" "+str(i)))
+    if len(rtbuttons[len(rtbuttons)-1]) == column:
+        rtbuttons.append([])
+    rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(str(upper),
+                                                            callback_data=keystr1+" "+keystr2+" "+str(upper)))
+    return rtbuttons
+
+
+def findgame(gpid: int) -> Tuple[GroupGame, bool]:
+    global ON_GAME
+    for i in range(len(ON_GAME)):
+        if ON_GAME[i].groupid == gpid:
+            return ON_GAME[i], True
+    return None, False
+
+
+def findgamewithkpid(kpid: int) -> Tuple[GroupGame, bool]:
+    global ON_GAME
+    for i in range(len(ON_GAME)):
+        if ON_GAME[i].kpid == kpid:
+            return ON_GAME[i], True
+    return None, False
+
+
+def findcardfromgame(game: GroupGame, plid: int) -> Tuple[dict, bool]:
+    for i in game.cards:
+        if i.playerid == plid:
+            return i, True
+    return None, False
+
+
+def showcardinfo(card1: GameCard) -> str:  # show full card
+    rttext = json.dumps(card1.__dict__, separators=(
+        "\n", ":"), ensure_ascii=False)
+    rttext = rttext[1:-1]
+    rttext.replace("{", "\n")
+    rttext.replace("}", "\n")
+    return rttext
+
+
+def findkpcards(kpid) -> List[GameCard]:
+    ans = []
+    for i in CARDS_LIST:
+        if i.playerid == kpid and GROUP_KP_DICT[str(i.groupid)] == kpid:
+            ans.append(i)
+    return ans
+
+
+
+def isadicename(dicename: str) -> bool:
+    if not botdice.isint(dicename):
+        a, b = dicename.split("d", maxsplit=1)
+        if not botdice.isint(a) or not botdice.isint(b):
+            return False
+    return True
 
 def start(update: Update, context: CallbackContext) -> bool:  # Only gives help
     if isprivatemsg(update):  # private message
@@ -267,13 +351,6 @@ def details(update: Update, context: CallbackContext):
     return True
 
 
-def getcard(plid: int) -> Tuple[GameCard, bool]:
-    global CARDS_LIST
-    for i in range(len(CARDS_LIST)):
-        if CARDS_LIST[i].playerid == plid:
-            return CARDS_LIST[i], True
-    return None, False
-
 
 def setage(update: Update, context: CallbackContext):
     if isgroupmsg(update):  # should be private
@@ -372,15 +449,6 @@ def setcondec(update: Update, context: CallbackContext):
     return True
 
 
-def getskilllevelfromdict(card1: GameCard, keys: str) -> int:
-    if keys in SKILL_DICT:
-        return SKILL_DICT[keys]
-    if keys == "母语":
-        return card1.data["EDU"]
-    if keys == "闪避":
-        return card1.data["DEX"]//2
-    return -1
-
 
 # Button. need 0-1 args, if len(args)==0, show button and listen
 def setjob(update: Update, context: CallbackContext) -> bool:
@@ -423,6 +491,7 @@ def setjob(update: Update, context: CallbackContext) -> bool:
     if not IGNORE_JOB_DICT and jobname not in JOB_DICT:
         update.message.reply_text("This job is not allowed!")
         return False
+    card1.info["job"] = jobname
     if jobname not in JOB_DICT:
         update.message.reply_text(
             "This job is not in joblist, you can use '/addskill skillname points (main/interest)' to choose skills you like! If interest is appended, the skill will cost interest points.")
@@ -587,23 +656,6 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
         card1.interest["points"])+"\nPlease choose a interest skill:", reply_markup=rp_markup)
     return True
 
-
-def makeIntButtons(lower: int, upper: int, keystr1: str, keystr2: str, step: int = 10, column: int = 4) -> List[list]:
-    rtbuttons = [[]]
-    if (lower//step)*step != lower:
-        rtbuttons[0].append(InlineKeyboardButton(
-            str(lower), callback_data=keystr1+" "+keystr2+" "+str(lower)))
-    t = step+(lower//step)*step
-    for i in range(t, upper, step):
-        if len(rtbuttons[len(rtbuttons)-1]) == column:
-            rtbuttons.append([])
-        rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(str(i),
-                                                                callback_data=keystr1+" "+keystr2+" "+str(i)))
-    if len(rtbuttons[len(rtbuttons)-1]) == column:
-        rtbuttons.append([])
-    rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(str(upper),
-                                                            callback_data=keystr1+" "+keystr2+" "+str(upper)))
-    return rtbuttons
 
 
 def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool:
@@ -966,17 +1018,16 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     ON_GAME.append(GroupGame(groupid=update.effective_chat.id,
                              kpid=kpid, cards=gamecards))
     writegameinfo(ON_GAME)
+    update.message.reply_text("Game start!")
     return True
 
 
 def abortgame(update: Update, context: CallbackContext) -> bool:
     if update.effective_chat.id > 0:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id, text="Game can only be aborted in a group.")
+        update.message.reply_text("Game can only be aborted in a group.")
         return False
     if str(update.effective_chat.id) in GROUP_KP_DICT and update.message.from_user.id != GROUP_KP_DICT[str(update.effective_chat.id)]:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id, text="Only KP can abort a game.")
+        update.message.reply_text("Only KP can abort a game.")
         return False
     global ON_GAME
     for i in range(len(ON_GAME)):
@@ -984,27 +1035,22 @@ def abortgame(update: Update, context: CallbackContext) -> bool:
             t = ON_GAME[i]
             ON_GAME = ON_GAME[:i]+ON_GAME[i+1:]
             del t
-            context.bot.send_message(
-                chat_id=update.effective_chat.id, text="Game aborted.")
+            update.message.reply_text("Game aborted.")
             writegameinfo(ON_GAME)
             return True
-    context.bot.send_message(
-        chat_id=update.effective_chat.id, text="Game not found.")
+    update.message.reply_text("Game not found.")
     return False
 
 
 def endgame(update: Update, context: CallbackContext) -> bool:
     if update.effective_chat.id > 0:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id, text="Game can only be ended in a group.")
+        update.message.reply_text("Game can only be ended in a group.")
         return False
     if str(update.effective_chat.id) not in GROUP_KP_DICT:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id, text="This group does not have a KP.")
+        update.message.reply_text("This group does not have a KP.")
         return False
     if update.message.from_user.id != GROUP_KP_DICT[str(update.effective_chat.id)]:
-        context.bot.send_message(
-            chat_id=update.effective_chat.id, text="Only KP can end a game.")
+        update.message.reply_text("Only KP can end a game.")
         return False
     global ON_GAME
     for i in range(len(ON_GAME)):
@@ -1023,36 +1069,12 @@ def endgame(update: Update, context: CallbackContext) -> bool:
                         CARDS_LIST[j].formergroupid = CARDS_LIST[j].groupid
                         break
             del t
-            context.bot.send_message(
-                chat_id=update.effective_chat.id, text="Game end!")
+            update.message.reply_text("Game end!")
             writegameinfo(ON_GAME)
             return True
-    context.bot.send_message(
-        chat_id=update.effective_chat.id, text="Game not found.")
+    update.message.reply_text("Game not found.")
     return False
 
-
-def findgame(gpid: int) -> Tuple[GroupGame, bool]:
-    global ON_GAME
-    for i in range(len(ON_GAME)):
-        if ON_GAME[i].groupid == gpid:
-            return ON_GAME[i], True
-    return None, False
-
-
-def findgamewithkpid(kpid: int) -> Tuple[GroupGame, bool]:
-    global ON_GAME
-    for i in range(len(ON_GAME)):
-        if ON_GAME[i].kpid == kpid:
-            return ON_GAME[i], True
-    return None, False
-
-
-def findcardfromgame(game: GroupGame, plid: int) -> Tuple[dict, bool]:
-    for i in game.cards:
-        if i.playerid == plid:
-            return i, True
-    return None, False
 
 
 # /switchcard <id>: switch to a card that KP controlling
@@ -1222,22 +1244,6 @@ def roll(update: Update, context: CallbackContext):
         return False
     return True
 
-
-def showcardinfo(card1: GameCard) -> str:  # show full card
-    rttext = json.dumps(card1.__dict__, separators=(
-        "\n", ":"), ensure_ascii=False)
-    rttext = rttext[1:-1]
-    rttext.replace("{", "\n")
-    rttext.replace("}", "\n")
-    return rttext
-
-
-def findkpcards(kpid) -> List[GameCard]:
-    ans = []
-    for i in CARDS_LIST:
-        if i.playerid == kpid and GROUP_KP_DICT[str(i.groupid)] == kpid:
-            ans.append(i)
-    return ans
 
 
 # find a certain attr to show
@@ -1673,14 +1679,6 @@ def setbkground(update: Update, context: CallbackContext) -> bool:
     return True
 
 
-def isadicename(dicename: str) -> bool:
-    if not botdice.isint(dicename):
-        a, b = dicename.split("d", maxsplit=1)
-        if not botdice.isint(a) or not botdice.isint(b):
-            return False
-    return True
-
-
 def sancheck(update: Update, context: CallbackContext) -> bool:
     if isprivatemsg(update):
         update.message.reply_text("Please do san check in a game.")
@@ -1760,6 +1758,95 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
     writegameinfo(ON_GAME)
     update.message.reply_text(rttext)
     return True
+
+
+def addcard(update: Update, context: CallbackContext) -> bool:
+    if isgroupmsg(update):
+        update.message.reply_text("Send private message to add card.")
+        return False
+    if len(context.args) == 0:
+        update.message.reply_text("Need args.")
+        return False
+    if (len(context.args)//2)*2!=len(context.args):
+        update.message.reply_text("Argument length should be even.")
+    t = createcard.templateNewCard()
+    for i in range(0,len(context.args), step=2):
+        argname = context.args[i]
+        argval = context.args[i+1]
+        if argname in t and not isinstance(t[argname], dict):
+            if isinstance(t[argname], bool):
+                if argval == "false" or argval == "False":
+                    argval = False
+                elif argval == "true" or argval == "True":
+                    argval = True
+                if not isinstance(argval, bool):
+                    update.message.reply_text(argname+" should be boolean type.")
+                    return False
+                t[argname] = argval
+            elif isinstance(t[argname], int):
+                if not botdice.isint(argval):
+                    update.message.reply_text(argname+" should be int type.")
+                    return False
+                t[argname] = int(argval)
+            else:
+                t[argname] = argval
+        elif argname in t and isinstance(t[argname], dict):
+            update.message.reply_text(argname+" is a dict, cannot assign a dict.")
+            return False
+        else:
+            notattr = True
+            for keys in t:
+                if not isinstance(keys, dict) or argname not in t[keys]:
+                    continue
+                notattr = False
+                if isinstance(t[keys][argname], bool):
+                    if argval == "false" or argval == "False":
+                        argval = False
+                    elif argval == "true" or argval == "True":
+                        argval = True
+                    if not isinstance(argval, bool):
+                        update.message.reply_text(argname+" should be boolean type.")
+                        return False
+                    t[keys][argname] = argval
+                elif isinstance(t[keys][argname], int):
+                    if not botdice.isint(argval):
+                        update.message.reply_text(argname+" should be int type.")
+                        return False
+                    t[keys][argname] = int(argval)
+                else:
+                    t[keys][argname] = argval
+            if notattr:
+                update.message.reply_text(argname+" not found in card template.")
+                return False
+    if t["groupid"] == 0:
+        update.message.reply_text("Need groupid!")
+        return False
+    if not isfromkp(update):
+        if t["playerid"] != 0:
+            update.message.reply_text("Cannot set playerid.")
+            return False
+        t["playerid"] = update.effective_chat.id
+    else:
+        kpid = update.effective_chat.id
+        if GROUP_KP_DICT[str(t["groupid"])] != kpid and t["playerid"]!=0 and t["playerid"] != kpid:
+            update.message.reply_text("Cannot set playerid.")
+            return False
+        if t["playerid"]==0:
+            t["playerid"] = kpid
+    card1 = GameCard(t)
+    card1.id = len(CARDS_LIST)
+    rttext = createcard.showchecks(card1)
+    if rttext != "All pass.":
+        update.message.reply_text("Add card successfully, but card didn't pass card checks.")
+        update.message.reply_text(rttext)
+    else:   
+        update.message.reply_text("Add card successfully.")
+    CARDS_LIST.append(card1)
+    writecards(CARDS_LIST)
+    return True
+
+    
+
 
 
 def unknown(update: Update, context: CallbackContext) -> None:

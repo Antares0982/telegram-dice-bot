@@ -45,6 +45,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('setbkground', setbkground))
     dispatcher.add_handler(CommandHandler('setsex', setsex))
     dispatcher.add_handler(CommandHandler('sancheck', sancheck))
+    dispatcher.add_handler(CommandHandler('addcard', addcard))
     dispatcher.add_handler(CallbackQueryHandler(button))
     dispatcher.add_handler(MessageHandler(Filters.command, unknown))
     updater.start_polling()
