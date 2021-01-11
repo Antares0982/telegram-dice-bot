@@ -981,7 +981,7 @@ def button(update: Update, context: CallbackContext):
             "Change interest skill level, skill name is: "+args[1], reply_markup=rp_markup)
         return True
     if args[0] == "strdec":
-        strdecval = int(args[1])
+        strdecval = int(args[2])
         card1, rttext, needcon = createcard.choosedec(card1, strdecval)
         writecards(CARDS_LIST)
         if needcon:
@@ -989,7 +989,7 @@ def button(update: Update, context: CallbackContext):
         update.message.edit_message_text(rttext)
         return True
     if args[0] == "condec":
-        condecval = int(args[1])
+        condecval = int(args[2])
         card1, rttext = createcard.choosedec2(card1, condecval)
         writecards(CARDS_LIST)
         update.message.edit_message_text(rttext)
