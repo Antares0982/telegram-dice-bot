@@ -986,13 +986,13 @@ def button(update: Update, context: CallbackContext):
         writecards(CARDS_LIST)
         if needcon:
             rttext += "\nUse /setcondec to set CON decrease."
-        update.message.edit_message_text(rttext)
+        query.edit_message_text(rttext)
         return True
     if args[0] == "condec":
         condecval = int(args[2])
         card1, rttext = createcard.choosedec2(card1, condecval)
         writecards(CARDS_LIST)
-        update.message.edit_message_text(rttext)
+        query.edit_message_text(rttext)
         return True
     # HIT BAD TRAP
     return False
