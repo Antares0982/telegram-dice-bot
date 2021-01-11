@@ -64,6 +64,8 @@ def isfromkp(update: Update) -> bool:
     return True
 
 # returns all groupid in which kpid is a kp
+
+
 def getkpgroup(kpid: int) -> List[int]:
     ans = []
     for keys in GROUP_KP_DICT:  # key is str(groupid)
@@ -148,13 +150,13 @@ def findkpcards(kpid) -> List[GameCard]:
     return ans
 
 
-
 def isadicename(dicename: str) -> bool:
     if not botdice.isint(dicename):
         a, b = dicename.split("d", maxsplit=1)
         if not botdice.isint(a) or not botdice.isint(b):
             return False
     return True
+
 
 def start(update: Update, context: CallbackContext) -> bool:  # Only gives help
     if isprivatemsg(update):  # private message
@@ -351,7 +353,6 @@ def details(update: Update, context: CallbackContext):
     return True
 
 
-
 def setage(update: Update, context: CallbackContext):
     if isgroupmsg(update):  # should be private
         update.message.reply_text("Send private message to set AGE.")
@@ -391,26 +392,37 @@ def setstrdec(update: Update, context: CallbackContext):
     if isgroupmsg(update):
         update.message.reply_text("Send private message to set STR decrease.")
         return False
-    if len(context.args) == 0:
-        update.message.reply_text(
-            "Use '/setstrdec STRDEC' to set STR decrease.")
-        return False
     plid = update.effective_chat.id
+    cardi, ok = getcard(plid)
+    if not ok:
+        update.message.reply_text("Can't find card.")
+        return False
+    if len(context.args) == 0:
+        if "STR_SIZ_M" in cardi.data:
+            rtbuttons = makeIntButtons(max(0, 1 - cardi.data["SIZ"] + cardi.data["STR_SIZ_M"]), min(
+                cardi.data["STR"]-1, cardi.data["STR_SIZ_M"]), "strdec", "", 1)
+        elif "STR_CON_M" in cardi.data:
+            rtbuttons = makeIntButtons(max(0, 1 - cardi.data["CON"] + cardi.data["STR_CON_M"]), min(
+                cardi.data["STR"]-1, cardi.data["STR_CON_M"]), "strdec", "", 1)
+        elif "STR_CON_DEX_M" in cardi.data:
+            rtbuttons = makeIntButtons(max(0, 2 - cardi.data["CON"]-cardi.data["DEX"] + cardi.data["STR_CON_DEX_M"]), min(
+                cardi.data["STR"]-1, cardi.data["STR_CON_DEX_M"]), "strdec", "", 1)
+        else:
+            update.message.reply_text("No need to set STR decrease.")
+            return False
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        update.message.reply_text("Set STR decrease: ", reply_markup=rp_markup)
+        return True
     global CARDS_LIST
     dec = context.args[0]
     if not botdice.isint(dec):
         update.message.reply_text("Invalid input.")
         return False
     dec = int(dec)
-    cardi, ok = getcard(plid)
-    if not ok:
-        update.message.reply_text("Can't find card.")
-        return False
     cardi, hintmsg, needcon = createcard.choosedec(cardi, dec)
     if hintmsg == "输入无效":
         update.message.reply_text("Invalid input!")
         return False
-
     update.message.reply_text(hintmsg)
     if needcon:
         update.message.reply_text("Use /setcondec to set CON decrease.")
@@ -425,20 +437,25 @@ def setcondec(update: Update, context: CallbackContext):
     if isgroupmsg(update):
         update.message.reply_text("Send private message to set CON decrease.")
         return False
-    if len(context.args) == 0:
-        update.message.reply_text(
-            "Use '/setcondec CONDEC' to set CON decrease.")
-        return False
-    dec = context.args[0]
-    if not botdice.isint(dec):
-        update.message.reply_text("Invalid input.")
-        return False
-    dec = int(dec)
     plid = update.effective_chat.id
     cardi, ok = getcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
+    if len(context.args) == 0:
+        if "CON_DEX_M" not in cardi.data:
+            update.message.reply_text("No need to set STR decrease.")
+            return False
+        rtbuttons = makeIntButtons(max(0, 1 - cardi.data["DEX"] + cardi.data["CON_DEX_M"]), min(
+                cardi.data["CON"]-1, cardi.data["CON_DEX_M"]), "condec", "", 1)
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        update.message.reply_text("Set CON decrease: ", reply_markup=rp_markup)
+        return True
+    dec = context.args[0]
+    if not botdice.isint(dec):
+        update.message.reply_text("Invalid input.")
+        return False
+    dec = int(dec)
     cardi, hintmsg = createcard.choosedec2(cardi, dec)
     if hintmsg == "输入无效":
         update.message.reply_text("Invalid input!")
@@ -447,7 +464,6 @@ def setcondec(update: Update, context: CallbackContext):
     writecards(CARDS_LIST)
     update.message.reply_text(hintmsg)
     return True
-
 
 
 # Button. need 0-1 args, if len(args)==0, show button and listen
@@ -655,7 +671,6 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
     update.message.reply_text("You have points:"+str(
         card1.interest["points"])+"\nPlease choose a interest skill:", reply_markup=rp_markup)
     return True
-
 
 
 def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool:
@@ -965,6 +980,20 @@ def button(update: Update, context: CallbackContext):
         query.edit_message_text(
             "Change interest skill level, skill name is: "+args[1], reply_markup=rp_markup)
         return True
+    if args[0] == "strdec":
+        strdecval = int(args[1])
+        card1, rttext, needcon = createcard.choosedec(card1, strdecval)
+        writecards(CARDS_LIST)
+        if needcon:
+            rttext += "\nUse /setcondec to set CON decrease."
+        update.message.edit_message_text(rttext)
+        return True
+    if args[0] == "condec":
+        condecval = int(args[1])
+        card1, rttext= createcard.choosedec2(card1, condecval)
+        writecards(CARDS_LIST)
+        update.message.edit_message_text(rttext)
+        return True
     # HIT BAD TRAP
     return False
 
@@ -1074,7 +1103,6 @@ def endgame(update: Update, context: CallbackContext) -> bool:
             return True
     update.message.reply_text("Game not found.")
     return False
-
 
 
 # /switchcard <id>: switch to a card that KP controlling
@@ -1243,7 +1271,6 @@ def roll(update: Update, context: CallbackContext):
     if rttext == "Invalid input.":
         return False
     return True
-
 
 
 # find a certain attr to show
@@ -1767,7 +1794,7 @@ def addcard(update: Update, context: CallbackContext) -> bool:
     if len(context.args) == 0:
         update.message.reply_text("Need args.")
         return False
-    if (len(context.args)//2)*2!=len(context.args):
+    if (len(context.args)//2)*2 != len(context.args):
         update.message.reply_text("Argument length should be even.")
     t = createcard.templateNewCard()
     for i in range(0, len(context.args), 2):
@@ -1780,7 +1807,8 @@ def addcard(update: Update, context: CallbackContext) -> bool:
                 elif argval == "true" or argval == "True":
                     argval = True
                 if not isinstance(argval, bool):
-                    update.message.reply_text(argname+" should be boolean type.")
+                    update.message.reply_text(
+                        argname+" should be boolean type.")
                     return False
                 t[argname] = argval
             elif isinstance(t[argname], int):
@@ -1791,7 +1819,8 @@ def addcard(update: Update, context: CallbackContext) -> bool:
             else:
                 t[argname] = argval
         elif argname in t and isinstance(t[argname], dict):
-            update.message.reply_text(argname+" is a dict, cannot assign a dict.")
+            update.message.reply_text(
+                argname+" is a dict, cannot assign a dict.")
             return False
         else:
             notattr = True
@@ -1805,19 +1834,22 @@ def addcard(update: Update, context: CallbackContext) -> bool:
                     elif argval == "true" or argval == "True":
                         argval = True
                     if not isinstance(argval, bool):
-                        update.message.reply_text(argname+" should be boolean type.")
+                        update.message.reply_text(
+                            argname+" should be boolean type.")
                         return False
                     t[keys][argname] = argval
                 elif isinstance(t[keys][argname], int):
                     if not botdice.isint(argval):
-                        update.message.reply_text(argname+" should be int type.")
+                        update.message.reply_text(
+                            argname+" should be int type.")
                         return False
                     t[keys][argname] = int(argval)
                 else:
                     t[keys][argname] = argval
             if notattr:
-                if argname not in SKILL_DICT and argname !="闪避" and argname !="母语":
-                    update.message.reply_text(argname+" not found in card template.")
+                if argname not in SKILL_DICT and argname != "闪避" and argname != "母语":
+                    update.message.reply_text(
+                        argname+" not found in card template.")
                     return False
                 if not botdice.isint(argval):
                     update.message.reply_text(argname+" should be int type.")
@@ -1833,25 +1865,23 @@ def addcard(update: Update, context: CallbackContext) -> bool:
         t["playerid"] = update.effective_chat.id
     else:
         kpid = update.effective_chat.id
-        if GROUP_KP_DICT[str(t["groupid"])] != kpid and t["playerid"]!=0 and t["playerid"] != kpid:
+        if GROUP_KP_DICT[str(t["groupid"])] != kpid and t["playerid"] != 0 and t["playerid"] != kpid:
             update.message.reply_text("Cannot set playerid.")
             return False
-        if t["playerid"]==0:
+        if t["playerid"] == 0:
             t["playerid"] = kpid
     card1 = GameCard(t)
     card1.id = len(CARDS_LIST)
     rttext = createcard.showchecks(card1)
     if rttext != "All pass.":
-        update.message.reply_text("Add card successfully, but card didn't pass card checks.")
+        update.message.reply_text(
+            "Add card successfully, but card didn't pass card checks.")
         update.message.reply_text(rttext)
-    else:   
+    else:
         update.message.reply_text("Add card successfully.")
     CARDS_LIST.append(card1)
     writecards(CARDS_LIST)
     return True
-
-    
-
 
 
 def unknown(update: Update, context: CallbackContext) -> None:
