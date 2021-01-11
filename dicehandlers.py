@@ -399,14 +399,14 @@ def setstrdec(update: Update, context: CallbackContext):
         return False
     if len(context.args) == 0:
         if "STR_SIZ_M" in cardi.data:
-            rtbuttons = makeIntButtons(max(0, 1 - cardi.data["SIZ"] + cardi.data["STR_SIZ_M"]), min(
-                cardi.data["STR"]-1, cardi.data["STR_SIZ_M"]), "strdec", "", 1)
+            rtbuttons = makeIntButtons(max(0, 1 - cardi.data["SIZ"] - cardi.data["STR_SIZ_M"]), min(
+                cardi.data["STR"]-1, -cardi.data["STR_SIZ_M"]), "strdec", "", 1)
         elif "STR_CON_M" in cardi.data:
-            rtbuttons = makeIntButtons(max(0, 1 - cardi.data["CON"] + cardi.data["STR_CON_M"]), min(
-                cardi.data["STR"]-1, cardi.data["STR_CON_M"]), "strdec", "", 1)
+            rtbuttons = makeIntButtons(max(0, 1 - cardi.data["CON"] - cardi.data["STR_CON_M"]), min(
+                cardi.data["STR"]-1, -cardi.data["STR_CON_M"]), "strdec", "", 1)
         elif "STR_CON_DEX_M" in cardi.data:
-            rtbuttons = makeIntButtons(max(0, 2 - cardi.data["CON"]-cardi.data["DEX"] + cardi.data["STR_CON_DEX_M"]), min(
-                cardi.data["STR"]-1, cardi.data["STR_CON_DEX_M"]), "strdec", "", 1)
+            rtbuttons = makeIntButtons(max(0, 2 - cardi.data["CON"]-cardi.data["DEX"] - cardi.data["STR_CON_DEX_M"]), min(
+                cardi.data["STR"]-1, -cardi.data["STR_CON_DEX_M"]), "strdec", "", 1)
         else:
             update.message.reply_text("No need to set STR decrease.")
             return False
@@ -446,8 +446,8 @@ def setcondec(update: Update, context: CallbackContext):
         if "CON_DEX_M" not in cardi.data:
             update.message.reply_text("No need to set STR decrease.")
             return False
-        rtbuttons = makeIntButtons(max(0, 1 - cardi.data["DEX"] + cardi.data["CON_DEX_M"]), min(
-            cardi.data["CON"]-1, cardi.data["CON_DEX_M"]), "condec", "", 1)
+        rtbuttons = makeIntButtons(max(0, 1 - cardi.data["DEX"] - cardi.data["CON_DEX_M"]), min(
+            cardi.data["CON"]-1, -cardi.data["CON_DEX_M"]), "condec", "", 1)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text("Set CON decrease: ", reply_markup=rp_markup)
         return True
