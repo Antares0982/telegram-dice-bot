@@ -447,7 +447,7 @@ def setcondec(update: Update, context: CallbackContext):
             update.message.reply_text("No need to set STR decrease.")
             return False
         rtbuttons = makeIntButtons(max(0, 1 - cardi.data["DEX"] + cardi.data["CON_DEX_M"]), min(
-                cardi.data["CON"]-1, cardi.data["CON_DEX_M"]), "condec", "", 1)
+            cardi.data["CON"]-1, cardi.data["CON_DEX_M"]), "condec", "", 1)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text("Set CON decrease: ", reply_markup=rp_markup)
         return True
@@ -990,7 +990,7 @@ def button(update: Update, context: CallbackContext):
         return True
     if args[0] == "condec":
         condecval = int(args[1])
-        card1, rttext= createcard.choosedec2(card1, condecval)
+        card1, rttext = createcard.choosedec2(card1, condecval)
         writecards(CARDS_LIST)
         update.message.edit_message_text(rttext)
         return True
