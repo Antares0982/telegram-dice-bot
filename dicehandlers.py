@@ -297,6 +297,17 @@ def newcard(update: Update, context: CallbackContext):
         return False
     global CARDS_LIST, DETAIL_DICT
     gpid = int(msg)
+    for cardi in CARDS_LIST:
+        if cardi.playerid == plid and cardi.groupid == gpid:
+            context.bot.send_message(
+                chat_id=plid, text="You already have a card in this group!")
+            return False
+        if cardi.playerid == plid:
+            textinfo = createcard.showchecks(cardi)
+            if textinfo != "All pass.":
+                context.bot.send_message(
+                    chat_id=plid, text="You already have a card. Please fill in all info first.")
+                return False
     new_card, detailmsg = createcard.generateNewCard(plid, gpid)
     DETAIL_DICT[plid] = detailmsg
     new_card.id = len(CARDS_LIST)
@@ -1400,7 +1411,8 @@ def show(update: Update, context: CallbackContext) -> bool:
     return True
 
 
-# (private)showids: return all card ids in a game/ out of a game
+# (private)showids: return all card ids (not in a game)
+# (private)showids game: return all card ids in a game
 # (private)showids kp: return all card ids kp controlling
 def showids(update: Update, context: CallbackContext) -> bool:
     if isgroupmsg(update):
@@ -1411,25 +1423,36 @@ def showids(update: Update, context: CallbackContext) -> bool:
         return False
     kpid = update.effective_chat.id
     game, ok = findgamewithkpid(kpid)
-    if not ok:
-        cards = CARDS_LIST
-    else:
-        cards = game.cards
     if len(context.args) >= 1 and context.args[0] == "kp":
         if not ok:
             update.message.reply_text("Should be in a game.")
             return False
+        cards = game.cards
         rttext = ""
         for i in range(len(game.kpcards)):
             rttext += game.kpcards[i].info["name"]+": "+str(i)+"\n"
         update.message.reply_text(rttext)
         return True
+    if len(context.args) >= 1 and context.args[0] == "game":
+        if not ok:
+            update.message.reply_text("Should be in a game.")
+            return False
+        cards = game.cards
+        rttext = ""
+        for cardi in cards:
+            rttext += cardi.info["name"]+": "+str(cardi.id)+"\n"
+        update.message.reply_text(rttext)
+        return True
+    cards = CARDS_LIST
     rttext = ""
     for cardi in cards:
         if GROUP_KP_DICT[str(cardi.groupid)] == kpid:
             if cardi.playerid == kpid:
                 rttext += "(KP) "
-            rttext += cardi.info["name"]+": "+str(cardi.id)+"\n"
+            if "name" in cardi.info and cardi.info["name"].strip() != "":
+                rttext += cardi.info["name"]+": "+str(cardi.id)+"\n"
+            else:
+                rttext += "None: "+str(cardi.id)+"\n"
     update.message.reply_text(rttext)
     return True
 

@@ -1,5 +1,5 @@
 # telegram-dice-bot
-tg跑团用骰子机器人，目前版本v1.0.0
+tg跑团用骰子机器人，目前版本v1.0.0，还有很多没有填好的坑，不建议使用
 
 ## 使用说明
 
@@ -41,7 +41,7 @@ KP进行游戏引导时，可以在指令前输入文字+空格（使该指令�
 
 * `/getid` 获取本群或用户id。
 
-* (private) `/newcard <groupid>` 生成新的角色卡基础数据，绑定至一个群。
+* (private) `/newcard <groupid>` 生成新的角色卡基础数据，绑定至一个群。该群已有该玩家的卡，或者该玩家在其它群有未创建完的卡则不允许创建。
 
 * (private) `/discard` 满足某些条件时，删除生成的角色卡。
 
@@ -49,9 +49,9 @@ KP进行游戏引导时，可以在指令前输入文字+空格（使该指令�
 
 * (private) `/setage <AGE>` 设置新角色卡的年龄。设置后不可删除角色卡。
 
-* (private) `/setstrdec <STRDEC>` 设置因为年龄设定导致的STR属性下降。
+* (private) `/setstrdec (<STRDEC>)` 设置因为年龄设定导致的STR属性下降。
 
-* (private) `/setcondec <CONDEC>` 设置因为年龄设定导致的CON属性下降。
+* (private) `/setcondec (<CONDEC>)` 设置因为年龄设定导致的CON属性下降。
 
 * (private) `/setjob (<jobname>)` 设置职业。
 
@@ -108,7 +108,7 @@ KP进行游戏引导时，可以在指令前输入文字+空格（使该指令�
   * (private) `/show kp` 显示目前用户作为KP控制的所有（游戏外）卡信息
   * (private) `/show game`显示KP所主持的游戏中所有卡信息
 
-* (private) `/showids (kp)` 不带kp参数时，如果在主持游戏，将会显示游戏内所有卡的id。如果不是在主持游戏，显示所有相关卡的id。带kp参数时，显示kp控制的卡的顺序号而非id，仅用于`/switchcard`指令配合使用。
+* (private) `/showids (kp)/(game)` 不带参数时，显示所有（游戏外）相关卡的id。如果带game参数且在主持游戏，将会显示游戏内所有卡的id，与`/modify`配合使用。带kp参数时，显示kp控制的卡的顺序号而非id，仅用于`/switchcard`指令配合使用。
 
 * (group)`/tempcheck <tempcheckvalue> (<cardid> <checkname>)` 只有游戏中可以使用。临时加/减一次检定，或者对某张卡写入一个长期生效的检定。
 
@@ -118,4 +118,4 @@ KP进行游戏引导时，可以在指令前输入文字+空格（使该指令�
 
 * `/switchcard <cardID>`  按照kp在游戏中控制的卡的顺序号而非真实id，切换kp控制的卡。顺序号用`/showids kp`来查看。
 
-* `modify <cardID> <attrname> <value>` 修改角色卡信息，请谨慎使用该指令。发送者需是kp。如果在主持游戏，则修改的是游戏中的属性，且id参数也是游戏中的卡id。如果不在游戏中，则修改的是游戏外角色卡信息，id参数是游戏外卡片id。
+* `modify <cardID> <attrname> <value>` 修改角色卡信息，*请谨慎使用该指令*。发送者需是kp。会自动判断发送者是否在主持游戏中。如果在主持游戏，则修改的是游戏中的属性，且id参数也是游戏中的卡id。如果不在游戏中，则修改的是游戏外角色卡信息，id参数是游戏外卡片id。提示：使用`/modify <id> discard true`来让玩家删除角色卡。
