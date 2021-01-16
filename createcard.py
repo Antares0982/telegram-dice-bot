@@ -10,13 +10,14 @@ import copy
 
 JOB_DICT = readjobdict()
 
+
 def plainNewCard() -> dict:
     t = {
         "id": -1,
         "playerid": 0,
         "groupid": 0,
         "data": {
-            
+
         },
         "info": {
         },
@@ -37,12 +38,12 @@ def plainNewCard() -> dict:
             "check5": False  # 名字等是否设定完成
         },
         "attr": {
-            "physique":0,
-            "DB":"",
-            "MOV":0,
-            "atktimes":1,
-            "sandown":"1/1d6",
-            "Armor":""
+            "physique": 0,
+            "DB": "",
+            "MOV": 0,
+            "atktimes": 1,
+            "sandown": "1/1d6",
+            "Armor": ""
         },
         "background": {
             "description": "",
@@ -67,27 +68,28 @@ def plainNewCard() -> dict:
     }
     return t
 
+
 def templateNewCard() -> dict:
     t = {
         "id": -1,
         "playerid": 0,
         "groupid": 0,
         "data": {
-            "STR":0,
-            "CON":0,
-            "SIZ":0,
-            "DEX":0,
-            "APP":0,
-            "INT":0,
-            "POW":0,
-            "EDU":0,
-            "LUCK":0
+            "STR": 0,
+            "CON": 0,
+            "SIZ": 0,
+            "DEX": 0,
+            "APP": 0,
+            "INT": 0,
+            "POW": 0,
+            "EDU": 0,
+            "LUCK": 0
         },
         "info": {
-            "AGE":0,
-            "job":"",
-            "name":"",
-            "sex":""
+            "AGE": 0,
+            "job": "",
+            "name": "",
+            "sex": ""
         },
         "skill": {
             "points": 0
@@ -106,14 +108,14 @@ def templateNewCard() -> dict:
             "check5": False  # 名字等是否设定完成
         },
         "attr": {
-            "SAN":0,
-            "MAXSAN":99,
-            "MAGIC":0,
-            "MAXLP":0,
-            "LP":0,
-            "physique":0,
-            "DB":"",
-            "MOV":0
+            "SAN": 0,
+            "MAXSAN": 99,
+            "MAGIC": 0,
+            "MAXLP": 0,
+            "LP": 0,
+            "physique": 0,
+            "DB": "",
+            "MOV": 0
         },
         "background": {
             "description": "",
@@ -137,8 +139,6 @@ def templateNewCard() -> dict:
         "status": "alive"
     }
     return t
-
-
 
 
 def get3d6str(dtname: str, a: int, b: int, c: int) -> str:
@@ -307,7 +307,9 @@ def choosedec(card: GameCard, strength: int) -> Tuple[GameCard, str, bool]:
         if not strength == -card.data["STR_CON_DEX_M"]:
             needCON = True
             card.data["CON_DEX_M"] = card.data["STR_CON_DEX_M"]+strength
-        rttext += "体质敏捷合计减"+str(-card.data["CON_DEX_M"])+"点。"
+            rttext += "体质敏捷合计减"+str(-card.data["CON_DEX_M"])+"点。"
+        else:
+            rttext += "体质敏捷合计减0点。"
         card.data.pop("STR_CON_DEX_M")
     else:
         return card, "输入无效", False
@@ -394,7 +396,7 @@ def checkcard(card: GameCard) -> bool:
     card.cardcheck["check3"] = True
     if card.skill["points"] != 0:
         return False
-    if card.interest["points"] != 0: # "points" must be in card.interest
+    if card.interest["points"] != 0:  # "points" must be in card.interest
         return False
     card.cardcheck["check4"] = True
     if "name" not in card.info or card.info["name"] == "":
