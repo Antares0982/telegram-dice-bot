@@ -11,19 +11,24 @@ def writekpinfo(dict1: dict) -> None:
         json.dump(dict1, f, indent=4, ensure_ascii=False)
 
 
-def writecards(listofgamecard: List[GameCard]) -> None:
-    listofdict:List[dict] = []
-    for i in range(len(listofgamecard)):
-        listofdict.append(listofgamecard[i].__dict__)
+def writecards(listofgamecard: Dict[int, Dict[int, GameCard]]) -> None:
+    listofdict: Dict[str, Dict[str, dict]] = {}
+    for gpids in listofgamecard:
+        if len(listofgamecard[gpids]) == 0:
+            continue
+        listofdict[str(gpids)] = {}
+        for cdids in listofgamecard[gpids]:
+            listofdict[str(gpids)][str(cdids)
+                                   ] = listofgamecard[gpids][cdids].__dict__
     with open(PATH_CARDSLIST, "w", encoding="utf-8") as f:
         json.dump(listofdict, f, indent=4, ensure_ascii=False)
 
 
 def writegameinfo(listofobj: List[GroupGame]) -> None:
-    savelist:List[dict] = []
+    savelist: List[dict] = []
     for i in range(len(listofobj)):
         savelist.append(copy.deepcopy(listofobj[i].__dict__))
-        tpcards:List[GameCard] = savelist[-1]["cards"]
+        tpcards: List[GameCard] = savelist[-1]["cards"]
         savelist[-1]["cards"] = []
         savelist[-1].pop("kpcards")
         for i in tpcards:
@@ -32,8 +37,9 @@ def writegameinfo(listofobj: List[GroupGame]) -> None:
         json.dump(savelist, f, indent=4, ensure_ascii=False)
 
 
-def readinfo() -> Tuple[Dict[str, int], List[GameCard], List[GroupGame]]:
+def readinfo() -> Tuple[Dict[str, int], Dict[int, Dict[int, GameCard]], List[GroupGame]]:
     # create file if not exist
+    # group-kp
     try:
         f = open(PATH_GROUP_KP, "r", encoding="utf-8")
         f.close()
@@ -46,21 +52,26 @@ def readinfo() -> Tuple[Dict[str, int], List[GameCard], List[GroupGame]]:
         with open(PATH_GROUP_KP, "r", encoding="utf-8") as f:
             gpkpdict = json.load(f)
     print("kp info: passed")
+    # cards
     try:
         f = open(PATH_CARDSLIST, "r", encoding="utf-8")
         f.close()
     except FileNotFoundError:
         with open(PATH_CARDSLIST, "w", encoding="utf-8") as f:
-            json.dump([], f, indent=4, ensure_ascii=False)
+            json.dump({}, f, indent=4, ensure_ascii=False)
         print("File does not exist, create new file")
-        cardslist = []
+        cardslist = {}
     else:
         with open(PATH_CARDSLIST, "r", encoding="utf-8") as f:
             cardslist = json.load(f)
-    gamecardlist:List[GameCard] = []
-    for i in range(len(cardslist)):
-        gamecardlist.append(GameCard(cardslist[i]))
+    gamecardlist: Dict[int, dict] = {}
+    for groupkeys in cardslist:
+        gamecardlist[int(groupkeys)] = {}
+        for keys in cardslist[groupkeys]:
+            gamecardlist[int(groupkeys)][int(keys)] = GameCard(
+                cardslist[groupkeys][keys])
     print("card info: passed")
+    # games
     try:
         f = open(PATH_ONGAME, "r", encoding="utf-8")
         f.close()
@@ -72,7 +83,7 @@ def readinfo() -> Tuple[Dict[str, int], List[GameCard], List[GroupGame]]:
     else:
         with open(PATH_ONGAME, "r", encoding="utf-8") as f:
             ongamelistdict = json.load(f)
-    ongamelist:List[GroupGame] = []
+    ongamelist: List[GroupGame] = []
     for i in range(len(ongamelistdict)):
         ongamelist.append(GroupGame(ongamelistdict[i]))
     print("game info: passed")

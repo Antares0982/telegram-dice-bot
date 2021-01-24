@@ -22,6 +22,49 @@ class GameCard:
         self.status: str = ""
         self.__dict__ = cardinfo
 
+    def __str__(self):
+        rttext: str = ""
+        rttext += "id: "+str(self.id)+"\n"
+        rttext += "playerid: "+str(self.playerid)+"\n"
+        rttext += "groupid: "+str(self.groupid)+"\n"
+        rttext += "基础数值: "+"\n"
+        for keys in self.data:
+            rttext += keys+": "+str(self.data[keys])+"\n"
+        rttext += "信息: "+"\n"
+        for keys in self.info:
+            rttext += keys+": "+str(self.info[keys])+"\n"
+        rttext += "技能: "+"\n"
+        for keys in self.skill:
+            rttext += keys+": "+str(self.skill[keys])+"\n"
+        rttext += "兴趣技能: "+"\n"
+        for keys in self.interest:
+            rttext += keys+": "+str(self.interest[keys])+"\n"
+        rttext += "建议技能: "+"\n"
+        for keys in self.suggestskill:
+            rttext += keys+": "+str(self.suggestskill[keys])+"\n"
+        rttext += "角色卡检查: "+"\n"
+        for keys in self.cardcheck:
+            rttext += keys+": "+str(self.cardcheck[keys])+"\n"
+        rttext += "其他属性: "+"\n"
+        for keys in self.attr:
+            rttext += keys+": "+str(self.attr[keys])+"\n"
+        rttext += "背景故事: "+"\n"
+        for keys in self.background:
+            rttext += keys+": "+str(self.background[keys])+"\n"
+        rttext += "临时检定加成: "+"\n"
+        for keys in self.tempstatus:
+            rttext += keys+": "+str(self.tempstatus[keys])+"\n"
+        rttext += "物品: "+self.item+"\n"
+        rttext += "资产: "+self.assets+"\n"
+        rttext += "角色类型: "+self.type+"\n"
+        rttext += "可删除: "
+        if self.discard:
+            rttext += "是\n"
+        else:
+            rttext += "否\n"
+        rttext += "状态: "+self.status+"\n"
+        return rttext
+
 
 class GroupGame:  # If defined, game is started.
     def __init__(self, groupid, cards: List[dict] = None, kpid: int = None):
@@ -47,3 +90,13 @@ class GroupGame:  # If defined, game is started.
         for i in self.cards:
             if i.playerid == self.kpid:
                 self.kpcards.append(i)
+
+    def __str__(self):
+        rttext = ""
+        for keys in self.__dict__:
+            if keys == "cards" or keys == "kpcards":
+                continue
+            rttext += keys+": "+str(self.__dict__[keys])+"\n"
+        rttext += "游戏中卡共有"+str(len(self.cards)) + \
+            "张，其中kp所持卡共有"+str(len(self.kpcards))+"张"
+        return rttext
