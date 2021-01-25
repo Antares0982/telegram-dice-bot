@@ -1,11 +1,9 @@
 # coding=utf-8
-from telegram.games.game import Game
 from gameclass import GameCard
 from cfg import *
 import numpy as np
 from typing import Tuple
 from botdicts import readjobdict
-import copy
 
 
 JOB_DICT = readjobdict()
@@ -17,7 +15,6 @@ def plainNewCard() -> dict:
         "playerid": 0,
         "groupid": 0,
         "data": {
-
         },
         "info": {
         },

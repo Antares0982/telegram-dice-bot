@@ -1,4 +1,5 @@
 from typing import List
+import copy
 
 
 class GameCard:
@@ -20,7 +21,7 @@ class GameCard:
         self.type: str = ""
         self.discard: bool = False
         self.status: str = ""
-        self.__dict__ = cardinfo
+        self.__dict__ = copy.deepcopy(cardinfo)
 
     def __str__(self):
         rttext: str = ""

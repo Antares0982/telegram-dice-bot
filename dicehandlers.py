@@ -26,6 +26,14 @@ ON_GAME: List[GroupGame]
 
 ID_POOL: List[int] = []
 
+
+def addIDpool(ID_POOL: List[int]):
+    for gpids in CARDS_LIST:
+        for cdids in CARDS_LIST[gpids]:
+            ID_POOL.append(cdids)
+            ID_POOL.sort()
+
+
 try:
     GROUP_KP_DICT, CARDS_LIST, ON_GAME = readinfo()
 except:
@@ -34,10 +42,7 @@ except:
     exit()
 else:
     updater.bot.send_message(chat_id=USERID, text="Bot is live!")
-    for gpids in CARDS_LIST:
-        for cdids in CARDS_LIST[gpids]:
-            ID_POOL.append(cdids)
-            ID_POOL.sort()
+    addIDpool(ID_POOL)
 
 DETAIL_DICT: Dict[int, str] = {}  # temply stores details
 
@@ -308,17 +313,15 @@ def getid(update: Update, context: CallbackContext) -> int:
 def newcard(update: Update, context: CallbackContext):
     plid = update.effective_chat.id
     if isgroupmsg(update):  # Shoule be private msg
-        context.bot.send_message(
-            chat_id=plid, text="Send private message to generate new card.")
+        update.message.reply_text("发送私聊消息创建角色卡。")
         return False
     if len(context.args) == 0:
-        context.bot.send_message(
-            chat_id=plid, text="使用'/newcard groupid'来创建新角色卡。如果你不知道groupid，在群里发送/getid 获取群id。")
+        update.message.reply_text(
+            "使用'/newcard groupid'来创建新角色卡。如果你不知道groupid，在群里发送/getid 获取群id。")
         return False
     msg = context.args[0]
     if not botdice.isint(msg):
-        context.bot.send_message(
-            chat_id=plid, text="无效输入。使用'/newcard groupid'来创建新角色卡。")
+        update.message.reply_text("无效输入。使用'/newcard groupid'来创建新角色卡。")
         return False
     global CARDS_LIST, DETAIL_DICT, ID_POOL
     gpid = int(msg)
@@ -326,7 +329,7 @@ def newcard(update: Update, context: CallbackContext):
         for cdid in CARDS_LIST[gpid]:
             if CARDS_LIST[gpid][cdid].playerid == plid:
                 update.message.reply_text("你在这个群已经有一张卡了！")
-            return False
+                return False
     if gpid not in CARDS_LIST:
         CARDS_LIST[gpid] = {}
     # for cardi in CARDS_LIST:
@@ -342,7 +345,6 @@ def newcard(update: Update, context: CallbackContext):
     #             return False
     new_card, detailmsg = createcard.generateNewCard(plid, gpid)
     DETAIL_DICT[plid] = detailmsg
-
     if len(context.args) > 1 and botdice.isint(context.args[1]) and int(context.args[1]) not in ID_POOL:
         new_card.id = int(context.args[1])
     else:
@@ -367,50 +369,67 @@ def newcard(update: Update, context: CallbackContext):
     writecards(CARDS_LIST)
     return True
 
+# (private)/discard (<groupid>/<cardid>) 删除对应卡片。
+
 
 def discard(update: Update, context: CallbackContext):
     if isgroupmsg(update):  # should be private
         update.message.reply_text("Send private message to discard.")
         return False
-    global CARDS_LIST
+    global CARDS_LIST, DETAIL_DICT
     plid = update.effective_chat.id  # sender
     # 先找到所有可删除的卡，返回一个列表
-    discardgplist = findDiscardCardsGroup(plid)
+    discardgpcdTupleList = findDiscardCardsGroup(plid)
     if len(context.args) > 0:
-        mapsdelgp: Dict[int, int] = {}
-        for i in range(len(discardgplist)):
-            mapsdelgp[discardgplist[i][0]] = i
-        dgpids: List[Tuple[int, int]] = []
-        for sgpids in context.args:
-            if botdice.isint(sgpids) and int(sgpids) in mapsdelgp:
-                dgpids.append(discardgplist[mapsdelgp[int(sgpids)]])
-        if len(dgpids) == 0:
-            update.message.reply_text("您输入的（要删除的卡所在的）群ID无效。")
+        trueDiscardTupleList: List[Tuple[int, int]] = []
+        for gpid, cdid in discardgpcdTupleList:
+            if str(gpid) in context.args or str(cdid) in context.args:
+                trueDiscardTupleList.append((gpid, cdid))
+        if len(trueDiscardTupleList) == 0:
+            update.message.reply_text("输入的（群/卡片）ID均无效。")
             return False
-        if len(dgpids) == 1:
-            gpid, cdid = dgpids[0]
+        if len(trueDiscardTupleList) == 1:
+            gpid, cdid = trueDiscardTupleList[0]
             rttext = "删除卡："+str(cdid)
             if "name" in CARDS_LIST[gpid][cdid].info and CARDS_LIST[gpid][cdid].info["name"] != "":
                 rttext += "\nname: "+str(CARDS_LIST[gpid][cdid].info["name"])
+            rttext += "\n/details 显示删除的卡片信息。删除操作不可逆。"
             update.message.reply_text(rttext)
         else:
-            update.message.reply_text("删除了"+str(len(dgpids))+"张卡片。")
-        for tps in dgpids:
-            gpid, cdid = tps
+            update.message.reply_text(
+                "删除了"+str(len(trueDiscardTupleList))+"张卡片。\n/details 显示删除的卡片信息。删除操作不可逆。")
+        detailinfo = ""
+        for gpid, cdid in trueDiscardTupleList:
+            detailinfo += "删除卡片：\n"+str(CARDS_LIST[gpid][cdid])+"\n"
             CARDS_LIST[gpid].pop(cdid)
             if len(CARDS_LIST[gpid]) == 0:
                 CARDS_LIST.pop(gpid)
+        DETAIL_DICT[plid] = detailinfo
         writecards(CARDS_LIST)
         return True
-    if len(discardgplist) > 1:
-        pass
-    if len(discardgplist) == 1:
-
-        gpid, cdid = discardgplist[0]
+    if len(discardgpcdTupleList) > 1:  # 创建按钮，接下来交给按钮完成
+        rtbuttons: List[List[str]] = [[]]
+        for gpid, cdid in discardgpcdTupleList:
+            if len(rtbuttons[len(rtbuttons)-1]) == 4:
+                rtbuttons.append([])
+            if "name" in CARDS_LIST[gpid][cdid].info and CARDS_LIST[gpid][cdid].info["name"] != 0:
+                cardname: str = CARDS_LIST[gpid][cdid].info["name"]
+            else:
+                cardname: str = str(cdid)
+            rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(cardname,
+                                                                    callback_data="discard "+str(gpid)+" "+str(cdid)))
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        update.message.reply_text("请点击要删除的卡片：", reply_markup=rp_markup)
+        return True
+    if len(discardgpcdTupleList) == 1:
+        gpid, cdid = discardgpcdTupleList[0]
         rttext = "删除卡："+str(cdid)
         if "name" in CARDS_LIST[gpid][cdid].info and CARDS_LIST[gpid][cdid].info["name"] != "":
             rttext += "\nname: "+str(CARDS_LIST[gpid][cdid].info["name"])
+        rttext += "\n/details 显示删除的卡片信息。删除操作不可逆。"
         update.message.reply_text(rttext)
+        detailinfo = "删除卡片：\n"+str(CARDS_LIST[gpid][cdid])+"\n"
+        DETAIL_DICT[plid] = detailinfo
         CARDS_LIST[gpid].pop(cdid)
         if len(CARDS_LIST[gpid]) == 0:
             CARDS_LIST.pop(gpid)
@@ -423,8 +442,8 @@ def discard(update: Update, context: CallbackContext):
 def details(update: Update, context: CallbackContext):
     global DETAIL_DICT
     if update.effective_chat.id not in DETAIL_DICT or DETAIL_DICT[update.effective_chat.id] == "":
-        context.bot.send_message(
-            chat_id=update.effective_chat.id, text="Nothing to show.")
+        update.message.reply_text("没有可显示的信息。")
+        DETAIL_DICT[update.effective_chat.id] = ""
         return False
     update.message.reply_text(DETAIL_DICT[update.effective_chat.id])
     DETAIL_DICT[update.effective_chat.id] = ""
@@ -1072,6 +1091,18 @@ def button(update: Update, context: CallbackContext):
         writecards(CARDS_LIST)
         query.edit_message_text(rttext)
         return True
+    if args[0] == "discard":
+        gpid, cdid = int(args[1]), int(args[2])
+        if gpid in CARDS_LIST and cdid in CARDS_LIST[gpid] and CARDS_LIST[gpid][cdid].discard:
+            detailinfo = "删除了：\n"+str(CARDS_LIST[gpid][cdid])
+            DETAIL_DICT[plid] = detailinfo
+            CARDS_LIST[gpid].pop(cdid)
+            if len(CARDS_LIST[gpid]) == 0:
+                CARDS_LIST.pop(gpid)
+            query.edit_message_text("删除了一张卡片，使用 /details 查看详细信息。\n该删除操作不可逆。")
+            return True
+        query.edit_message_text("没有找到卡片。")
+        return False
     # HIT BAD TRAP
     return False
 
@@ -1106,22 +1137,28 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     if update.message.from_user.id != GROUP_KP_DICT[str(update.effective_chat.id)]:
         update.message.reply_text("Only KP can start a game.")
         return False
+    gpid = update.effective_chat.id
     kpid = update.message.from_user.id
     global CARDS_LIST, ON_GAME
     for games in ON_GAME:
         if games.kpid == kpid:
             update.message.reply_text(
-                "A KP can only start ONE game at the same time.")
+                "一个KP一次只能同时主持一场游戏。")
+            return False
+    if gpid not in CARDS_LIST:
+        update.message.reply_text("在没有卡片的情况下开始游戏。")
+        ON_GAME.append(
+            GroupGame(groupid=update.effective_chat.id, kpid=kpid, cards=[]))
+        writegameinfo(ON_GAME)
+        return True
     gamecards = []
-    for i in range(len(CARDS_LIST)):
-        if CARDS_LIST[i].groupid == update.effective_chat.id:
-            cardcheckinfo = createcard.showchecks(CARDS_LIST[i])
-            if cardcheckinfo != "All pass.":
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id, text="Card id: "+str(i)+" is not ready to play. Because:\n"+cardcheckinfo)
-                return False
-            gamecards.append(CARDS_LIST[i].__dict__)
-            gamecards[-1]["id"] = len(gamecards)-1
+    for cdid in CARDS_LIST[gpid]:
+        cardcheckinfo = createcard.showchecks(CARDS_LIST[gpid][cdid])
+        if cardcheckinfo != "All pass.":
+            update.message.reply_text(
+                "卡片: "+str(cdid)+"还没有准备好。因为：\n"+cardcheckinfo)
+            return False
+        gamecards.append(CARDS_LIST[gpid][cdid].__dict__)
     ON_GAME.append(GroupGame(groupid=update.effective_chat.id,
                              kpid=kpid, cards=gamecards))
     writegameinfo(ON_GAME)
@@ -1159,27 +1196,27 @@ def endgame(update: Update, context: CallbackContext) -> bool:
     if update.message.from_user.id != GROUP_KP_DICT[str(update.effective_chat.id)]:
         update.message.reply_text("Only KP can end a game.")
         return False
-    global ON_GAME
+    global CARDS_LIST, ON_GAME
+    gpid = update.effective_chat.id
+    kpid = GROUP_KP_DICT[str(gpid)]
     for i in range(len(ON_GAME)):
-        if ON_GAME[i].groupid == update.effective_chat.id:
+        if ON_GAME[i].groupid == gpid:
             t = ON_GAME[i]
             ON_GAME = ON_GAME[:i]+ON_GAME[i+1:]
-            gamecards = t.cards
-            for i in range(len(gamecards)):
-                for j in range(len(CARDS_LIST)):
-                    if gamecards[i].playerid == CARDS_LIST[j].playerid:
-                        t_id = CARDS_LIST[j].id
-                        CARDS_LIST[j] = gamecards[i]
-                        CARDS_LIST[j].id = t_id
-                        CARDS_LIST[j].formerplayerid = CARDS_LIST[j].playerid
-                        CARDS_LIST[j].playerid = 0  # 解绑
-                        CARDS_LIST[j].formergroupid = CARDS_LIST[j].groupid
-                        break
-            del t
-            update.message.reply_text("Game end!")
             writegameinfo(ON_GAME)
+            gamecards = t.cards
+            for cardi in gamecards:
+                cardi.playerid = kpid
+                if cardi.id not in CARDS_LIST[gpid]:
+                    CARDS_LIST[gpid][cardi.id] = cardi
+                    continue
+                CARDS_LIST[gpid].pop(cardi.id)
+                CARDS_LIST[gpid][cardi.id] = cardi
+            del t
+            update.message.reply_text("游戏结束！")
+            writecards(CARDS_LIST)
             return True
-    update.message.reply_text("Game not found.")
+    update.message.reply_text("没找到进行中的游戏。")
     return False
 
 
@@ -1402,17 +1439,19 @@ def show(update: Update, context: CallbackContext) -> bool:
             kpid = update.effective_chat.id
             # args[1] should be group id
             if len(context.args) < 2:
-                update.message.reply_text("Need groupid.")
+                update.message.reply_text("需要群ID。")
                 return False
             gpid = context.args[1]
             if not botdice.isint(gpid):
-                update.message.reply_text("Invalid groupid.")
+                update.message.reply_text("无效ID。")
                 return False
             gpid = int(gpid)
-            ans = []
-            for i in CARDS_LIST:
-                if i.groupid == gpid:
-                    ans.append(i)
+            if gpid not in CARDS_LIST:
+                update.message.reply_text("这个群没有卡。")
+                return False
+            ans: List[GameCard] = []
+            for cdid in CARDS_LIST[gpid]:
+                ans.append(CARDS_LIST[gpid][cdid])
             if len(ans) == 0:
                 update.message.reply_text("No card found.")
                 return False
@@ -1510,16 +1549,19 @@ def showids(update: Update, context: CallbackContext) -> bool:
             rttext += cardi.info["name"]+": "+str(cardi.id)+"\n"
         update.message.reply_text(rttext)
         return True
-    cards = CARDS_LIST
+    kpgps = getkpgroup(kpid)
     rttext = ""
-    for cardi in cards:
-        if GROUP_KP_DICT[str(cardi.groupid)] == kpid:
-            if cardi.playerid == kpid:
+    for gpid in kpgps:
+        if gpid not in CARDS_LIST:
+            continue
+        for cdid in CARDS_LIST[gpid]:
+            if CARDS_LIST[gpid][cdid].playerid == kpid:
                 rttext += "(KP) "
-            if "name" in cardi.info and cardi.info["name"].strip() != "":
-                rttext += cardi.info["name"]+": "+str(cardi.id)+"\n"
+            if "name" in CARDS_LIST[gpid][cdid].info and CARDS_LIST[gpid][cdid].info["name"].strip() != "":
+                rttext += CARDS_LIST[gpid][cdid].info["name"] + \
+                    ": "+str(CARDS_LIST[gpid][cdid].id)+"\n"
             else:
-                rttext += "None: "+str(cardi.id)+"\n"
+                rttext += "None: "+str(CARDS_LIST[gpid][cdid].id)+"\n"
     update.message.reply_text(rttext)
     return True
 
