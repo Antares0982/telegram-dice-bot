@@ -38,7 +38,7 @@ def writegameinfo(listofobj: List[GroupGame]) -> None:
         json.dump(savelist, f, indent=4, ensure_ascii=False)
 
 
-def readinfo() -> Tuple[Dict[str, int], Dict[int, Dict[int, GameCard]], List[GroupGame]]:
+def readinfo() -> Tuple[Dict[int, int], Dict[int, Dict[int, GameCard]], List[GroupGame]]:
     # create file if not exist
     # group-kp
     try:
@@ -48,10 +48,13 @@ def readinfo() -> Tuple[Dict[str, int], Dict[int, Dict[int, GameCard]], List[Gro
         with open(PATH_GROUP_KP, "w", encoding="utf-8") as f:
             json.dump({}, f, indent=4, ensure_ascii=False)
         print("File does not exist, create new file")
-        gpkpdict = {}
+        gpkpdict: Dict[int, int] = {}
     else:
         with open(PATH_GROUP_KP, "r", encoding="utf-8") as f:
-            gpkpdict = json.load(f)
+            gpkpstrdict: Dict[str, int] = json.load(f)
+        gpkpdict: Dict[int, int] = {}
+        for keys in gpkpstrdict:
+            gpkpdict[int(keys)] = gpkpstrdict[keys]
     print("kp info: passed")
     # cards
     try:

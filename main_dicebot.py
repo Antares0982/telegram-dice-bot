@@ -19,6 +19,7 @@ logging.basicConfig(
 def main() -> None:
     dispatcher.add_handler(CommandHandler('start', start))
     dispatcher.add_handler(CommandHandler('addkp', addkp))
+    dispatcher.add_handler(CommandHandler('transferkp', transferkp))
     dispatcher.add_handler(CommandHandler('delkp', delkp))
     dispatcher.add_handler(CommandHandler('reload', reload))
     dispatcher.add_handler(CommandHandler('showuserlist', showuserlist))
@@ -50,7 +51,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('addcard', addcard))
     dispatcher.add_handler(CallbackQueryHandler(button))
     dispatcher.add_handler(MessageHandler(Filters.command, unknown))
-    updater.start_polling()
+    updater.start_polling(clean=True)
 
 
 if __name__ == "__main__":

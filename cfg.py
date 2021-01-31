@@ -10,6 +10,8 @@ PROXY_URL = cfgparser.get("PROXY", "PROXY_URL")  # 代理
 
 TOKEN = cfgparser.get("TOKEN", "TOKEN")  # BOT TOKEN
 
+BOT_ID = int(TOKEN.split(":")[0])
+
 # DATA_PATH = r'/home/tgbot/'  # 数据文件存在哪个目录
 
 DATA_PATH = cfgparser.get("PATH", "DATA_PATH")
