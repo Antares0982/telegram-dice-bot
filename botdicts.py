@@ -28,6 +28,7 @@ def writegameinfo(listofobj: List[GroupGame]) -> None:
     savelist: List[dict] = []
     for i in range(len(listofobj)):
         savelist.append(copy.deepcopy(listofobj[i].__dict__))
+        savelist[-1]["gamerule"] = savelist[-1]["gamerule"].__dict__
         tpcards: List[GameCard] = savelist[-1]["cards"]
         savelist[-1]["cards"] = []
         savelist[-1].pop("kpcards")
@@ -100,3 +101,25 @@ def readjobdict() -> dict:
     with open(PATH_JOBDICT, 'r', encoding='utf-8') as f:
         d = json.load(f)
     return d
+
+
+def readcurrentcarddict() -> dict:
+    try:
+        f = open(PATH_CURRENTCARDDICT, "r", encoding="utf-8")
+        f.close()
+    except FileNotFoundError:
+        with open(PATH_CURRENTCARDDICT, "w", encoding="utf-8") as f:
+            json.dump({}, f, indent=4, ensure_ascii=False)
+        d = {}
+    else:
+        with open(PATH_CURRENTCARDDICT, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+    d1 = {}
+    for keys in d:
+        d1[int(keys)] = (d[keys][0], d[keys][1])
+    return d1
+
+
+def writecurrentcarddict(d: Dict[int, Tuple[int, int]]) -> None:
+    with open(PATH_CURRENTCARDDICT, "w", encoding="utf-8") as f:
+        json.dump(d, f, indent=4, ensure_ascii=False)

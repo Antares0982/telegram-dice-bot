@@ -26,6 +26,8 @@ ON_GAME: List[GroupGame]
 
 ID_POOL: List[int] = []
 
+CURRENT_CARD_DICT: Dict[int, Tuple[int, int]] = readcurrentcarddict()
+
 
 def addIDpool(ID_POOL: List[int]):
     for gpids in CARDS_LIST:
@@ -40,11 +42,11 @@ except:
     updater.bot.send_message(
         chat_id=USERID, text="Something went wrong, please check json files!")
     exit()
-else:
-    updater.bot.send_message(chat_id=USERID, text="Bot is live!")
-    addIDpool(ID_POOL)
 
-DETAIL_DICT: Dict[int, str] = {}  # temply stores details
+updater.bot.send_message(chat_id=USERID, text="Bot is live!")
+addIDpool(ID_POOL)
+
+DETAIL_DICT: Dict[int, str] = {}  # 临时地存储详细信息
 
 SKILL_DICT: dict = readskilldict()
 JOB_DICT: dict = createcard.JOB_DICT
@@ -78,7 +80,7 @@ def isfromkp(update: Update) -> bool:
 # returns all groupid in which kpid is a kp
 
 
-def getkpgroup(kpid: int) -> List[int]:
+def findkpgroup(kpid: int) -> List[int]:
     ans = []
     for keys in GROUP_KP_DICT:  # key is str(groupid)
         if GROUP_KP_DICT[keys] == kpid:
@@ -86,13 +88,33 @@ def getkpgroup(kpid: int) -> List[int]:
     return ans
 
 
-def getcard(plid: int) -> Tuple[GameCard, bool]:
-    global CARDS_LIST
-    for i in CARDS_LIST:
-        for cardid in CARDS_LIST[i]:
-            if CARDS_LIST[i][cardid].playerid == plid:
-                return CARDS_LIST[i][cardid], True
+def findcard(plid: int) -> Tuple[GameCard, bool]:
+    if plid not in CURRENT_CARD_DICT:
+        return None, False
+    gpid, cdid = CURRENT_CARD_DICT[plid]
+    if gpid not in CARDS_LIST or cdid not in CARDS_LIST[gpid]:
+        CURRENT_CARD_DICT.pop(plid)
+        writecurrentcarddict(CURRENT_CARD_DICT)
+        return None, False
+    return CARDS_LIST[gpid][cdid], True
+
+
+def findcardwithid(cdid: int) -> Tuple[GameCard, bool]:
+    if cdid not in ID_POOL:
+        return None, False
+    for gpid in CARDS_LIST:
+        if cdid in CARDS_LIST[gpid]:
+            return CARDS_LIST[gpid][cdid], True
     return None, False
+
+
+def findallplayercards(plid: int) -> List[Tuple[int, int]]:
+    ans: List[Tuple[int, int]] = []
+    for gpid in CARDS_LIST:
+        for cdid in CARDS_LIST[gpid]:
+            if CARDS_LIST[gpid][cdid].playerid == plid:
+                ans.append((gpid, cdid))
+    return ans
 
 
 def getskilllevelfromdict(card1: GameCard, keys: str) -> int:
@@ -139,12 +161,18 @@ def findgamewithkpid(kpid: int) -> Tuple[GroupGame, bool]:
     return None, False
 
 
-def findcardfromgame(game: GroupGame, plid: int) -> Tuple[dict, bool]:
+def findcardfromgame(game: GroupGame, plid: int) -> Tuple[GameCard, bool]:
     for i in game.cards:
         if i.playerid == plid:
             return i, True
     return None, False
 
+
+def findcardfromgamewithid(game:GroupGame, cdid:int) -> Tuple[GameCard, bool]:
+    for i in game.cards:
+        if i.id == cdid:
+            return i,True
+    return None, False
 
 def findDiscardCardsGroup(plid: int) -> List[Tuple[int, int]]:
     ans: List[int] = []
@@ -165,6 +193,47 @@ def showcardinfo(card1: GameCard) -> str:  # show full card
     rttext.replace("{", "\n")
     rttext.replace("}", "\n")
     return rttext
+
+
+def modifythisdict(d: dict, attrname: str, val: str) -> Tuple[str, bool]:
+    if isinstance(d[attrname], dict):
+        return "不能修改dict类型", False
+    if isinstance(d[attrname], bool):
+        if val in ["F", "false", "False"]:
+            d[attrname] = False
+            val = "False"
+        elif val in ["T", "true", "True"]:
+            d[attrname] = True
+            val = "True"
+        else:
+            return "无效的值", False
+        return "", True
+    if isinstance(d[attrname], int):
+        if not botdice.isint(val):
+            return "无效的值", False
+        d[attrname] = int(val)
+        return "", True
+    if isinstance(d[attrname], str):
+        d[attrname] = val
+        return "", True
+    return "类型错误！", False
+
+
+def modifycardinfo(card1: GameCard, attrname: str, val: str) -> Tuple[str, bool]:
+    if attrname in card1.__dict__:
+        rtmsg, ok = modifythisdict(card1.__dict__)
+        if not ok:
+            return rtmsg, ok
+        return "卡id："+str(card1.id)+"的属性："+attrname+"修改为"+val, True
+    for key in card1.__dict__:
+        if not isinstance(card1.__dict__[key], dict) or key == "tempstatus":
+            continue
+        if attrname in card1.__dict__[key]:
+            rtmsg, ok = modifythisdict(card1.__dict__[key], attrname, val)
+            if not ok:
+                return rtmsg, ok
+            return "卡id："+str(card1.id)+"的属性："+attrname+"修改为"+val, True
+    return "找不到该属性", False
 
 
 def findkpcards(kpid) -> List[GameCard]:
@@ -281,7 +350,7 @@ def showuserlist(update: Update, context: CallbackContext) -> bool:
         return True
     if isfromkp(update):  # private msg
         kpid = update.effective_chat.id
-        gpids = getkpgroup(kpid)
+        gpids = findkpgroup(kpid)
         if len(CARDS_LIST) == 0:
             update.message.reply_text("没有角色卡")
             return False
@@ -345,10 +414,10 @@ def newcard(update: Update, context: CallbackContext):
     #             return False
     new_card, detailmsg = createcard.generateNewCard(plid, gpid)
     DETAIL_DICT[plid] = detailmsg
-    if len(context.args) > 1 and botdice.isint(context.args[1]) and int(context.args[1]) not in ID_POOL:
+    if len(context.args) > 1 and botdice.isint(context.args[1]) and int(context.args[1]) not in ID_POOL and int(context.args[1]) > 0:
         new_card.id = int(context.args[1])
     else:
-        if len(context.args) > 1 and botdice.isint(context.args[1]) and int(context.args[1]) in ID_POOL:
+        if len(context.args) > 1 and botdice.isint(context.args[1]) and (int(context.args[1]) in ID_POOL or int(context.args[1]) < 0):
             update.message.reply_text("无效ID，自动获取ID")
         nid = 0
         while nid in ID_POOL:
@@ -367,6 +436,10 @@ def newcard(update: Update, context: CallbackContext):
         "长按/setage 并输入一个数字来设定年龄。如果需要帮助，使用/createcardhelp 来获取帮助。")
     CARDS_LIST[new_card.groupid][new_card.id] = new_card
     writecards(CARDS_LIST)
+    if plid in CURRENT_CARD_DICT:
+        update.message.reply_text("创建新卡时控制自动切换至新卡")
+    CURRENT_CARD_DICT[plid] = (new_card.groupid, new_card.id)
+    writecurrentcarddict(CURRENT_CARD_DICT)
     return True
 
 # (private)/discard (<groupid>/<cardid>) 删除对应卡片。
@@ -404,6 +477,9 @@ def discard(update: Update, context: CallbackContext):
             CARDS_LIST[gpid].pop(cdid)
             if len(CARDS_LIST[gpid]) == 0:
                 CARDS_LIST.pop(gpid)
+            if plid in CURRENT_CARD_DICT and CURRENT_CARD_DICT[plid][0] == gpid and CURRENT_CARD_DICT[plid][1] == cdid:
+                CURRENT_CARD_DICT.pop(plid)
+                writecurrentcarddict(CURRENT_CARD_DICT)
         DETAIL_DICT[plid] = detailinfo
         writecards(CARDS_LIST)
         return True
@@ -423,6 +499,9 @@ def discard(update: Update, context: CallbackContext):
         return True
     if len(discardgpcdTupleList) == 1:
         gpid, cdid = discardgpcdTupleList[0]
+        if plid in CURRENT_CARD_DICT and CURRENT_CARD_DICT[plid][0] == gpid and CURRENT_CARD_DICT[plid][1] == cdid:
+            CURRENT_CARD_DICT.pop(plid)
+            writecurrentcarddict(CURRENT_CARD_DICT)
         rttext = "删除卡："+str(cdid)
         if "name" in CARDS_LIST[gpid][cdid].info and CARDS_LIST[gpid][cdid].info["name"] != "":
             rttext += "\nname: "+str(CARDS_LIST[gpid][cdid].info["name"])
@@ -462,7 +541,7 @@ def setage(update: Update, context: CallbackContext):
         update.message.reply_text("Invalid input.")
         return False
     age = int(age)
-    cardi, ok = getcard(update.effective_chat.id)
+    cardi, ok = findcard(update.effective_chat.id)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
@@ -490,7 +569,7 @@ def setstrdec(update: Update, context: CallbackContext):
         update.message.reply_text("Send private message to set STR decrease.")
         return False
     plid = update.effective_chat.id
-    cardi, ok = getcard(plid)
+    cardi, ok = findcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
@@ -535,7 +614,7 @@ def setcondec(update: Update, context: CallbackContext):
         update.message.reply_text("Send private message to set CON decrease.")
         return False
     plid = update.effective_chat.id
-    cardi, ok = getcard(plid)
+    cardi, ok = findcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
@@ -569,7 +648,7 @@ def setjob(update: Update, context: CallbackContext) -> bool:
         update.message.reply_text("Send private message to set job.")
         return False
     plid = update.effective_chat.id
-    card1, ok = getcard(plid)
+    card1, ok = findcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
@@ -914,7 +993,7 @@ def addskill(update: Update, context: CallbackContext) -> bool:
         update.message.reply_text("Send private message to add skill.")
         return False
     plid = update.effective_chat.id
-    card1, ok = getcard(plid)
+    card1, ok = findcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
@@ -966,7 +1045,7 @@ def button(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
     args = query.data.split(" ")
-    card1, ok = getcard(plid)
+    card1, ok = findcard(plid)
     if not ok:
         query.edit_message_text(text="Can't find card.")
         return False
@@ -1082,7 +1161,7 @@ def button(update: Update, context: CallbackContext):
         card1, rttext, needcon = createcard.choosedec(card1, strdecval)
         writecards(CARDS_LIST)
         if needcon:
-            rttext += "\nUse /setcondec to set CON decrease."
+            rttext += "\n使用 /setcondec 来设置CON（体质）下降值。"
         query.edit_message_text(rttext)
         return True
     if args[0] == "condec":
@@ -1093,16 +1172,32 @@ def button(update: Update, context: CallbackContext):
         return True
     if args[0] == "discard":
         gpid, cdid = int(args[1]), int(args[2])
-        if gpid in CARDS_LIST and cdid in CARDS_LIST[gpid] and CARDS_LIST[gpid][cdid].discard:
-            detailinfo = "删除了：\n"+str(CARDS_LIST[gpid][cdid])
-            DETAIL_DICT[plid] = detailinfo
-            CARDS_LIST[gpid].pop(cdid)
-            if len(CARDS_LIST[gpid]) == 0:
-                CARDS_LIST.pop(gpid)
-            query.edit_message_text("删除了一张卡片，使用 /details 查看详细信息。\n该删除操作不可逆。")
-            return True
-        query.edit_message_text("没有找到卡片。")
-        return False
+        if plid in CURRENT_CARD_DICT and CURRENT_CARD_DICT[plid][0] == gpid and CURRENT_CARD_DICT[plid][1] == cdid:
+            CURRENT_CARD_DICT.pop(plid)
+            writecurrentcarddict(CURRENT_CARD_DICT)
+        if gpid not in CARDS_LIST or cdid not in CARDS_LIST[gpid] or CARDS_LIST[gpid][cdid].playerid != plid or not CARDS_LIST[gpid][cdid].discard:
+            query.edit_message_text("没有找到卡片。")
+            return False
+        detailinfo = "删除了：\n"+str(CARDS_LIST[gpid][cdid])
+        DETAIL_DICT[plid] = detailinfo
+        CARDS_LIST[gpid].pop(cdid)
+        if len(CARDS_LIST[gpid]) == 0:
+            CARDS_LIST.pop(gpid)
+        query.edit_message_text("删除了一张卡片，使用 /details 查看详细信息。\n该删除操作不可逆。")
+        return True
+    if args[0] == "switch":
+        gpid, cdid = int(args[1]), int(args[2])
+        if gpid not in CARDS_LIST or cdid not in CARDS_LIST[gpid] or CARDS_LIST[gpid][cdid].playerid != plid:
+            query.edit_message_text("没有找到卡片。")
+            return False
+        CURRENT_CARD_DICT[plid] = (gpid, cdid)
+        writecurrentcarddict(CURRENT_CARD_DICT)
+        cardi = CARDS_LIST[gpid][cdid]
+        if "name" not in cardi.info or cardi.info["name"] == "":
+            query.edit_message_text("修改成功，现在操作的卡是："+str(cdid))
+        else:
+            query.edit_message_text("修改成功，现在操作的卡是："+cardi.info["name"])
+        return True
     # HIT BAD TRAP
     return False
 
@@ -1112,7 +1207,7 @@ def setname(update: Update, context: CallbackContext) -> bool:
     if len(context.args) == 0:
         update.message.reply_text("Please use '/setname NAME' to set name.")
         return False
-    card1, ok = getcard(plid)
+    card1, ok = findcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
@@ -1206,6 +1301,9 @@ def endgame(update: Update, context: CallbackContext) -> bool:
             writegameinfo(ON_GAME)
             gamecards = t.cards
             for cardi in gamecards:
+                if cardi.playerid in CURRENT_CARD_DICT and CURRENT_CARD_DICT[cardi.playerid][0] == gpid and CURRENT_CARD_DICT[cardi.playerid][1] == cardi.id:
+                    CURRENT_CARD_DICT.pop(cardi.playerid)
+                    writecurrentcarddict(CURRENT_CARD_DICT)
                 cardi.playerid = kpid
                 if cardi.id not in CARDS_LIST[gpid]:
                     CARDS_LIST[gpid][cardi.id] = cardi
@@ -1220,8 +1318,94 @@ def endgame(update: Update, context: CallbackContext) -> bool:
     return False
 
 
-# /switchcard <id>: switch to a card that KP controlling
-def switchcard(update: Update, context: CallbackContext):
+# /switch (<id>): 切换进行修改操作时控制的卡，可以输入gpid，也可以是cdid
+def switch(update: Update, context: CallbackContext):
+    if isgroupmsg(update):
+        update.message.reply_text("对bot私聊来切换卡。")
+        return False
+    plid = update.effective_chat.id
+    if len(context.args) > 0:
+        if not botdice.isint(context.args[0]):
+            update.message.reply_text("输入无效。")
+            return False
+        numid = int(context.args[0])
+        if numid < 0:
+            gpid = numid
+            cardscount = 0
+            temptuple: Tuple[int, int] = (0, 0)
+            for cdid in CARDS_LIST[gpid]:
+                if CARDS_LIST[gpid][cdid].playerid == plid:
+                    cardscount += 1
+                    if cardscount > 1:
+                        update.message.reply_text(
+                            "在这个群你有多于一张卡，请输入具体的卡id。如果不知道自己的卡id，用 /showmycards 来显示ID。")
+                        return False
+                    temptuple = (gpid, cdid)
+            if cardscount == 0:
+                update.message.reply_text("你在这个群没有卡。")
+                return False
+            rttext = "切换成功，现在操作的卡：\n"
+            cardi = CARDS_LIST[gpid][temptuple[1]]
+            if "name" in cardi.info and cardi.info["name"] != "":
+                rttext += cardi.info["name"]+": "+str(cardi.id)
+            else:
+                rttext += "(No name): "+str(cardi.id)
+            CURRENT_CARD_DICT[plid] = temptuple
+            writecurrentcarddict(CURRENT_CARD_DICT)
+            update.message.reply_text(rttext)
+            return True
+        else:
+            cdid = numid
+            for gpid in CARDS_LIST:
+                if cdid in CARDS_LIST[gpid]:
+                    rttext = "切换成功，现在操作的卡：\n"
+                    cardi = CARDS_LIST[gpid][cdid]
+                    if "name" in cardi.info and cardi.info["name"] != "":
+                        rttext += cardi.info["name"]+": "+str(cardi.id)
+                    else:
+                        rttext += "(No name): "+str(cardi.id)
+                    CURRENT_CARD_DICT[plid] = (gpid, cdid)
+                    writecurrentcarddict(CURRENT_CARD_DICT)
+                    update.message.reply_text(rttext)
+                    return True
+            update.message.reply_text("找不到卡。")
+            return False
+    mycardslist = findallplayercards(plid)
+    if len(mycardslist) == 0:
+        update.message.reply_text("你没有任何卡。")
+        return False
+    if len(mycardslist) == 1:
+        gpid, cdid = mycardslist[0]
+        rttext = "你只有一张卡，自动切换。现在操作的卡：\n"
+        cardi = CARDS_LIST[gpid][cdid]
+        if "name" in cardi.info and cardi.info["name"] != "":
+            rttext += cardi.info["name"]+": "+str(cardi.id)
+        else:
+            rttext += "(No name): "+str(cardi.id)
+        update.message.reply_text(rttext)
+        CURRENT_CARD_DICT[plid] = (gpid, cdid)
+        writecurrentcarddict(CURRENT_CARD_DICT)
+        return True
+    # 多个选项。创建按钮
+    rtbuttons = [[]]
+    for gpid, cdid in mycardslist:
+        cardi = CARDS_LIST[gpid][cdid]
+        cardiname: str
+        if "name" not in cardi.info or cardi.info["name"] == "":
+            cardiname = str(cdid)
+        else:
+            cardiname = cardi.info["name"]
+        if len(rtbuttons[len(rtbuttons)-1]) == 4:
+            rtbuttons.append([])
+        rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(
+            cardiname, callback_data="switch "+str(gpid)+" "+str(cdid)))
+    rp_markup = InlineKeyboardMarkup(rtbuttons)
+    update.message.reply_text("请选择要切换控制的卡：", reply_markup=rp_markup)
+    # 交给按钮来完成
+    return True
+
+
+def switchkp(update: Update, context: CallbackContext):
     game, ok = findgamewithkpid(update.message.from_user.id)
     if not ok:
         update.message.reply_text("Game not found.")
@@ -1241,8 +1425,13 @@ def switchcard(update: Update, context: CallbackContext):
     return True
 
 
+def showmycards(update: Update, context: CallbackContext) -> bool:
+    pass
+
 # /tempcheck <tpcheck:int>: add temp check
 # /tempcheck <tpcheck:int> (<cardid> <dicename>): add temp check for one card in a game
+
+
 def tempcheck(update: Update, context: CallbackContext):
     if len(context.args) == 0:
         context.bot.send_message(
@@ -1427,7 +1616,7 @@ def show(update: Update, context: CallbackContext) -> bool:
     if isprivatemsg(update):
         if len(context.args) == 0:
             plid = update.effective_chat.id
-            card1, ok = getcard(plid)
+            card1, ok = findcard(plid)
             if not ok:
                 update.message.reply_text(
                     "Can't find card. If you are kp, please use '/show kp'.")
@@ -1477,7 +1666,7 @@ def show(update: Update, context: CallbackContext) -> bool:
                 update.message.reply_text(showcardinfo(cards[i]))
             return True
         plid = update.effective_chat.id
-        card1, ok = getcard(plid)
+        card1, ok = findcard(plid)
         if not ok:
             update.message.reply_text("Can't find card.")
             return False
@@ -1499,7 +1688,7 @@ def show(update: Update, context: CallbackContext) -> bool:
         attrname = context.args[0]
         if game.kpctrl == -1:
             update.message.reply_text(
-                "No card choosen. Use /switchcard to switch card.")
+                "No card choosen. Use /switch to switch card.")
             return False
         if not showattrinfo(update, game.kpcards[game.kpctrl], attrname):
             return False
@@ -1549,7 +1738,7 @@ def showids(update: Update, context: CallbackContext) -> bool:
             rttext += cardi.info["name"]+": "+str(cardi.id)+"\n"
         update.message.reply_text(rttext)
         return True
-    kpgps = getkpgroup(kpid)
+    kpgps = findkpgroup(kpid)
     rttext = ""
     for gpid in kpgps:
         if gpid not in CARDS_LIST:
@@ -1566,129 +1755,84 @@ def showids(update: Update, context: CallbackContext) -> bool:
     return True
 
 
+# /modify <cardid> <arg> <value> (game): 修改id为cardid的卡的value，要修改的参数是arg。带game时修改的是游戏内卡片数据，不指明时默认游戏外
 def modify(update: Update, context: CallbackContext) -> bool:
-    if not isfromkp(update):
-        update.message.reply_text("Not authorized.")
+    if not isfromkp(update) and update.effective_chat.id != USERID:
+        update.message.reply_text("没有权限")
         return False
     # need 3 args, first: card id, second: attrname, third: value
     if len(context.args) < 3:
-        update.message.reply_text("Need more arguments.")
+        update.message.reply_text("需要至少3个参数")
         return False
     card_id = context.args[0]
     if not botdice.isint(card_id):
-        update.message.reply_text("Invalid id.")
+        update.message.reply_text("无效ID")
         return False
     card_id = int(card_id)
-    kpid = update.message.from_user.id
+    if update.message.from_user.id == USERID: # 最高控制权限
+        if len(context.args) == 3 or context.args[3] != "game":
+            cardi, ok = findcardwithid(card_id)
+            if not ok:
+                update.message.reply_text("找不到卡片")
+                return False
+            rtmsg, ok = modifycardinfo(cardi, context.args[1], context.args[2])
+            update.message.reply_text(rtmsg)
+            if not ok:
+                return False
+            writecards(CARDS_LIST)
+            return True
+        cardi, ok = findcardwithid(card_id)
+        if not ok:
+            update.message.reply_text("找不到卡片")
+            return False
+        game, ok = findgame(cardi.groupid)
+        if not ok:
+            update.message.reply_text("找不到游戏")
+            return False
+        cardi,ok = findcardfromgamewithid(game, card_id)
+        if not ok:
+            update.message.reply_text("找不到游戏中的卡")
+            return False
+        rtmsg, ok = modifycardinfo(cardi, context.args[1], context.args[2])
+        update.message.reply_text(rtmsg)
+        if not ok:
+            return False
+        writecards(CARDS_LIST)
+        return True
+    kpid = update.message.from_user.id # 
+    if len(context.args)<=3 or context.args[3]!="game":
+        cardi,ok = findcardwithid(card_id)
+        if not ok:
+            update.message.reply_text("找不到卡片")
+            return False
+        if GROUP_KP_DICT[str(cardi.groupid)]!=kpid:
+            update.message.reply_text("没有权限")
+            return False
+        rtmsg, ok = modifycardinfo(cardi, context.args[1], context.args[2])
+        update.message.reply_text(rtmsg)
+        if not ok:
+            return False
+        writecards(CARDS_LIST)
+        return True
     game, ok = findgamewithkpid(kpid)
     if not ok:
-        if card_id >= len(CARDS_LIST):
-            update.message.reply_text("Invalid id.")
-            return False
-        card1 = CARDS_LIST[card_id]
-        if str(card1.groupid) not in GROUP_KP_DICT or GROUP_KP_DICT[str(card1.groupid)] != kpid:
-            update.message.reply_text("Invalid id.")
-            return False
-    else:
-        cards = game.cards
-        card1 = ""
-        for cardi in cards:
-            if cardi.id == card_id:
-                card1 = cardi
-                break
-        if isinstance(card1, str):
-            update.message.reply_text("Invalid id.")
-            return False
-    # Now the valid card is found
-    attrname = context.args[1]
-    if attrname in card1.__dict__:
-        if isinstance(card1.__dict__[attrname], dict):
-            update.message.reply_text("Cannot edit dict.")
-            return False
-        if isinstance(card1.__dict__[attrname], bool):
-            if context.args[2] in ["F", "false", "False"]:
-                card1.__dict__[attrname] = False
-            elif context.args[2] in ["T", "true", "True"]:
-                card1.__dict__[attrname] = True
-            else:
-                update.message.reply_text("Invalid argument.")
-                return False
-            if ok:
-                writegameinfo(ON_GAME)
-            else:
-                writecards(CARDS_LIST)
-            update.message.reply_text("Modified.")
-            return True
-        if isinstance(card1.__dict__[attrname], int):
-            if not botdice.isint(context.args[2]):
-                update.message.reply_text("Invalid argument.")
-                return False
-            card1.__dict__[attrname] = int(context.args[2])
-            if ok:
-                writegameinfo(ON_GAME)
-            else:
-                writecards(CARDS_LIST)
-            update.message.reply_text("Modified.")
-            return True
-        if isinstance(card1.__dict__[attrname], str):
-            card1.__dict__[attrname] = context.args[2]
-            if ok:
-                writegameinfo(ON_GAME)
-            else:
-                writecards(CARDS_LIST)
-            update.message.reply_text("Modified.")
-            return True
-        update.message.reply_text("Type error!!!")
+        update.message.reply_text("没有进行中的游戏")
         return False
-    for keys in card1.__dict__:
-        if isinstance(card1.__dict__[keys], dict):
-            if attrname in card1.__dict__[keys]:
-                getdict = card1.__dict__[keys]
-                if isinstance(getdict[attrname], dict):
-                    update.message.reply_text("Cannot edit dict.")
-                    return False
-                if isinstance(getdict[attrname], bool):
-                    if context.args[2] in ["F", "false", "False"]:
-                        getdict[attrname] = False
-                    elif context.args[2] in ["T", "true", "True"]:
-                        getdict[attrname] = True
-                    else:
-                        update.message.reply_text("Invalid argument.")
-                        return False
-                    if ok:
-                        writegameinfo(ON_GAME)
-                    else:
-                        writecards(CARDS_LIST)
-                    update.message.reply_text("Modified.")
-                    return True
-                if isinstance(getdict[attrname], int):
-                    if not botdice.isint(context.args[2]):
-                        update.message.reply_text("Invalid argument.")
-                        return False
-                    getdict[attrname] = int(context.args[2])
-                    if ok:
-                        writegameinfo(ON_GAME)
-                    else:
-                        writecards(CARDS_LIST)
-                    update.message.reply_text("Modified.")
-                    return True
-                if isinstance(getdict[attrname], str):
-                    getdict[attrname] = context.args[2]
-                    if ok:
-                        writegameinfo(ON_GAME)
-                    else:
-                        writecards(CARDS_LIST)
-                    update.message.reply_text("Modified.")
-                    return True
-                update.message.reply_text("Type error!!!")
-                return False
-    update.message.reply_text("Cannot find this attribute.")
-    return False
+    cardi, ok = findcardfromgamewithid(card_id)
+    if not ok:
+        update.message.reply_text("找不到游戏中的卡或没有权限")
+        return False
+    rtmsg, ok = modifycardinfo(cardi, context.args[1], context.args[2])
+    update.message.reply_text(rtmsg)
+    if not ok:
+        return False
+    writecards(CARDS_LIST)
+    return True
 
 
 def randombackground(update: Update, context: CallbackContext) -> bool:
     plid = update.message.from_user.id
-    card1, ok = getcard(plid)
+    card1, ok = findcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
@@ -1795,7 +1939,7 @@ def setsex(update: Update, context: CallbackContext) -> bool:
     if len(context.args) == 0:
         update.message.reply_text("Please use '/setsex sex' to set sex.")
         return False
-    card1, ok = getcard(plid)
+    card1, ok = findcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
@@ -1822,7 +1966,7 @@ def setbkground(update: Update, context: CallbackContext) -> bool:
         update.message.reply_text(
             "Please use '/setbkground bkgroundname bkgroudinfo' to set background story.")
         return False
-    card1, ok = getcard(plid)
+    card1, ok = findcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
@@ -1921,13 +2065,13 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
 
 def addcard(update: Update, context: CallbackContext) -> bool:
     if isgroupmsg(update):
-        update.message.reply_text("Send private message to add card.")
+        update.message.reply_text("向我发送私聊消息来添加卡")
         return False
     if len(context.args) == 0:
-        update.message.reply_text("Need args.")
+        update.message.reply_text("需要参数")
         return False
     if (len(context.args)//2)*2 != len(context.args):
-        update.message.reply_text("Argument length should be even.")
+        update.message.reply_text("参数长度应该是偶数")
     t = createcard.templateNewCard()
     for i in range(0, len(context.args), 2):
         argname = context.args[i]
@@ -1940,19 +2084,19 @@ def addcard(update: Update, context: CallbackContext) -> bool:
                     argval = True
                 if not isinstance(argval, bool):
                     update.message.reply_text(
-                        argname+" should be boolean type.")
+                        argname+"应该为bool类型")
                     return False
                 t[argname] = argval
             elif isinstance(t[argname], int):
                 if not botdice.isint(argval):
-                    update.message.reply_text(argname+" should be int type.")
+                    update.message.reply_text(argname+"应该为int类型")
                     return False
                 t[argname] = int(argval)
             else:
                 t[argname] = argval
         elif argname in t and isinstance(t[argname], dict):
             update.message.reply_text(
-                argname+" is a dict, cannot assign a dict.")
+                argname+" 是dict类型，不可直接赋值")
             return False
         else:
             notattr = True
@@ -1967,13 +2111,13 @@ def addcard(update: Update, context: CallbackContext) -> bool:
                         argval = True
                     if not isinstance(argval, bool):
                         update.message.reply_text(
-                            argname+" should be boolean type.")
+                            argname+"应该为bool类型")
                         return False
                     t[keys][argname] = argval
                 elif isinstance(t[keys][argname], int):
                     if not botdice.isint(argval):
                         update.message.reply_text(
-                            argname+" should be int type.")
+                            argname+"应该为int类型")
                         return False
                     t[keys][argname] = int(argval)
                 else:
@@ -1981,37 +2125,41 @@ def addcard(update: Update, context: CallbackContext) -> bool:
             if notattr:
                 if argname not in SKILL_DICT and argname != "闪避" and argname != "母语":
                     update.message.reply_text(
-                        argname+" not found in card template.")
+                        argname+"角色卡模板中没有找到")
                     return False
                 if not botdice.isint(argval):
-                    update.message.reply_text(argname+" should be int type.")
+                    update.message.reply_text(argname+"应该为int类型")
                     return False
                 t["skill"][argname] = int(argval)
     if t["groupid"] == 0:
-        update.message.reply_text("Need groupid!")
+        update.message.reply_text("需要groupid！")
         return False
     if not isfromkp(update):
         if t["playerid"] != 0:
-            update.message.reply_text("Cannot set playerid.")
+            update.message.reply_text("不可以设置playerid")
             return False
         t["playerid"] = update.effective_chat.id
     else:
         kpid = update.effective_chat.id
         if GROUP_KP_DICT[str(t["groupid"])] != kpid and t["playerid"] != 0 and t["playerid"] != kpid:
-            update.message.reply_text("Cannot set playerid.")
+            update.message.reply_text("不可以设置playerid")
             return False
         if t["playerid"] == 0:
             t["playerid"] = kpid
     card1 = GameCard(t)
-    card1.id = len(CARDS_LIST)
+    if "id" not in context.args:
+        nid = 0
+        while nid in ID_POOL:
+            nid+=1
+        card1.id = nid
     rttext = createcard.showchecks(card1)
     if rttext != "All pass.":
         update.message.reply_text(
-            "Add card successfully, but card didn't pass card checks.")
+            "卡片添加成功，但没有通过开始游戏的检查。")
         update.message.reply_text(rttext)
     else:
-        update.message.reply_text("Add card successfully.")
-    CARDS_LIST.append(card1)
+        update.message.reply_text("卡片添加成功")
+    CARDS_LIST[card1.groupid][card1.id] = card1
     writecards(CARDS_LIST)
     return True
 

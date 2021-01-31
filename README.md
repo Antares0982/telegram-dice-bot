@@ -3,9 +3,9 @@ tg跑团用骰子机器人，目前版本v1.0.1，开发中，暂时不能正常
 
 ## 更新计划
 
-* 更改`CARDS_LIST`的数据类型，可以在创建卡时自选好记的数字id
+* 更改`CARDS_LIST`的数据类型，可以在创建卡时自选好记的数字id（完成！）
 
-* 增加bot控制者对所有卡的`/modify`权限以及`/show`权限
+* 增加bot控制者对所有卡的`/modify`权限（完成）以及`/show`权限
 
 * 增加创建卡时输入的群id是否有效的判断
 
@@ -139,7 +139,7 @@ KP进行游戏引导时，可以在指令前输入文字+空格（使该指令�
   * (private) `/show kp` 显示目前用户作为KP控制的所有（游戏外）卡信息
   * (private) `/show game`显示KP所主持的游戏中所有卡信息
 
-* (private) `/showids (kp)/(game)` 不带参数时，显示所有（游戏外）相关卡的id。如果带game参数且在主持游戏，将会显示游戏内所有卡的id，与`/modify`配合使用。带kp参数时，显示kp控制的卡的顺序号而非id，仅用于`/switchcard`指令配合使用。
+* (private) `/showids (kp)/(game)` 不带参数时，显示所有（游戏外）相关卡的id。如果带game参数且在主持游戏，将会显示游戏内所有卡的id，与`/modify`配合使用。带kp参数时，显示kp控制的卡的顺序号而非id，仅用于`/switch`指令配合使用。
 
 * (group)`/tempcheck <tempcheckvalue> (<cardid> <checkname>)` 只有游戏中可以使用。临时加/减一次检定，或者对某张卡写入一个长期生效的检定。
 
@@ -147,6 +147,6 @@ KP进行游戏引导时，可以在指令前输入文字+空格（使该指令�
 
   * 如果对某张卡写入游戏中长期生效的加/减检定，例如，用`/tempcheck -10 0 STR`可以对id为0的卡写入一个-10的STR检定下降。如果要去掉这个设置，则使用`/tempcheck 0 0 STR`即可。
 
-* `/switchcard <cardID>`  按照kp在游戏中控制的卡的顺序号而非真实id，切换kp控制的卡。顺序号用`/showids kp`来查看。
+* `/switch <cardID>`  按照kp在游戏中控制的卡的顺序号而非真实id，切换kp控制的卡。顺序号用`/showids kp`来查看。
 
 * `modify <cardID> <attrname> <value>` 修改角色卡信息，*请谨慎使用该指令*。发送者需是kp。会自动判断发送者是否在主持游戏中。如果在主持游戏，则修改的是游戏中的属性，且id参数也是游戏中的卡id。如果不在游戏中，则修改的是游戏外角色卡信息，id参数是游戏外卡片id。提示：使用`/modify <id> discard true`来让玩家删除角色卡。
