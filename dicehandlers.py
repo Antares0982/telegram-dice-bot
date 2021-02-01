@@ -1,8 +1,7 @@
 # -*- coding:utf-8 -*-
 # Only define handlers and dicts that store info
 
-from os import write
-from re import T
+
 import time
 from typing import List
 
@@ -31,11 +30,11 @@ ID_POOL: List[int] = []
 CURRENT_CARD_DICT: Dict[int, Tuple[int, int]] = readcurrentcarddict()
 
 
-def addIDpool(ID_POOL: List[int]):
+def addIDpool(idpool: List[int]):
     for gpids in CARDS_DICT:
         for cdids in CARDS_DICT[gpids]:
-            ID_POOL.append(cdids)
-            ID_POOL.sort()
+            idpool.append(cdids)
+            idpool.sort()
 
 
 # 检测json文件能否正常读取
@@ -462,9 +461,14 @@ def delkp(update: Update, context: CallbackContext) -> bool:
 
 
 def reload(update, context) -> bool:
-    global GROUP_KP_DICT, CARDS_DICT, ON_GAME
+    """重新读取文件"""
+    global GROUP_KP_DICT, CARDS_DICT, ON_GAME, CURRENT_CARD_DICT, ID_POOL
     try:
         GROUP_KP_DICT, CARDS_DICT, ON_GAME = readinfo()
+        CURRENT_CARD_DICT = readcurrentcarddict()
+        ID_POOL = []
+        addIDpool(ID_POOL)
+
     except:
         return errorHandler(update, "读取文件出现问题，请检查json文件！")
     update.message.reply_text('成功重新读取文件。')
