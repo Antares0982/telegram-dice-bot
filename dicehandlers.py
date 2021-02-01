@@ -42,10 +42,10 @@ try:
     GROUP_KP_DICT, CARDS_DICT, ON_GAME = readinfo()
 except:
     updater.bot.send_message(
-        chat_id=USERID, text="读取文件出现问题，请检查json文件！")
+        chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
     exit()
 
-updater.bot.send_message(chat_id=USERID, text="Bot is live!")
+updater.bot.send_message(chat_id=ADMIN_ID, text="Bot is live!")
 addIDpool(ID_POOL)
 
 DETAIL_DICT: Dict[int, str] = {}  # 临时地存储详细信息
@@ -480,7 +480,7 @@ def showuserlist(update: Update, context: CallbackContext) -> bool:
     """显示所有信息。拒绝无权限者使用这一指令。"""
     if isgroupmsg(update):  # Group msg: do nothing, even sender is USER or KP
         return False
-    if update.effective_chat.id == USERID:  # 全部显示
+    if update.effective_chat.id == ADMIN_ID:  # 全部显示
         rttext = "GROUP_KP_LIST:\n"
         if not GROUP_KP_DICT:
             rttext += "None"
@@ -1902,7 +1902,7 @@ def showids(update: Update, context: CallbackContext) -> bool:
 
 # /modify <cardid> <arg> <value> (game): 修改id为cardid的卡的value，要修改的参数是arg。带game时修改的是游戏内卡片数据，不指明时默认游戏外
 def modify(update: Update, context: CallbackContext) -> bool:
-    if not isfromkp(update) and update.effective_chat.id != USERID:
+    if not isfromkp(update) and update.effective_chat.id != ADMIN_ID:
         update.message.reply_text("没有权限")
         return False
     # need 3 args, first: card id, second: attrname, third: value
@@ -1914,7 +1914,7 @@ def modify(update: Update, context: CallbackContext) -> bool:
         update.message.reply_text("无效ID")
         return False
     card_id = int(card_id)
-    if update.message.from_user.id == USERID:  # 最高控制权限
+    if update.message.from_user.id == ADMIN_ID:  # 最高控制权限
         if len(context.args) == 3 or context.args[3] != "game":
             cardi, ok = findcardwithid(card_id)
             if not ok:

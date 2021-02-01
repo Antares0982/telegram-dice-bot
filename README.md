@@ -41,12 +41,12 @@ pip3 install logging
 pip3 install pysocks
 ```
 
-使用前先重命名`sample_config.ini`到`config.ini`，并填入相应参数（TOKEN, USERID, DATA_PATH）。参数说明如下：
+使用前先重命名`sample_config.ini`到`config.ini`，并填入相应参数（TOKEN, ADMIN_ID, DATA_PATH）。参数说明如下：
 
 * 使用代理的话将`PROXY`参数设为`true`，不需要则设为`false`。使用代理时，填写相应的代理地址`PROXY_URL`。
 * `TOKEN`一项中填写你的tgbot token。
 * `DATA_PATH`填写数据文件夹的位置，在末尾需要`/`，如果是win系统则是`\`
-* `USERID`填写你的telegram id。如果不知道自己的ID可以先填0，启动之后对bot发送`/getid`来获得ID，修改后重启bot。
+* `ADMIN_ID`填写你的telegram id。如果不知道自己的ID可以先填0，启动之后对bot发送`/getid`来获得ID，修改后重启bot。
 * `HELP`是使用时给使用者的提示。
 * `IGNORE_JOB_DICT`是否可以设置职业表以外的职业（职业表位置：`/data/jobdict.json`），如果设为`false`则只能设置职业表内的职业。
 

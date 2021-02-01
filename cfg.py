@@ -23,7 +23,7 @@ PATH_SKILLDICT = DATA_PATH+r'skilldict.json'
 PATH_JOBDICT = DATA_PATH+r'jobdict.json'
 PATH_CURRENTCARDDICT = DATA_PATH+r'currentcarddict.json'
 
-USERID = cfgparser.getint("ID", "USERID")  # BOT控制者的userid
+ADMIN_ID = cfgparser.getint("ID", "ADMIN_ID")  # BOT控制者的userid
 
 IGNORE_JOB_DICT = cfgparser.getboolean("SETTINGS", "IGNORE_JOB_DICT")
 

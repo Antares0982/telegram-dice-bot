@@ -25,7 +25,7 @@ def bot(update: Update, context: CallbackContext) -> bool:
     `/bot stop`将结束程序。
 
     `/bot restart`将调用`reload`方法重新加载所有数据。"""
-    if update.message.from_user.id != USERID:
+    if update.message.from_user.id != ADMIN_ID:
         return errorHandler(update, "没有权限", True)
     if len(context.args) == 0:
         return errorHandler(update, "参数无效", True)
@@ -40,22 +40,20 @@ def bot(update: Update, context: CallbackContext) -> bool:
                 gpids.append(gpid)
         for gpid in gpids:
             context.bot.send_message(chat_id=gpid, text="Bot程序终止！")
-        context.bot.send_message(chat_id=USERID, text="进程被指令终止。")
+        context.bot.send_message(chat_id=ADMIN_ID, text="进程被指令终止。")
         # 结束进程，先写入所有数据
         writecards(CARDS_DICT)
         writecurrentcarddict(CURRENT_CARD_DICT)
         writekpinfo(GROUP_KP_DICT)
         writegameinfo(ON_GAME)
         pid = os.getpid()
-        print(sys.platform)
-        if sys.platform == "win32":
-            print(pid)
+        if sys.platform == "win32":  # windows
             os.kill(pid, signal.CTRL_C_EVENT)
-            print(pid)
-        else:
-            os.kill(pid, signal.SIGSTOP)
+        else:  # Other
+            os.kill(pid, signal.SIGKILL)
+        return True
     elif inst == "restart":
-        reload(update, context)
+        return reload(update, context)
 
 
 def main() -> None:
