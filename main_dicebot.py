@@ -57,8 +57,9 @@ def bot(update: Update, context: CallbackContext) -> bool:
 
 
 def main() -> None:
-    dispatcher.add_handler(CommandHandler('start', start))
     dispatcher.add_handler(CommandHandler('bot', bot))
+
+    dispatcher.add_handler(CommandHandler('start', start))
     dispatcher.add_handler(CommandHandler('addkp', addkp))
     dispatcher.add_handler(CommandHandler('transferkp', transferkp))
     dispatcher.add_handler(CommandHandler('delkp', delkp))

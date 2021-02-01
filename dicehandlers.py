@@ -2,8 +2,8 @@
 # Only define handlers and dicts that store info
 
 
+from configparser import Error
 import time
-from typing import List
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, Updater
@@ -13,24 +13,30 @@ from botdicts import *
 import botdice
 import createcard
 
+# 代理设置
 if PROXY:
     updater = Updater(token=TOKEN, request_kwargs={
                       'proxy_url': PROXY_URL}, use_context=True)
 else:
     updater = Updater(token=TOKEN, use_context=True)
 
-global GROUP_KP_DICT, CARDS_DICT, ON_GAME
-
+# 数据
 GROUP_KP_DICT: Dict[int, int]
 CARDS_DICT: Dict[int, Dict[int, GameCard]]
 ON_GAME: List[GroupGame]
 
 ID_POOL: List[int] = []
 
-CURRENT_CARD_DICT: Dict[int, Tuple[int, int]] = readcurrentcarddict()
+CURRENT_CARD_DICT: Dict[int, Tuple[int, int]]
+
+SKILL_DICT: dict
+JOB_DICT: dict
+
+DETAIL_DICT: Dict[int, str] = {}  # 临时地存储详细信息
 
 
 def addIDpool(idpool: List[int]):
+    """读取全部卡ID，用于防止卡id重复"""
     for gpids in CARDS_DICT:
         for cdids in CARDS_DICT[gpids]:
             idpool.append(cdids)
@@ -40,18 +46,21 @@ def addIDpool(idpool: List[int]):
 # 检测json文件能否正常读取
 try:
     GROUP_KP_DICT, CARDS_DICT, ON_GAME = readinfo()
+    CURRENT_CARD_DICT = readcurrentcarddict()
+    SKILL_DICT = readskilldict()
+    JOB_DICT = createcard.JOB_DICT
 except:
     updater.bot.send_message(
         chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
     exit()
 
+# 读取完成
 updater.bot.send_message(chat_id=ADMIN_ID, text="Bot is live!")
 addIDpool(ID_POOL)
 
-DETAIL_DICT: Dict[int, str] = {}  # 临时地存储详细信息
 
-SKILL_DICT: dict = readskilldict()
-JOB_DICT: dict = createcard.JOB_DICT
+def getcontextid(update: Update) -> int:
+    return update.effective_chat.id
 
 
 def isprivatemsg(update: Update) -> bool:
@@ -80,8 +89,6 @@ def isfromkp(update: Update) -> bool:
     if update.effective_chat.id not in GROUP_KP_DICT or GROUP_KP_DICT[update.effective_chat.id] != update.message.from_user.id:
         return False
     return True
-
-# returns all groupid in which kpid is a kp
 
 
 def findkpgroups(kpid: int) -> List[int]:
@@ -479,7 +486,7 @@ def reload(update, context) -> bool:
 def showuserlist(update: Update, context: CallbackContext) -> bool:
     """显示所有信息。拒绝无权限者使用这一指令。"""
     if isgroupmsg(update):  # Group msg: do nothing, even sender is USER or KP
-        return False
+        return errorHandler(update, "Sorry, I didn't understand that command.", True)
     if update.effective_chat.id == ADMIN_ID:  # 全部显示
         rttext = "GROUP_KP_LIST:\n"
         if not GROUP_KP_DICT:
@@ -512,8 +519,7 @@ def showuserlist(update: Update, context: CallbackContext) -> bool:
         kpid = update.effective_chat.id
         gpids = findkpgroups(kpid)
         if len(CARDS_DICT) == 0:
-            update.message.reply_text("没有角色卡")
-            return False
+            return errorHandler(update, "没有角色卡")
         rttext1: str = ""
         rttext2: str = ""
         for gpid in gpids:
@@ -526,41 +532,35 @@ def showuserlist(update: Update, context: CallbackContext) -> bool:
         for i in range(len(ON_GAME)):
             if ON_GAME[i].kpid == kpid:
                 update.message.reply_text(
-                    "Group: "+str(ON_GAME[i].groupid)+"is in a game.")
+                    "群："+str(ON_GAME[i].groupid)+"正在游戏中")
         return True
-    update.message.reply_text("Sorry, I didn't understand that command.")
-    return False
+    return errorHandler(update, "Sorry, I didn't understand that command.", True)
 
 
 def getid(update: Update, context: CallbackContext) -> int:
-    context.bot.send_message(parse_mode='HTML', chat_id=update.effective_chat.id,
-                             text="<code>"+str(update.effective_chat.id)+"</code> \n点击即可复制")
-    return update.effective_chat.id
+    """获取所在聊天环境的id。私聊使用该指令发送用户id，群聊使用该指令发送群id"""
+    chatid = getcontextid(update)
+    context.bot.send_message(parse_mode='HTML', chat_id=chatid,
+                             text="<code>"+str(chatid)+"</code> \n点击即可复制")
+    return chatid
 
 
 def newcard(update: Update, context: CallbackContext):
     plid = update.effective_chat.id
     if isgroupmsg(update):  # 只接受私聊消息
-        update.message.reply_text("发送私聊消息创建角色卡。")
-        return False
+        return errorHandler(update, "发送私聊消息创建角色卡。")
     if len(context.args) == 0:
-        update.message.reply_text(
-            "使用'/newcard groupid'来创建新角色卡。如果你不知道groupid，在群里发送 /getid 获取群id。")
-        return False
+        return errorHandler(update, "使用'/newcard groupid'来创建新角色卡。如果你不知道groupid，在群里发送 /getid 获取群id。")
     msg = context.args[0]
     if not botdice.isint(msg) or int(msg) >= 0:
-        update.message.reply_text(
-            "无效群id。如果你不知道groupid，在群里发送 /getid 获取群id。使用'/newcard groupid'来创建新角色卡。")
-        return False
-    global CARDS_DICT, DETAIL_DICT, ID_POOL
+        return errorHandler(update, "无效群id。如果你不知道groupid，在群里发送 /getid 获取群id。使用'/newcard groupid'来创建新角色卡。")
     gpid = int(msg)
-    # 开始处理
+    # 符合建卡条件，开始处理
     # 检查(pl)是否已经有卡
     if gpid in CARDS_DICT:
         for cdid in CARDS_DICT[gpid]:
             if CARDS_DICT[gpid][cdid].playerid == plid and GROUP_KP_DICT[gpid] != plid:
-                update.message.reply_text("你在这个群已经有一张卡了！")
-                return False
+                return errorHandler(update, "你在这个群已经有一张卡了！")
     if gpid not in CARDS_DICT:
         CARDS_DICT[gpid] = {}
     # 符合建卡条件，生成新卡
@@ -570,13 +570,15 @@ def newcard(update: Update, context: CallbackContext):
         new_card.id = int(context.args[1])
     else:
         if len(context.args) > 1 and botdice.isint(context.args[1]) and (int(context.args[1]) in ID_POOL or int(context.args[1]) < 0):
-            update.message.reply_text("无效ID，自动获取ID")
+            update.message.reply_text("输入的ID已经被占用，自动获取ID")
         nid = 0
         while nid in ID_POOL:
             nid += 1
         new_card.id = nid
+        ID_POOL.append(nid)
+        ID_POOL.sort()
     update.message.reply_text("角色卡已创建。使用 /details 查看角色卡详细信息。")
-    # 如果有3个属性小于50：discard=true
+    # 如果有3个属性小于50，则discard=true
     countless50 = 0
     for keys in new_card.data:
         if new_card.data[keys] < 50:
@@ -590,7 +592,7 @@ def newcard(update: Update, context: CallbackContext):
     CARDS_DICT[new_card.groupid][new_card.id] = new_card
     writecards(CARDS_DICT)
     if plid in CURRENT_CARD_DICT:
-        update.message.reply_text("创建新卡时控制自动切换至新卡")
+        update.message.reply_text("创建新卡时，控制自动切换至新卡")
     CURRENT_CARD_DICT[plid] = (new_card.groupid, new_card.id)
     writecurrentcarddict(CURRENT_CARD_DICT)
     return True
@@ -599,19 +601,18 @@ def newcard(update: Update, context: CallbackContext):
 
 
 def discard(update: Update, context: CallbackContext):
-    if isgroupmsg(update):  # should be private
-        update.message.reply_text("Send private message to discard.")
-        return False
-    global CARDS_DICT, DETAIL_DICT
-    plid = update.effective_chat.id  # sender
+    if isgroupmsg(update):
+        return errorHandler(update, "发送私聊消息删除卡。")
+    plid = update.effective_chat.id  # 发送者
     # 先找到所有可删除的卡，返回一个列表
     discardgpcdTupleList = findDiscardCardsGroupIDTuple(plid)
     if len(context.args) > 0:
+        # 求args提供的卡id与可删除的卡id的交集
         trueDiscardTupleList: List[Tuple[int, int]] = []
         for gpid, cdid in discardgpcdTupleList:
             if str(gpid) in context.args or str(cdid) in context.args:
                 trueDiscardTupleList.append((gpid, cdid))
-        if len(trueDiscardTupleList) == 0:
+        if len(trueDiscardTupleList) == 0:  # 交集为空集
             update.message.reply_text("输入的（群/卡片）ID均无效。")
             return False
         if len(trueDiscardTupleList) == 1:
@@ -626,7 +627,8 @@ def discard(update: Update, context: CallbackContext):
                 "删除了"+str(len(trueDiscardTupleList))+"张卡片。\n/details 显示删除的卡片信息。删除操作不可逆。")
         detailinfo = ""
         for gpid, cdid in trueDiscardTupleList:
-            detailinfo += "删除卡片：\n"+str(CARDS_DICT[gpid][cdid])+"\n"
+            detailinfo += "删除卡片：\n" + \
+                str(CARDS_DICT[gpid][cdid])+"\n"  # 获取删除的卡片的详细信息
             CARDS_DICT[gpid].pop(cdid)
             if len(CARDS_DICT[gpid]) == 0:
                 CARDS_DICT.pop(gpid)
@@ -667,50 +669,42 @@ def discard(update: Update, context: CallbackContext):
             CARDS_DICT.pop(gpid)
         writecards(CARDS_DICT)
         return True
-    update.message.reply_text("找不到卡。")
-    return False
+    # 没有可删除的卡
+    return errorHandler(update, "找不到可删除的卡。")
 
 
 def details(update: Update, context: CallbackContext):
-    global DETAIL_DICT
     if update.effective_chat.id not in DETAIL_DICT or DETAIL_DICT[update.effective_chat.id] == "":
-        update.message.reply_text("没有可显示的信息。")
         DETAIL_DICT[update.effective_chat.id] = ""
-        return False
+        return errorHandler(update, "没有可显示的信息。")
     update.message.reply_text(DETAIL_DICT[update.effective_chat.id])
     DETAIL_DICT[update.effective_chat.id] = ""
     return True
 
 
 def setage(update: Update, context: CallbackContext):
-    if isgroupmsg(update):  # should be private
-        update.message.reply_text("Send private message to set AGE.")
-        return False
+    if isgroupmsg(update):
+        return errorHandler(update, "发送私聊消息设置年龄。")
     if len(context.args) == 0:
-        update.message.reply_text("Use '/setage AGE' to set AGE.")
-        return False
+        return errorHandler(update, "使用'/setage AGE'来设置年龄。")
     age = context.args[0]
     if not botdice.isint(age):
-        update.message.reply_text("Invalid input.")
-        return False
+        return errorHandler(update, "输入无效")
     age = int(age)
     cardi, ok = findcard(update.effective_chat.id)
     if not ok:
-        update.message.reply_text("Can't find card.")
-        return False
+        return errorHandler(update, "找不到卡")
     if "AGE" in cardi.info and cardi.info["AGE"] > 0:
-        update.message.reply_text("Age is already set.")
-        return False
+        return errorHandler(update, "已经设置过年龄了。")
     if age < 17 or age > 99:
-        update.message.reply_text("Age should be 17-99.")
-        return False
+        return errorHandler(update, "年龄应当在17-99岁。")
     global DETAIL_DICT
     cardi.info["AGE"] = age
     cardi.cardcheck["check1"] = True
     cardi, detailmsg = createcard.generateAgeAttributes(cardi)
     DETAIL_DICT[update.effective_chat.id] = detailmsg
     update.message.reply_text(
-        "Age is set! To see more infomation, use /details. If age >= 40, you may need to set STR decrease using '/setstrdec number'.")
+        "年龄设置完成！如果需要查看详细信息，使用 /details。如果年龄不小于40，或小于20，你可能需要使用指令'/setstrdec number'设置STR减值。")
     if cardi.cardcheck["check2"]:
         createcard.generateOtherAttributes(cardi)
     writecards(CARDS_DICT)
@@ -719,7 +713,7 @@ def setage(update: Update, context: CallbackContext):
 
 def setstrdec(update: Update, context: CallbackContext):
     if isgroupmsg(update):
-        update.message.reply_text("Send private message to set STR decrease.")
+        return errorHandler(update, "Send private message to set STR decrease.")
         return False
     plid = update.effective_chat.id
     cardi, ok = findcard(plid)
@@ -2313,5 +2307,4 @@ def addcard(update: Update, context: CallbackContext) -> bool:
 
 
 def unknown(update: Update, context: CallbackContext) -> None:
-    if update.effective_chat.id > 0:
-        update.message.reply_text("Sorry, I didn't understand that command.")
+    errorHandler(update, "Sorry, I didn't understand that command.", True)

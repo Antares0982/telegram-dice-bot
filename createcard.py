@@ -329,6 +329,7 @@ def choosedec2(card: dict, con: int) -> Tuple[dict, str]:
 
 
 def generateOtherAttributes(card: GameCard) -> Tuple[GameCard, str]:
+    """获取到年龄之后，通过年龄计算一些衍生数据。"""
     if not card.cardcheck["check2"]:  # This trap should not be hit
         return card, "Please set DATA decrease first"
     card.attr["SAN"] = card.data["POW"]

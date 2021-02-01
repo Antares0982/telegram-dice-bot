@@ -13,13 +13,14 @@ def writekpinfo(dict1: dict) -> None:
 
 def writecards(listofgamecard: Dict[int, Dict[int, GameCard]]) -> None:
     listofdict: Dict[str, Dict[str, dict]] = {}
-    for gpids in listofgamecard:
-        if len(listofgamecard[gpids]) == 0:
+    for gpid in listofgamecard:
+        if len(listofgamecard[gpid]) == 0:
+            listofgamecard.pop(gpid)
             continue
-        listofdict[str(gpids)] = {}
-        for cdids in listofgamecard[gpids]:
-            listofdict[str(gpids)][str(cdids)
-                                   ] = listofgamecard[gpids][cdids].__dict__
+        listofdict[str(gpid)] = {}
+        for cdids in listofgamecard[gpid]:
+            listofdict[str(gpid)][str(cdids)
+                                   ] = listofgamecard[gpid][cdids].__dict__
     with open(PATH_CARDSLIST, "w", encoding="utf-8") as f:
         json.dump(listofdict, f, indent=4, ensure_ascii=False)
 
