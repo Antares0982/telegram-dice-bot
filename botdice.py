@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 import numpy as np
 from typing import List
 
@@ -41,7 +42,7 @@ def commondice(dicename) -> str:
         ans += " = "+str(int(sum(ansint)))
         return ans
     dicess = dicename.split('+')
-    ansint:List[int] = []
+    ansint: List[int] = []
     for i in range(len(dicess)):
         if dicess[i].find('d') < 0 and not isint(dicess[i]):
             return "Invalid input."

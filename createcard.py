@@ -1,4 +1,4 @@
-# coding=utf-8
+# -*- coding:utf-8 -*-
 from gameclass import GameCard
 from cfg import *
 import numpy as np

@@ -2,7 +2,6 @@
 # Only define handlers and dicts that store info
 
 
-from configparser import Error
 import time
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -82,7 +81,9 @@ def searchifkp(plid: int) -> bool:
 
 
 def isfromkp(update: Update) -> bool:
-    """判断消息发送者是否是kp"""
+    """判断消息发送者是否是kp。
+
+    如果是私聊消息，只需要发送者是某群KP即返回True。如果是群聊消息，当发送者是本群KP才返回True"""
     if isprivatemsg(update):  # 私聊消息，判断是否是kp
         return searchifkp(update.effective_chat.id)
     # 如果是群消息，判断该指令是否来自本群kp
@@ -224,6 +225,43 @@ def findDiscardCardsGroupIDTuple(plid: int) -> List[Tuple[int, int]]:
 def showcardinfo(card1: GameCard) -> str:  # show full card
     """调用`GameCard.__str__`返回`card1`的信息"""
     return str(card1)
+
+
+def showvalwithkey(d: dict, keyname: str) -> Tuple[str, bool]:
+    if keyname not in d:
+        return None, False
+    val = d[keyname]
+    rttext: str = ""
+    if isinstance(val, dict):
+        for key in val:
+            rttext += key+": "+str(val[key])+"\n"
+    else:
+        rttext = str(val)
+    if rttext == "":
+        rttext = "None"
+    return rttext, True
+# find a certain attr to show
+
+
+def showattrinfo(update: Update, card1: GameCard, attrname: str) -> bool:
+    """显示卡中某项具体的数据，并直接由`update`输出到用户。
+    不能输出属性`tempstatus`下的子属性。
+    如果获取不到`attrname`这个属性，返回False。"""
+    rttext, ok = showvalwithkey(card1.__dict__, attrname)
+    if ok:
+        update.message.reply_text(rttext)
+        return True
+    # 没有在最外层找到
+    for keys in card1.__dict__:
+        if not isinstance(card1.__dict__[keys], dict) or (keys == "tempstatus" and attrname != "global"):
+            continue
+        rttext, ok = showvalwithkey(card1.__dict__[keys], attrname)
+        if not ok:
+            continue
+        update.message.reply_text(rttext)
+        return True
+    update.message.reply_text("找不到这个属性！")
+    return False
 
 
 def modifythisdict(d: dict, attrname: str, val: str) -> Tuple[str, bool]:
@@ -597,7 +635,7 @@ def newcard(update: Update, context: CallbackContext):
     writecurrentcarddict(CURRENT_CARD_DICT)
     return True
 
-# (private)/discard (<groupid>/<cardid>) 删除对应卡片。
+# (private)/discard (--groupid/--cardid) 删除对应卡片。
 
 
 def discard(update: Update, context: CallbackContext):
@@ -1465,7 +1503,7 @@ def endgame(update: Update, context: CallbackContext) -> bool:
     return False
 
 
-# /switch (<id>): 切换进行修改操作时控制的卡，可以输入gpid，也可以是cdid
+# /switch (--id): 切换进行修改操作时控制的卡，可以输入gpid，也可以是cdid
 def switch(update: Update, context: CallbackContext):
     if isgroupmsg(update):
         update.message.reply_text("对bot私聊来切换卡。")
@@ -1575,8 +1613,8 @@ def switchkp(update: Update, context: CallbackContext):
 def showmycards(update: Update, context: CallbackContext) -> bool:
     pass
 
-# /tempcheck <tpcheck:int>: add temp check
-# /tempcheck <tpcheck:int> (<cardid> <dicename>): add temp check for one card in a game
+# /tempcheck --tpcheck:int: add temp check
+# /tempcheck --tpcheck:int (--cardid --dicename): add temp check for one card in a game
 
 
 def tempcheck(update: Update, context: CallbackContext):
@@ -1716,169 +1754,254 @@ def roll(update: Update, context: CallbackContext):
     return True
 
 
-# find a certain attr to show
-def showattrinfo(update: Update, card1: GameCard, attrname: str) -> bool:
-    if attrname in card1.__dict__:
-        ans = card1.__dict__[attrname]
-        rttext = ""
-        if isinstance(ans, dict):
-            for keys in ans:
-                rttext += keys+": "+str(ans[keys])+"\n"
-        else:
-            rttext = str(ans)
-        if rttext == "":
-            rttext = "None"
-        update.message.reply_text(rttext)
-        return True
-    for keys in card1.__dict__:
-        if keys == "tempstatus" and attrname != "global":
-            continue
-        if isinstance(card1.__dict__[keys], dict):
-            if attrname in card1.__dict__[keys]:
-                rttext = str(card1.__dict__[keys][attrname])
-                if rttext == "":
-                    rttext = "None"
-                update.message.reply_text(rttext)
-                return True
-    update.message.reply_text("Can't find this attribute of card!")
-    return False
-
-# /show: show card you are controlling
-# /show <attrname>: show attr of your card
-# (private)/show game: show cards in your game (KP only)
-# (private)/show kp: show cards KP controlling (KP only)
-# (private)/show group <groupid>: show all cards in a certain group (KP only)
-
-
 def show(update: Update, context: CallbackContext) -> bool:
-    # Should not return game info, unless args[0] == "game"
+    """显示目前操作中的卡片的信息。
+    /show card: 显示当前操作的整张卡片的信息
+    /show --attrname: 显示卡片的某项具体属性
+    """
+    if len(context.args) == 0:
+        return errorHandler(update, "需要参数")
     if isprivatemsg(update):
-        if len(context.args) == 0:
-            plid = update.effective_chat.id
-            card1, ok = findcard(plid)
-            if not ok:
-                update.message.reply_text(
-                    "Can't find card. If you are kp, please use '/show kp'.")
-                return False
-            update.message.reply_text(showcardinfo(card1))
-            return True
-        attrname = context.args[0]
-        if attrname == "group":
-            kpid = update.effective_chat.id
-            # args[1] should be group id
-            if len(context.args) < 2:
-                update.message.reply_text("需要群ID。")
-                return False
-            gpid = context.args[1]
-            if not botdice.isint(gpid):
-                update.message.reply_text("无效ID。")
-                return False
-            gpid = int(gpid)
-            if gpid not in CARDS_DICT:
-                update.message.reply_text("这个群没有卡。")
-                return False
-            ans: List[GameCard] = []
-            for cdid in CARDS_DICT[gpid]:
-                ans.append(CARDS_DICT[gpid][cdid])
-            if len(ans) == 0:
-                update.message.reply_text("No card found.")
-                return False
-            for i in ans:
-                update.message.reply_text(showcardinfo(i))
-            return True
-        if attrname == "game":
-            kpid = update.effective_chat.id
-            game, ok = findgamewithkpid(kpid)
-            if not ok:
-                update.message.reply_text("Game not found.")
-                return False
-            for i in game.cards:
-                update.message.reply_text(showcardinfo(i))
-            return True
-        if attrname == "kp":
-            kpid = update.effective_chat.id
-            cards = findkpcards(kpid)
-            if len(cards) == 0:
-                update.message.reply_text("You have no cards as a kp.")
-                return False
-            for i in range(len(cards)):
-                update.message.reply_text(showcardinfo(cards[i]))
-            return True
         plid = update.effective_chat.id
         card1, ok = findcard(plid)
         if not ok:
-            update.message.reply_text("Can't find card.")
-            return False
+            return errorHandler(update, "找不到卡。")
+        if context.args[0] == "card":
+            update.message.reply_text(showcardinfo(card1))
+            return True
+        attrname = context.args[0]
         if not showattrinfo(update, card1, attrname):
             return False
         return True
-    # Group msg, ON_GAME is needed
+    # 群消息
     gpid = update.effective_chat.id
     senderid = update.message.from_user.id
-    game, ok = findgame(gpid)
-    if not ok:
-        update.message.reply_text(
-            "Can't find game, please send private message to show card info.")
-        return False
-    if GROUP_KP_DICT[gpid] == senderid:  # KP
-        if len(context.args) == 0:
-            update.message.reply_text("Cannot show all info in a group.")
-            return False
-        attrname = context.args[0]
-        if game.kpctrl == -1:
-            update.message.reply_text(
-                "No card choosen. Use /switch to switch card.")
-            return False
-        if not showattrinfo(update, game.kpcards[game.kpctrl], attrname):
-            return False
-        return True
-    card1, ok = findcardfromgame(game, senderid)
-    if not ok:
-        update.message.reply_text("Can't find card.")
-        return False
-    if len(context.args) == 0:
-        update.message.reply_text(showcardinfo(card1))
+    # KP
+    if gpid in GROUP_KP_DICT and GROUP_KP_DICT[gpid] == senderid and context.args[0] == "card":
+        return errorHandler(update, "为保护NPC或敌人信息，不可以在群内显示KP整张卡片", True)
+    game, ingame = findgame(gpid)
+    if not ingame:  # 显示游戏外数据，需要提示
+        cardi, ok = findcard(senderid)
+        if not ok:
+            return errorHandler(update, "找不到卡。")
+    else:
+        if isfromkp(update):
+            if game.kpctrl != -1:
+                cardi = game.kpcards[game.kpctrl]
+            else:
+                return errorHandler(update, "注意：kpctrl值为-1")
+        else:
+            cardi, ok = findcardfromgame(game, senderid)
+    # 显示游戏内数据，需要提示是游戏内/外的卡
+    if context.args[0] == "card":
+        rttext = ""
+        if ingame:
+            rttext += "显示游戏中的卡片：\n"
+        else:
+            rttext += "显示游戏外的卡片：\n"
+        rttext += showcardinfo(cardi)
+        update.message.reply_text(rttext)
         return True
     attrname = context.args[0]
-    if not showattrinfo(update, card1, attrname):
+    if ingame:
+        update.message.reply_text("显示游戏中的卡片：")
+    else:
+        update.message.reply_text("显示游戏外的卡片：")
+    if not showattrinfo(update, cardi, attrname):
         return False
     return True
 
 
-# (private)showids: return all card ids (not in a game)
+def showkp(update: Update, context: CallbackContext) -> bool:
+    """这一指令是为KP设计的。
+
+    (private)/showkp game: 显示发送者主持的游戏中所有的卡
+    (private)/showkp card: 显示发送者作为KP控制的所有卡
+    (private)/showkp group --groupid: 显示发送者是KP的某个群内的所有卡"""
+    # Should not return game info, unless args[0] == "game"
+    if isgroupmsg(update):
+        return errorHandler(update, "使用该指令请发送私聊消息", True)
+    if len(context.args) == 0:
+        return errorHandler(update, "需要参数")
+    arg = context.args[0]
+    if arg == "group":
+        kpid = update.effective_chat.id
+        # args[1] should be group id
+        if len(context.args) < 2:
+            update.message.reply_text("需要群ID。")
+            return False
+        gpid = context.args[1]
+        if not botdice.isint(gpid):
+            update.message.reply_text("无效ID。")
+            return False
+        gpid = int(gpid)
+        if gpid not in CARDS_DICT:
+            update.message.reply_text("这个群没有卡。")
+            return False
+        ans: List[GameCard] = []
+        for cdid in CARDS_DICT[gpid]:
+            ans.append(CARDS_DICT[gpid][cdid])
+        if len(ans) == 0:
+            update.message.reply_text("No card found.")
+            return False
+        for i in ans:
+            update.message.reply_text(showcardinfo(i))
+        return True
+    if arg == "game":
+        kpid = update.effective_chat.id
+        game, ok = findgamewithkpid(kpid)
+        if not ok:
+            update.message.reply_text("Game not found.")
+            return False
+        for i in game.cards:
+            update.message.reply_text(showcardinfo(i))
+        return True
+    if arg == "kp":
+        kpid = update.effective_chat.id
+        cards = findkpcards(kpid)
+        if len(cards) == 0:
+            update.message.reply_text("You have no cards as a kp.")
+            return False
+        for i in range(len(cards)):
+            update.message.reply_text(showcardinfo(cards[i]))
+        return True
+    return errorHandler(update, "无法识别的参数")
+
+
+def showcard(update: Update, context: CallbackContext) -> bool:
+    """显示某张卡的信息。
+
+    `/showcard --cardid (--attrname)`: 显示卡id为`cardid`的卡片的信息。
+    如果`attrname`不为空，则显示这一项数据。
+
+    显示前会检查发送者是否有权限显示这张卡。在这些情况下，无法显示卡：
+
+    群聊环境：显示非本群的卡片，或者显示本群PL以外的卡片；
+
+    私聊环境：作为PL，显示非自己控制的卡片；KP想显示非自己管理的群的卡片。"""
+    if len(context.args) == 0:
+        return errorHandler(update, "需要参数")
+    if not botdice.isint(context.args[0]):
+        return errorHandler(update, "参数不是整数", True)
+    cdid = int(context.args[0])
+    cardi, ok = findcardwithid(cdid)
+    if not ok:
+        return errorHandler(update, "没有这张卡", True)
+    if isprivatemsg(update):
+        # 检查是否合法
+        if isfromkp(update):  # KP
+            kpid = update.effective_chat.id
+            if cardi.groupid not in GROUP_KP_DICT or GROUP_KP_DICT[cardi.groupid] != kpid:
+                return errorHandler(update, "没有权限")
+        else:
+            # 非KP，只能显示自己的卡
+            plid = update.effective_chat.id
+            if cardi.playerid != plid:
+                return errorHandler(update, "没有权限")
+        # 有权限显示
+        if len(context.args) >= 2:
+            if not showattrinfo(update, cardi, context.args[1]):
+                return False
+            return True
+        update.message.reply_text(showcardinfo(cardi))
+        return True
+    # 处理群聊消息
+    gpid = update.effective_chat.id
+    if cardi.groupid != gpid or cardi.playerid == GROUP_KP_DICT[gpid] or cardi.type != "PL":
+        return errorHandler(update, "没有权限", True)
+    # 有权限显示
+    if len(context.args) >= 2:
+        if not showattrinfo(update, cardi, context.args[1]):
+            return False
+        return True
+    update.message.reply_text(showcardinfo(cardi))
+    return True
+
+# (private)
 # (private)showids game: return all card ids in a game
 # (private)showids kp: return all card ids kp controlling
+
+
 def showids(update: Update, context: CallbackContext) -> bool:
+    """用于显示卡的id。只接受私聊消息。
+
+    群聊时，只能显示游戏中PL的卡片id。
+
+    `showids`: 显示游戏外的卡id。
+
+    `showids game`: 显示游戏中的卡id。
+
+    私聊时，只有KP可以使用该指令。两个指令同上，但结果将更详细，结果会包括KP主持游戏的所有群的卡片。额外有一个功能：
+
+    `showids kp`: 返回KP游戏中控制的所有卡片id"""
     if isgroupmsg(update):
-        update.message.reply_text("Send private message to see IDs.")
-        return False
+        gpid = update.effective_chat.id
+        if len(context.args) == 0:
+            if gpid not in CARDS_DICT:
+                return errorHandler(update, "本群没有卡")
+            rttext = ""
+            for cdid in CARDS_DICT[gpid]:
+                cardi = CARDS_DICT[gpid][cdid]
+                if cardi.playerid == GROUP_KP_DICT[gpid] or cardi.type != "PL":
+                    continue
+                rttext += str(cardi.id)+": "
+                if "name" not in cardi.info or cardi.info["name"] == "":
+                    rttext += "No name\n"
+                else:
+                    rttext += cardi.info["name"]+"\n"
+            if rttext == "":
+                return errorHandler(update, "本群没有卡")
+            update.message.reply_text(rttext)
+            return True
+        if context.args[0] != "game":
+            return errorHandler(update, "无法识别的参数", True)
+        game, ok = findgame(gpid)
+        if not ok:
+            return errorHandler(update, "没有进行中的游戏", True)
+        rttext = ""
+        for cardi in game.cards:
+            if cardi in game.kpcards or cardi.type != "PL":
+                continue
+            rttext += str(cardi.id)+": "
+            if "name" not in cardi.info or cardi.info["name"] == "":
+                rttext += "No name\n"
+            else:
+                rttext += cardi.info["name"]+"\n"
+        if rttext == "":
+            return errorHandler(update, "游戏中没有卡")
+        update.message.reply_text(rttext)
+        return True
+    # 下面处理私聊消息
     if not isfromkp(update):
-        update.message.reply_text("Not authorized.")
-        return False
+        return errorHandler(update, "没有权限")
     kpid = update.effective_chat.id
     game, ok = findgamewithkpid(kpid)
-    if len(context.args) >= 1 and context.args[0] == "kp":
-        if not ok:
-            update.message.reply_text("Should be in a game.")
-            return False
-        cards = game.cards
+    if len(context.args) >= 1:
+        if context.args[0] != "kp" and context.args[0] != "game":
+            return errorHandler(update, "无法识别的参数")
+        if context.args[0] == "kp":
+            if not ok:
+                return errorHandler(update, "该参数只返回游戏中你的卡片，但你目前没有主持游戏")
+            cards = game.kpcards
+        else:
+            if not ok:
+                return errorHandler(update, "你目前没有主持游戏")
+            cards = game.cards
         rttext = ""
-        for i in range(len(game.kpcards)):
-            rttext += game.kpcards[i].info["name"]+": "+str(i)+"\n"
-        update.message.reply_text(rttext)
-        return True
-    if len(context.args) >= 1 and context.args[0] == "game":
-        if not ok:
-            update.message.reply_text("Should be in a game.")
-            return False
-        cards = game.cards
-        rttext = ""
+        if len(cards) == 0:
+            return errorHandler(update, "游戏中KP没有卡")
         for cardi in cards:
-            rttext += cardi.info["name"]+": "+str(cardi.id)+"\n"
+            if "name" in cardi.info and cardi.info["name"] != "":
+                rttext += str(cardi.id)+": "+cardi.info["name"]+"\n"
+            else:
+                rttext += str(cardi.id) + ": No name\n"
         update.message.reply_text(rttext)
         return True
+    # 不带参数，显示全部该KP做主持的群中的卡id
     kpgps = findkpgroups(kpid)
     rttext = ""
+    if popallempties(CARDS_DICT):
+        writecards(CARDS_DICT)
     for gpid in kpgps:
         if gpid not in CARDS_DICT:
             continue
@@ -1886,95 +2009,102 @@ def showids(update: Update, context: CallbackContext) -> bool:
             if CARDS_DICT[gpid][cdid].playerid == kpid:
                 rttext += "(KP) "
             if "name" in CARDS_DICT[gpid][cdid].info and CARDS_DICT[gpid][cdid].info["name"].strip() != "":
-                rttext += CARDS_DICT[gpid][cdid].info["name"] + \
-                    ": "+str(CARDS_DICT[gpid][cdid].id)+"\n"
+                rttext += str(CARDS_DICT[gpid][cdid].id) + \
+                    ": "+CARDS_DICT[gpid][cdid].info["name"]+"\n"
             else:
-                rttext += "None: "+str(CARDS_DICT[gpid][cdid].id)+"\n"
+                rttext += str(CARDS_DICT[gpid][cdid].id) + ": No name\n"
+    if rttext == "":
+        return errorHandler(update, "没有可显示的卡")
     update.message.reply_text(rttext)
     return True
 
 
-# /modify <cardid> <arg> <value> (game): 修改id为cardid的卡的value，要修改的参数是arg。带game时修改的是游戏内卡片数据，不指明时默认游戏外
 def modify(update: Update, context: CallbackContext) -> bool:
+    """强制修改某张卡某个属性的值。使用时需要注意可能出现的问题，使用该指令前请三思。
+
+    /modify --cardid --arg --value (game): 修改id为cardid的卡的value，要修改的参数是arg。带game时修改的是游戏内卡片数据，不指明时默认游戏外
+    """
     if not isfromkp(update) and update.effective_chat.id != ADMIN_ID:
-        update.message.reply_text("没有权限")
-        return False
+        return errorHandler(update, "没有权限", True)
     # need 3 args, first: card id, second: attrname, third: value
     if len(context.args) < 3:
-        update.message.reply_text("需要至少3个参数")
-        return False
+        return errorHandler(update, "需要至少3个参数", True)
+    if context.args[1] == "id" or context.args[1] == "groupid":
+        return errorHandler(update, "该属性无法修改", True)
     card_id = context.args[0]
     if not botdice.isint(card_id):
-        update.message.reply_text("无效ID")
-        return False
+        return errorHandler(update, "无效ID", True)
     card_id = int(card_id)
     if update.message.from_user.id == ADMIN_ID:  # 最高控制权限
         if len(context.args) == 3 or context.args[3] != "game":
             cardi, ok = findcardwithid(card_id)
             if not ok:
-                update.message.reply_text("找不到卡片")
-                return False
+                return errorHandler(update, "找不到卡片")
             rtmsg, ok = modifycardinfo(cardi, context.args[1], context.args[2])
-            update.message.reply_text(rtmsg)
             if not ok:
+                update.message.reply_text(rtmsg)
                 return False
+            update.message.reply_text("修改了游戏外的卡片：\n"+rtmsg)
             writecards(CARDS_DICT)
             return True
         cardi, ok = findcardwithid(card_id)
         if not ok:
-            update.message.reply_text("找不到卡片")
-            return False
+            return errorHandler(update, "警告：找不到游戏外对应卡片，请务必核查是ID输入有误还是数据出现不一致！")
         game, ok = findgame(cardi.groupid)
         if not ok:
-            update.message.reply_text("找不到游戏")
-            return False
+            return errorHandler(update, "找不到游戏", True)
         cardi, ok = findcardfromgamewithid(game, card_id)
         if not ok:
-            update.message.reply_text("找不到游戏中的卡")
+            update.message.reply_text("警告：找不到游戏中的卡，数据出现不一致！")
             return False
         rtmsg, ok = modifycardinfo(cardi, context.args[1], context.args[2])
-        update.message.reply_text(rtmsg)
+
         if not ok:
+            update.message.reply_text(rtmsg)
             return False
-        writecards(CARDS_DICT)
+        update.message.reply_text("修改了游戏中的卡片：\n"+rtmsg)
+        writecards(ON_GAME)
         return True
+    # 处理有权限的非BOT控制者，即kp
     kpid = update.message.from_user.id
     if len(context.args) <= 3 or context.args[3] != "game":
         cardi, ok = findcardwithid(card_id)
         if not ok:
-            update.message.reply_text("找不到卡片")
-            return False
+            return errorHandler(update, "找不到卡片")
         if GROUP_KP_DICT[cardi.groupid] != kpid:
-            update.message.reply_text("没有权限")
-            return False
+            return errorHandler(update, "没有权限", True)
         rtmsg, ok = modifycardinfo(cardi, context.args[1], context.args[2])
-        update.message.reply_text(rtmsg)
         if not ok:
+            update.message.reply_text(rtmsg)
             return False
+        update.message.reply_text("修改了游戏外的卡片：\n"+rtmsg)
         writecards(CARDS_DICT)
         return True
     game, ok = findgamewithkpid(kpid)
     if not ok:
-        update.message.reply_text("没有进行中的游戏")
-        return False
+        return errorHandler(update, "没有进行中的游戏", True)
     cardi, ok = findcardfromgamewithid(card_id)
     if not ok:
-        update.message.reply_text("找不到游戏中的卡或没有权限")
-        return False
+        return errorHandler(update, "找不到游戏中的卡")
     rtmsg, ok = modifycardinfo(cardi, context.args[1], context.args[2])
-    update.message.reply_text(rtmsg)
     if not ok:
+        update.message.reply_text(rtmsg)
         return False
-    writecards(CARDS_DICT)
+    update.message.reply_text("修改了游戏中的卡片：\n"+rtmsg)
+    writecards(ON_GAME)
     return True
 
 
 def randombackground(update: Update, context: CallbackContext) -> bool:
+    """生成随机的背景故事。
+
+    获得当前发送者修改中的卡，生成随机的背景故事并写入。"""
     plid = update.message.from_user.id
     card1, ok = findcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
+    # 随机信仰
     rdfaithlist = [
         "毗沙门天",
         "伊斯兰教",
@@ -2096,7 +2226,7 @@ def setsex(update: Update, context: CallbackContext) -> bool:
     return True
 
 
-# setbkground <bkgroundname> <bkgroundinfo...>: Need at least 2 args
+# setbkground --bkgroundname --bkgroundinfo...: Need at least 2 args
 
 
 def setbkground(update: Update, context: CallbackContext) -> bool:

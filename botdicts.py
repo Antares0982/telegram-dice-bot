@@ -1,9 +1,19 @@
 # -*- coding:utf-8 -*-
 import copy
 import json
-from typing import Tuple, List, Dict
+from typing import Any, Tuple, List, Dict
 from cfg import *
 from gameclass import *
+
+
+def popallempties(d: Dict[Any, dict]) -> bool:
+    """将二层字典中一层的空键删除。如果有空键，返回True，否则返回False"""
+    ans: bool = False
+    for key in d:
+        if not d[key]:
+            ans = True
+            d.pop(key)
+    return ans
 
 
 def writekpinfo(dict1: dict) -> None:
@@ -20,7 +30,7 @@ def writecards(listofgamecard: Dict[int, Dict[int, GameCard]]) -> None:
         listofdict[str(gpid)] = {}
         for cdids in listofgamecard[gpid]:
             listofdict[str(gpid)][str(cdids)
-                                   ] = listofgamecard[gpid][cdids].__dict__
+                                  ] = listofgamecard[gpid][cdids].__dict__
     with open(PATH_CARDSLIST, "w", encoding="utf-8") as f:
         json.dump(listofdict, f, indent=4, ensure_ascii=False)
 

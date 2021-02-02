@@ -20,7 +20,7 @@ logging.basicConfig(
 
 
 def bot(update: Update, context: CallbackContext) -> bool:
-    """直接控制控制程序的行为。可以直接调用updater。
+    """直接控制控制程序的行为。可以直接调用updater。使用方法：
 
     `/bot stop`将结束程序。
 
@@ -48,12 +48,13 @@ def bot(update: Update, context: CallbackContext) -> bool:
         writegameinfo(ON_GAME)
         pid = os.getpid()
         if sys.platform == "win32":  # windows
-            os.kill(pid, signal.CTRL_C_EVENT)
+            os.kill(pid, signal.SIGBREAK)
         else:  # Other
             os.kill(pid, signal.SIGKILL)
-        return True
-    elif inst == "restart":
+        return errorHandler(update, "关闭失败！")
+    if inst == "restart":
         return reload(update, context)
+    return errorHandler(update, "没有这一指令", True)
 
 
 def main() -> None:
@@ -83,6 +84,8 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('tempcheck', tempcheck))
     dispatcher.add_handler(CommandHandler('roll', roll))
     dispatcher.add_handler(CommandHandler('show', show))
+    dispatcher.add_handler(CommandHandler('showkp', showkp))
+    dispatcher.add_handler(CommandHandler('showcard', showcard))
     dispatcher.add_handler(CommandHandler('showids', showids))
     dispatcher.add_handler(CommandHandler('modify', modify))
     dispatcher.add_handler(CommandHandler(
@@ -97,6 +100,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    pid = os.getpid()
-    print(pid)
     main()

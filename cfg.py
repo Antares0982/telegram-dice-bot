@@ -1,4 +1,4 @@
-# coding=utf-8
+# -*- coding:utf-8 -*-
 from configparser import ConfigParser
 cfgparser = ConfigParser()
 cfgparser.read('config.ini')
