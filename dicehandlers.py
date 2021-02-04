@@ -144,6 +144,33 @@ def initrules(gpid: int) -> None:
     writerules(GROUP_RULES)
 
 
+def skillcantouchmax(card1: GameCard) -> Tuple[bool, bool]:
+    """判断一张卡当前是否可以新增一个专精技能。
+
+    第一个返回值描述年龄是否符合Aged标准。第二个返回值描述在当前年龄下能否触摸到专精等级"""
+    initrules(card1.groupid)
+    if card1.info["AGE"] > GROUP_RULES[card1.groupid].skillmaxAged[3]:
+        ans1 = True
+        skillmaxrule = GROUP_RULES[card1.groupid].skillmaxAged
+    else:
+        ans1 = False
+        skillmaxrule = GROUP_RULES[card1.groupid].skillmax
+    countSpecialSkill = 0
+    for skill in card1.skill:
+        if skill == "points":
+            continue
+        if card1.skill[skill] > skillmaxrule[0]:
+            countSpecialSkill += 1
+    for skill in card1.interest:
+        if skill == "points":
+            continue
+        if card1.interest[skill] > skillmaxrule[0]:
+            countSpecialSkill += 1
+    if countSpecialSkill >= skillmaxrule[2]:
+        return ans1, False
+    return ans1, True
+
+
 def getskilllevelfromdict(card1: GameCard, keys: str) -> int:
     """从技能表中读取的技能初始值。
 
@@ -157,7 +184,7 @@ def getskilllevelfromdict(card1: GameCard, keys: str) -> int:
     return -1
 
 
-def makeIntButtons(lower: int, upper: int, keystr1: str, keystr2: str, step: int = 10, column: int = 4) -> List[list]:
+def makeIntButtons(lower: int, upper: int, keystr1: str, keystr2: str, step: int = 5, column: int = 4) -> List[list]:
     """返回一个InlineKeyboardButton组成的二维列表。按钮的显示文本是整数。
 
     `lower`表示最小值，`upper`表示最大值，均是按钮的一部分。
@@ -948,23 +975,110 @@ def setjob(update: Update, context: CallbackContext) -> bool:
     return True
 
 
+def skillmaxval(skillname: str, card1: GameCard, ismainskill: bool) -> int:
+    """通过cost规则，返回技能能达到的最高值。该函数主要用于制作按钮"""
+    aged, ok = skillcantouchmax(card1)
+    if aged:
+        skillrule = GROUP_RULES[card1.groupid].skillmaxAged
+    else:
+        skillrule = GROUP_RULES[card1.groupid].skillmax
+    if ok:
+        maxval = skillrule[1]
+    else:
+        maxval = skillrule[0]
+    basicval = -1
+    if ismainskill:
+        pts = card1.skill["points"]
+        if skillname in card1.skill:
+            basicval = card1.skill[skillname]
+    else:
+        pts = card1.interest["points"]
+        if skillname in card1.interest:
+            basicval = card1.interest[skillname]
+    initrules(card1.groupid)
+    costrule = GROUP_RULES[card1.groupid].skillCost
+    if basicval == -1:
+        basicval = getskilllevelfromdict(card1, skillname)
+    if len(costrule) <= 2:
+        skillmax = (pts+basicval*costrule[0])//costrule[0]
+        return min(maxval, skillmax)
+    # 有非默认的规则，长度不为2
+    i = 1
+    skillmax = basicval
+    while i < len(costrule):
+        if (costrule[i]-skillmax)*costrule[i-1] <= pts:
+            pts -= (costrule[i]-skillmax)*costrule[i-1]
+            skillmax = costrule[i]
+            i += 2
+        else:
+            return min(maxval, (pts+skillmax*costrule[i-1])//costrule[i-1])
+    return min(maxval, skillmax)
+
+
+def evalskillcost(skillname: str, skillval: int, card1: GameCard, ismainskill: bool) -> int:
+    """返回由当前技能值增加到目标值需要消耗多少点数。如果目标技能值低于已有值，返回负数"""
+    if skillval > 99:
+        return 10000  # HIT BAD TRAP
+    basicval = -1
+    if ismainskill:
+        if skillname in card1.skill:
+            basicval = card1.skill[skillname]
+    else:
+        if skillname in card1.interest:
+            basicval = card1.interest[skillname]
+    if basicval == -1:
+        basicval = getskilllevelfromdict(card1, skillname)
+    if skillval == basicval:
+        return 0
+    initrules(card1.groupid)
+    costrule = GROUP_RULES[card1.groupid].skillCost
+    if skillval < basicval:
+        # 返还技能点，返回负数
+        if len(costrule) <= 2:
+            return (skillval-basicval)*costrule[0]
+        i = len(costrule)-1
+        while i >= 0 and costrule[i] >= basicval:
+            i -= 2
+        if i < 0:
+            return (skillval-basicval)*costrule[0]
+        if skillval >= costrule[i]:
+            return (skillval-basicval)*costrule[i+1]
+        ans = 0
+        while i >= 0 and skillval < costrule[i]:
+            ans += (basicval-costrule[i])*costrule[i+1]
+            basicval = costrule[i]
+            i -= 2
+        return -(ans+(basicval-skillval)*costrule[i+1])
+    # 增加点数，返回值为正
+    if skillval <= costrule[1]:
+        return (skillval-basicval)*costrule[0]
+    i = 1
+    ans = 0
+    while skillval > costrule[i]:
+        ans += costrule[i-1]*(costrule[i]-basicval)
+        basicval = costrule[i]
+        i += 2
+    return ans + costrule[i-1]*(costrule[i]-basicval)
+
+
 def addmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
+    """该函数对没有`skillname`这项技能的卡使用。将主要技能值设置为`skillvalue`。"""
     if card1.skill["points"] == 0:
-        update.message.reply_text("You don't have any main skill points left!")
-        return False
-    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > min(getskilllevelfromdict(card1, skillname)+card1.skill["points"], 99):
-        update.message.reply_text("Skill value is too high or too low.")
-        return False
-    card1.skill["points"] -= skillvalue - \
-        getskilllevelfromdict(card1, skillname)
-    update.message.reply_text("Skill is set: "+skillname+" "+str(
-        skillvalue)+", cost points: "+str(skillvalue - getskilllevelfromdict(card1, skillname)))
+        return errorHandler(update, "你已经没有剩余点数了")
+    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > skillmaxval(skillname, card1, True):
+        return errorHandler(update, "目标技能点太高或太低")
+    # 计算点数消耗
+    costval = evalskillcost(skillname, skillvalue, card1, True)
+    card1.skill["points"] -= costval
+    update.message.reply_text(
+        "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
     card1.skill[skillname] = skillvalue
     writecards(CARDS_DICT)
     return True
 
 
 def addsgskill(skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
+    """添加一个建议的技能。直接调用`addmainskill`完成。"""
     if not addmainskill(skillname, skillvalue, card1, update):
         return False
     card1.suggestskill.pop(skillname)
@@ -973,29 +1087,35 @@ def addsgskill(skillname: str, skillvalue: int, card1: GameCard, update: Update)
 
 
 def addintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
+    """该函数对没有`skillname`这项技能的卡使用。将兴趣技能值设置为`skillvalue`。"""
     if card1.interest["points"] == 0:
-        update.message.reply_text(
-            "You don't have any interest skill points left!")
-        return False
-    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > min(getskilllevelfromdict(card1, skillname)+card1.interest["points"], 99):
-        update.message.reply_text("Skill value is too high or too low.")
-        return False
-    card1.interest["points"] -= skillvalue - \
-        getskilllevelfromdict(card1, skillname)
-    update.message.reply_text("Skill is set: "+skillname+" "+str(
-        skillvalue)+", cost points: "+str(skillvalue - getskilllevelfromdict(card1, skillname)))
+        return errorHandler(update, "你已经没有剩余点数了")
+
+    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > skillmaxval(skillname, card1, False):
+        return errorHandler(update, "目标技能点太高或太低")
+    # 计算点数消耗
+    costval = evalskillcost(skillname, skillvalue, card1, False)
+    card1.interest["points"] -= costval
+    update.message.reply_text(
+        "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
     card1.interest[skillname] = skillvalue
     writecards(CARDS_DICT)
     return True
 
 
 def cgmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:  # Change main skill level
-    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > min(card1.skill[skillname]+card1.skill["points"], 99):
-        update.message.reply_text("Skill value is too high or too low.")
-        return False
-    card1.skill["points"] -= skillvalue - card1.skill[skillname]
-    update.message.reply_text("Skill is set: "+skillname+" "+str(
-        skillvalue)+", cost points: "+str(skillvalue - card1.skill[skillname]))
+    """修改主要技能的值。如果将技能点调低，返还技能点数。"""
+
+    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > skillmaxval(skillname, card1, True):
+        return errorHandler(update, "目标技能点太高或太低")
+    costval = evalskillcost(skillname, skillvalue, card1, True)
+    card1.skill["points"] -= costval
+    if costval >= 0:
+        update.message.reply_text(
+            "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
+    else:
+        update.message.reply_text(
+            "技能设置成功："+skillname+" "+str(skillvalue)+"，返还点数："+str(-costval))
     card1.skill[skillname] = skillvalue
     writecards(CARDS_DICT)
     return True
@@ -1003,25 +1123,39 @@ def cgmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Update
 
 # Change interest skill level
 def cgintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
-    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > min(card1.interest[skillname]+card1.interest["points"], 99):
-        update.message.reply_text("Skill value is too high or too low.")
-        return False
-    card1.interest["points"] -= skillvalue - card1.interest[skillname]
-    update.message.reply_text("Skill is set: "+skillname+" "+str(
-        skillvalue)+", cost points: "+str(skillvalue - card1.interest[skillname]))
+    """修改兴趣技能的值。如果将技能点调低，返还技能点数。"""
+
+    if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > skillmaxval(skillname, card1, False):
+        return errorHandler(update, "目标技能点太高或太低")
+    costval = evalskillcost(skillname, skillvalue, card1, False)
+    card1.interest["points"] -= costval
+    if costval >= 0:
+        update.message.reply_text(
+            "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
+    else:
+        update.message.reply_text(
+            "技能设置成功："+skillname+" "+str(skillvalue)+"，返还点数："+str(-costval))
     card1.interest[skillname] = skillvalue
     writecards(CARDS_DICT)
     return True
 
 
 def addcredit(update: Update, context: CallbackContext, card1: GameCard) -> bool:
-    update.message.reply_text("Please set 信用 first!")
+    update.message.reply_text("请先设置信用！")
     if card1.info["job"] in JOB_DICT:
         m = JOB_DICT[card1.info["job"]][0]
         mm = JOB_DICT[card1.info["job"]][1]
     else:
-        m = 5
-        mm = 99
+        aged, ok = skillcantouchmax(card1)
+        if aged:
+            skillmaxrule = GROUP_RULES[card1.groupid].skillmaxAged
+        else:
+            skillmaxrule = GROUP_RULES[card1.groupid].skillmax
+        m = 0
+        if ok:
+            mm = skillmaxrule[1]
+        else:
+            mm = skillmaxrule[0]
     rtbuttons = makeIntButtons(m, mm, "addmainskill", "信用")
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     update.message.reply_text(
@@ -1030,8 +1164,13 @@ def addcredit(update: Update, context: CallbackContext, card1: GameCard) -> bool
 
 
 def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool:
+    """表示指令/addskill 中没有参数的情况。
+    创建技能按钮来完成技能的添加。
+
+    因为兴趣技能过多，使用可以翻页的按钮列表。"""
+    pass
     rtbuttons = [[]]
-    # If skill["points"] is 0, turn to interest.
+    # If card1.skill["points"] is 0, turn to interest.
     # Then it must be main skill. After all main skills are added, add interest skills.
     if card1.skill["points"] > 0:
         if not card1.suggestskill:  # Increase skills already added, because sgskill is empty
@@ -1094,43 +1233,45 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
 
 
 def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool:
+    """该函数在`/addskill`接收且仅接收一个参数时调用。制作技能数值表。"""
     # skillname is already checked if in SKILL_DICT
     # First search if args skillname in skill or suggestskill.
     # Otherwise, if (not suggestskill) and main points>0, should add main skill. Else should add Interest skill
     # Show button for numbers
     skillname = context.args[0]
     m = getskilllevelfromdict(card1, skillname)
+
     if skillname in card1.skill:  # GOOD TRAP: cgmainskill
-        mm = card1.skill["points"]+card1.skill[skillname]
-        rtbuttons = makeIntButtons(m, min(99, mm), "cgmainskill", skillname)
+        mm = skillmaxval(skillname, card1, True)
+        rtbuttons = makeIntButtons(m, mm, "cgmainskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
             "Change skill level, skill name is: "+skillname, reply_markup=rp_markup)
         return True
     if skillname in card1.suggestskill:  # GOOD TRAP: addsgskill
-        mm = card1.skill["points"] + m
-        rtbuttons = makeIntButtons(m, min(99, mm), "addsgskill", skillname)
+        mm = skillmaxval(skillname, card1, True)
+        rtbuttons = makeIntButtons(m, mm, "addsgskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
             "Add suggested skill, skill name is: "+skillname, reply_markup=rp_markup)
         return True
     if skillname in card1.interest:  # GOOD TRAP: cgintskill
-        mm = card1.interest["points"]+card1.interest[skillname]
-        rtbuttons = makeIntButtons(m, min(99, mm), "cgintskill", skillname)
+        mm = skillmaxval(skillname, card1, False)
+        rtbuttons = makeIntButtons(m, mm, "cgintskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
             "Change interest skill, skill name is: "+skillname, reply_markup=rp_markup)
         return True
     if card1.skill["points"] > 0:  # GOOD TRAP: addmainskill
-        mm = card1.skill["points"]+m
-        rtbuttons = makeIntButtons(m, min(99, mm), "addmainskill", skillname)
+        mm = skillmaxval(skillname, card1, True)
+        rtbuttons = makeIntButtons(m, mm, "addmainskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
             "Add main skill, skill name is: "+skillname, reply_markup=rp_markup)
         return True
     # GOOD TRAP: addintskill
-    mm = card1.interest["points"]+m
-    rtbuttons = makeIntButtons(m, min(99, mm), "addintskill", skillname)
+    mm = skillmaxval(skillname, card1, False)
+    rtbuttons = makeIntButtons(m, mm, "addintskill", skillname)
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     update.message.reply_text(
         "Add interest skill, skill name is: "+skillname, reply_markup=rp_markup)
@@ -1138,151 +1279,92 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
 
 
 def addskill2(update: Update, context: CallbackContext, card1: GameCard) -> bool:
+    """该函数在`/addskill`接收且仅接收两个参数时调用。直接修改技能值。"""
     skillname = context.args[0]
     skillvalue = int(context.args[1])
     if skillname in card1.skill:  # Change skill level.
-        if not cgmainskill(skillname, skillvalue, card1, update):
-            return False
-        writecards(CARDS_DICT)
-        return True
+        return cgmainskill(skillname, skillvalue, card1, update)
     if skillname in card1.suggestskill:
-        if not addsgskill(skillname, skillvalue, card1, update):
-            return False
-        writecards(CARDS_DICT)
-        return True
+        return addsgskill(skillname, skillvalue, card1, update)
     if skillname in card1.interest:  # Change skill level.
-        if not cgintskill(skillname, skillvalue, card1, update):
-            return False
-        writecards(CARDS_DICT)
-        return True
+        return cgintskill(skillname, skillvalue, card1, update)
     # If cannot judge which skill is, one more arg is needed. Then turn to addskill3()
     if card1.skill["points"] > 0 and card1.interest["points"] > 0:
-        update.message.reply_text(
-            "Please use '/addskill skillname skillvalue main/interest' to specify!")
-        return False
+        return errorHandler(update, "请使用'/addskill skillname skillvalue main/interest'来指定技能种类！")
     # HIT GOOD TRAP
     if card1.skill["points"] > 0:
-        if not addmainskill(skillname, skillvalue, card1, update):
-            return False
-        writecards(CARDS_DICT)
-        return True
-    if not addintskill(skillname, skillvalue, card1, update):
-        return False
-    writecards(CARDS_DICT)
-    return True
+        return addmainskill(skillname, skillvalue, card1, update)
+    return addintskill(skillname, skillvalue, card1, update)
 
 
 def addskill3(update: Update, context: CallbackContext, card1: GameCard) -> bool:
+    """该函数在`/addskill`接收三个参数时调用。直接修改技能值。"""
     skillname = context.args[0]
     skillvalue = int(context.args[1])
-    if context.args[2] != "interest" or context.args[2] != "main":
-        update.message.reply_text(
-            "Is it an interest/main skill? Please specify.")
-        return False
+    if context.args[2] != "interest" and context.args[2] != "main":
+        return errorHandler(update, "这是main（主要）还是interest（兴趣）技能？请在第三个参数位置指明")
     if context.args[2] == "interest" and (skillname in card1.suggestskill or skillname in card1.skill):
-        update.message.reply_text("This is a main skill.")
-        return False
+        return errorHandler(update, "这是main（主要）技能")
     if context.args[2] == "main" and skillname in card1.interest:
-        update.message.reply_text("This is a main skill.")
-        return False
+        return errorHandler(update, "这是interest（兴趣）技能")
     # HIT GOOD TRAP
-    # This means arg3 is "interest". Change skill level.
     if skillname in card1.interest:
-        if not cgintskill(skillname, skillvalue, card1, update):
-            return False
-        writecards(CARDS_DICT)
-        return True
+        # This means arg3 is "interest". Change skill level.
+        return cgintskill(skillname, skillvalue, card1, update)
     if skillname in card1.suggestskill:  # Add suggest skill
-        if not addsgskill(skillname, skillvalue, card1, update):
-            return False
-        writecards(CARDS_DICT)
-        return True
+        return addsgskill(skillname, skillvalue, card1, update)
     if skillname in card1.skill:  # Change skill level.
-        if not cgmainskill(skillname, skillvalue, card1, update):
-            return False
-        writecards(CARDS_DICT)
-        return True
+        return cgmainskill(skillname, skillvalue, card1, update)
     if context.args[2] == "main":
-        if not addmainskill(skillname, skillvalue, card1, update):
-            return False
-        writecards(CARDS_DICT)
-        return True
-    if not addintskill(skillname, skillvalue, card1, update):
-        return False
-    writecards(CARDS_DICT)
-    return True
-
-
-def basicskillcheck(card1: GameCard) -> int:
-    if "母语" in card1.suggestskill:
-        return 1
-    if "母语" not in card1.skill and "母语" not in card1.interest:
-        return 2
-    if "闪避" in card1.suggestskill:
-        return 3
-    if "闪避" not in card1.skill and "闪避" not in card1.interest:
-        return 4
-    return 0
-
-
-def setbasicskill(update: Update, context: CallbackContext, card1: GameCard, skillchecktype: int) -> bool:
-    if skillchecktype == 1:
-        update.message.reply_text("Please add suggested skill '母语' first!")
+        return addmainskill(skillname, skillvalue, card1, update)
+    return addintskill(skillname, skillvalue, card1, update)
 
 
 # Button. need 0-3 args, if len(args)==0 or 1, show button and listen; if len(args)==3, the third should be "interest/main" to give interest skills
 # Compicated
 def addskill(update: Update, context: CallbackContext) -> bool:
+    """该函数用于增加/修改技能。
+
+    增加技能这一功能非常复杂，它的详细功能被拆分为4个函数。
+    该函数只做基础的检查工作。检查通过后给4个拆分出的函数调用。"""
     if isgroupmsg(update):
-        update.message.reply_text("Send private message to add skill.")
-        return False
+        return errorHandler(update, "发私聊消息来增改技能", True)
     plid = update.effective_chat.id
     card1, ok = findcard(plid)
     if not ok:
-        update.message.reply_text("Can't find card.")
-        return False
+        return errorHandler(update, "找不到卡")
     if card1.skill["points"] == -1:
-        update.message.reply_text(
-            "Info not complete. Not allowed to add skill now.")
-        return False
-    if card1.skill["points"] == 0 and card1.interest["points"] == 0:
+        return errorHandler(update, "信息不完整，无法添加技能")
+    if card1.skill["points"] == 0 and card1.interest["points"] == 0 and len(context.args) == 0:
         if len(context.args) == 0 or (context.args[0] not in card1.skill and context.args[0] not in card1.interest):
-            update.message.reply_text("You don't have any points left!")
-            return False
+            return errorHandler(update, "你已经没有技能点了，请添加参数来修改具体的技能！")
     if "job" not in card1.info:
-        update.message.reply_text("Please set job first.")
-        return False
+        return errorHandler(update, "请先设置职业")
     if "信用" not in card1.skill:
-        if addcredit(update, context, card1):
-            return True
-        return False
+        return addcredit(update, context, card1)
     if len(context.args) == 0:  # HIT GOOD TRAP
-        if addskill0(update, context, card1):
-            return True
-        return False
+        return addskill0(update, context, card1)
     skillname = context.args[0]
     # HIT BAD TRAP
     if skillname != "母语" and skillname != "闪避" and (skillname not in SKILL_DICT or skillname == "克苏鲁神话"):
-        update.message.reply_text("This skill is not allowed.")
-        return False
+        return errorHandler(update, "无法设置这个技能")
     if len(context.args) == 1:  # HIT GOOD TRAP
         # This function only returns True
         return addskill1(update, context, card1)
     skillvalue = context.args[1]
     if not botdice.isint(skillvalue):
-        update.message.reply_text("Invalid input.")
+        return errorHandler(update, "第二个参数：无效输入")
     skillvalue = int(skillvalue)
-    if len(context.args) >= 3:  # No buttons
-        # HIT GOOD TRAP
-        if addskill3(update, context, card1):
-            return True
-        return False
-    if addskill2(update, context, card1):
-        return True
-    return False
+    # HIT GOOD TRAP
+    if len(context.args) >= 3:
+        # No buttons
+        return addskill3(update, context, card1)
+    return addskill2(update, context, card1)
 
 
 def button(update: Update, context: CallbackContext):
+    """所有按钮请求经该函数处理。功能十分复杂，拆分成多个子函数来处理。
+    接收到按钮的参数后，转到对应的子函数处理。"""
     if isgroupmsg(update):
         return False
     plid = update.effective_chat.id
@@ -1706,7 +1788,12 @@ def tempcheck(update: Update, context: CallbackContext):
 
 
 def roll(update: Update, context: CallbackContext):
-    # 只接受第一个空格前的参数。dicename可能是技能名，可能是3d6，可能是1d4+2d10。骰子环境可能是游戏中，游戏外。需要考虑多个情况
+    """基本的骰子功能。
+
+    只接受第一个空格前的参数`dicename`。
+    `dicename`可能是技能名，可能是`3d6`，可能是`1d4+2d10`。
+    骰子环境可能是游戏中，游戏外。"""
+    #
     if len(context.args) == 0:
         update.message.reply_text(botdice.commondice("1d100"))  # 骰1d100
         return True
@@ -1715,22 +1802,26 @@ def roll(update: Update, context: CallbackContext):
     if isgroupmsg(update):  # Group msg
         initrules(gpid)
         game, ok = findgame(gpid)
+        # 检查输入参数是不是一个基础骰子，如果是则直接计算骰子
         if not ok or dicename.find('d') >= 0:
             rttext = botdice.commondice(dicename)
-            update.message.reply_text(rttext)
             if rttext == "Invalid input.":
-                return False
+                return errorHandler(update, "无效输入")
+            update.message.reply_text(rttext)
             return True
+        # 获取临时检定
         tpcheck, game.tpcheck = game.tpcheck, 0
+        if tpcheck != 0:
+            writegameinfo(ON_GAME)
         senderid = update.message.from_user.id
         gpid = update.effective_chat.id
         if senderid != GROUP_KP_DICT[update.effective_chat.id]:
             gamecard, ok = findcardfromgame(game, senderid)
         elif game.kpctrl == -1:
             rttext = botdice.commondice(dicename)
-            update.message.reply_text(rttext)
             if rttext == "Invalid input.":
-                return False
+                return errorHandler(update, "无效输入")
+            update.message.reply_text(rttext)
             return True
         else:
             gamecard = game.kpcards[game.kpctrl]
@@ -1781,8 +1872,7 @@ def roll(update: Update, context: CallbackContext):
                 test = 50
         else:  # HIT BAD TRAP
             print(len(dicename))
-            update.message.reply_text("Invalid input.")
-            return False
+            return errorHandler(update, "无效输入")
         if "global" in gamecard.tempstatus:
             test += gamecard.tempstatus["global"]
         if dicename in gamecard.tempstatus:
@@ -1790,9 +1880,11 @@ def roll(update: Update, context: CallbackContext):
         test += tpcheck
         testval = botdice.dicemdn(1, 100)[0]
         rttext = "检定："+dicename+" "+str(testval)+"/"+str(test)+" "
-        if (test < 50 and testval > 95) or (test >= 50 and testval == 100):
+        greatsuccessrule = GROUP_RULES[gpid].greatsuccess
+        greatfailrule = GROUP_RULES[gpid].greatfail
+        if (test < 50 and testval >= greatfailrule[2] and testval <= greatfailrule[3]) or (test >= 50 and testval >= greatfailrule[0] and testval <= greatfailrule[1]):
             rttext += "大失败"
-        elif testval == 1:
+        elif (test < 50 and testval >= greatsuccessrule[2] and testval <= greatsuccessrule[3]) or (test >= 50 and testval >= greatsuccessrule[0] and testval <= greatsuccessrule[1]):
             rttext += "大成功"
         elif testval > test:
             rttext += "失败"
@@ -2342,15 +2434,17 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
     sanity = card1.attr["SAN"]
     check = botdice.dicemdn(1, 100)[0]
     rttext += str(check)+"/"+str(sanity)+" "
-    if (sanity < 50 and check > 95) or (sanity >= 50 and check == 100):  # 大失败
+    initrules(gpid)
+    greatfailrule = GROUP_RULES[gpid].greatfail
+    if (sanity < 50 and check >= greatfailrule[2] and check <= greatfailrule[3]) or (sanity >= 50 and check >= greatfailrule[0] and check <= greatfailrule[1]):  # 大失败
         rttext += "大失败"
         anstype = "大失败"
     elif check > sanity:  # check fail
         rttext += "失败"
         anstype = "失败"
     else:
-        rttext += "成功"
-        anstype = "成功"
+        rttext += ""
+        anstype = ""
     rttext += "\n损失理智："
     sanloss, m, n = 0, 0, 0
     if anstype == "大失败":

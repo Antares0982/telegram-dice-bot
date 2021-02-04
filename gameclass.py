@@ -75,7 +75,6 @@ class GroupGame:  # If defined, game is started.
             self.kpid: int = groupid["kpid"]
             self.kpctrl: int = groupid["kpctrl"]
             self.tpcheck: int = groupid["tpcheck"]
-            self.gamerule: GroupRule = GroupRule(groupid["gamerule"])
             tpcardslist = groupid["cards"]
             self.cards = []
             for i in tpcardslist:
@@ -89,7 +88,6 @@ class GroupGame:  # If defined, game is started.
                 self.cards.append(GameCard(i))
             self.kpctrl: int = -1
             self.tpcheck: int = 0
-            self.gamerule: GroupRule = GroupRule()
         self.kpcards: List[GameCard] = []
         for i in self.cards:
             if i.playerid == self.kpid:
