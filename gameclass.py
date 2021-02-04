@@ -107,6 +107,10 @@ class GroupGame:  # If defined, game is started.
 
 
 class GroupRule:
+    """一场游戏的规则。
+
+    KP在群里用`/setrule`设置规则。群中如果没有规则，会自动生成默认规则。"""
+
     def __init__(self, rules: Dict[str, List[int]] = {}):  # 不允许用户调用
         # 0位参数描述一般技能上限，1位参数描述专精技能上限，2位参数描述专精技能个数。上限<=99
         self.skillmax: List[int] = [80, 90, 1]
@@ -126,56 +130,56 @@ class GroupRule:
         for key in cgrules:
             if key == "skillmax":
                 if len(cgrules[key]) != 3:
-                    return "skillmax 参数长度有误", False
+                    return rttext+"skillmax 参数长度有误", False
                 if cgrules[key][2] > 20:
-                    return "skillmax 专精技能个数太多", False
+                    return rttext+"skillmax 专精技能个数太多", False
                 if cgrules[key][0] < 0 or cgrules[key][1] <= cgrules[key][0] or cgrules[key][1] >= 100 or cgrules[key][2] < 0:
-                    return "skillmax 参数有误", False
+                    return rttext+"skillmax 参数有误", False
                 rttext += "skillmax设置成功，值："+str(cgrules[key])+"\n"
                 self.__dict__[key] = cgrules[key]
             elif key == "skillmaxAged":
                 if len(cgrules[key]) != 4:
-                    return "skillmaxAged 参数长度有误", False
+                    return rttext+"skillmaxAged 参数长度有误", False
                 if cgrules[key][2] > 20:
-                    return "skillmaxAged 专精技能个数太多", False
+                    return rttext+"skillmaxAged 专精技能个数太多", False
                 if cgrules[key][0] < 0 or cgrules[key][1] <= cgrules[key][0] or cgrules[key][1] >= 100 or cgrules[key][2] < 0 or cgrules[key][3] < 17 or cgrules[key][3] > 100:
-                    return "skillmaxAged 参数有误", False
+                    return rttext+"skillmaxAged 参数有误", False
                 rttext += "skillmaxAged设置成功，值："+str(cgrules[key])+"\n"
                 self.__dict__[key] = cgrules[key]
             elif key == "skillCost":
                 if len(cgrules[key]) & 1 != 0 or len(cgrules[key]) == 0:
-                    return "skillCost 参数长度有误", False
+                    return rttext+"skillCost 参数长度有误", False
                 i = 0
                 while i+2 < len(cgrules[key]):
                     if cgrules[key][i+2] <= cgrules[key][i]:
-                        return "skillCost 参数有误", False
+                        return rttext+"skillCost 参数有误", False
                     i += 2
                 i = 1
                 while i+2 < len(cgrules[key]):
                     if cgrules[key][i+2] <= cgrules[key][i]:
-                        return "skillCost 参数有误", False
+                        return rttext+"skillCost 参数有误", False
                     i += 2
                 del i
                 if cgrules[key][0] <= 0 or cgrules[key][1] <= 0 or cgrules[key][len(cgrules[key])-1] != 100:
-                    return "skillCost 参数有误", False
+                    return rttext+"skillCost 参数有误", False
                 rttext += "skillCost设置成功，值："+str(cgrules[key])+"\n"
                 self.__dict__[key] = cgrules[key]
             elif key == "greatsuccess":
                 if len(cgrules[key]) != 4:
-                    return "greatsuccess 参数长度有误", False
+                    return rttext+"greatsuccess 参数长度有误", False
                 if cgrules[key][0] > cgrules[key][1] or cgrules[key][2] > cgrules[key][3]:
-                    return "greatsuccess 参数有误", False
+                    return rttext+"greatsuccess 参数有误", False
                 if cgrules[key][0] <= 0 or cgrules[key][1] > 100 or cgrules[key][2] <= 0 or cgrules[key][1] > 100:
-                    return "greatsuccess 参数有误", False
+                    return rttext+"greatsuccess 参数有误", False
                 rttext += "greatsuccess设置成功，值："+str(cgrules[key])+"\n"
                 self.__dict__[key] = cgrules[key]
             elif key == "greatfail":
                 if len(cgrules[key]) != 4:
-                    return "greatfail 参数长度有误", False
+                    return rttext+"greatfail 参数长度有误", False
                 if cgrules[key][0] > cgrules[key][1] or cgrules[key][2] > cgrules[key][3]:
-                    return "greatfail 参数有误", False
+                    return rttext+"greatfail 参数有误", False
                 if cgrules[key][0] <= 0 or cgrules[key][1] > 100 or cgrules[key][2] <= 0 or cgrules[key][1] > 100:
-                    return "greatfail 参数有误", False
+                    return rttext+"greatfail 参数有误", False
                 rttext += "greatfail设置成功，值："+str(cgrules[key])+"\n"
                 self.__dict__[key] = cgrules[key]
             else:

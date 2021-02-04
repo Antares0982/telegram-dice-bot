@@ -17,11 +17,13 @@ def popallempties(d: Dict[Any, dict]) -> bool:
 
 
 def writekpinfo(dict1: dict) -> None:
+    """用于GROUP_KP_DICT写入"""
     with open(PATH_GROUP_KP, "w", encoding="utf-8") as f:
         json.dump(dict1, f, indent=4, ensure_ascii=False)
 
 
 def writecards(listofgamecard: Dict[int, Dict[int, GameCard]]) -> None:
+    """用于CARDS_DICT写入"""
     listofdict: Dict[str, Dict[str, dict]] = {}
     for gpid in listofgamecard:
         if len(listofgamecard[gpid]) == 0:
@@ -36,6 +38,7 @@ def writecards(listofgamecard: Dict[int, Dict[int, GameCard]]) -> None:
 
 
 def writegameinfo(listofobj: List[GroupGame]) -> None:
+    """用于ON_GAME写入"""
     savelist: List[dict] = []
     for i in range(len(listofobj)):
         savelist.append(copy.deepcopy(listofobj[i].__dict__))
@@ -50,7 +53,8 @@ def writegameinfo(listofobj: List[GroupGame]) -> None:
 
 
 def readinfo() -> Tuple[Dict[int, int], Dict[int, Dict[int, GameCard]], List[GroupGame]]:
-    # create file if not exist
+    """读取三个文件的数据：GROUP_KP_DICT, CARDS_DICT, ON_GAME"""
+    # 如果文件不存在，则创建新文件
     # group-kp
     try:
         f = open(PATH_GROUP_KP, "r", encoding="utf-8")
@@ -106,18 +110,21 @@ def readinfo() -> Tuple[Dict[int, int], Dict[int, Dict[int, GameCard]], List[Gro
 
 
 def readskilldict() -> dict:
+    """读取SKILL_DICT"""
     with open(PATH_SKILLDICT, 'r', encoding="utf-8") as f:
         d = json.load(f)
     return d
 
 
 def readjobdict() -> dict:
+    """读取JOB_DICT"""
     with open(PATH_JOBDICT, 'r', encoding='utf-8') as f:
         d = json.load(f)
     return d
 
 
 def readcurrentcarddict() -> dict:
+    """读取CURRENT_CARD_DICT"""
     try:
         f = open(PATH_CURRENTCARDDICT, "r", encoding="utf-8")
         f.close()
@@ -135,5 +142,34 @@ def readcurrentcarddict() -> dict:
 
 
 def writecurrentcarddict(d: Dict[int, Tuple[int, int]]) -> None:
+    """CURRENT_CARD_DICT写入"""
     with open(PATH_CURRENTCARDDICT, "w", encoding="utf-8") as f:
         json.dump(d, f, indent=4, ensure_ascii=False)
+
+
+def readrules() -> Dict[int, GroupRule]:
+    """读取GROUP_RULES"""
+    d: Dict[str, dict]
+    try:
+        f = open(PATH_RULES, "r", encoding='utf-8')
+        f.close()
+    except FileNotFoundError:
+        with open(PATH_RULES, "w", encoding="utf-8") as f:
+            json.dump({}, f, indent=4, ensure_ascii=False)
+        d = {}
+    else:
+        with open(PATH_RULES, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+    d1: Dict[int, GroupRule] = {}
+    for key in d:
+        d1[int(key)] = GroupRule(d[key])
+    return d1
+
+
+def writerules(d: Dict[int, GroupRule]) -> None:
+    """GROUP_RULES写入"""
+    d1: Dict[int, dict] = {}
+    for key in d:
+        d1[key] = d[key].__dict__
+    with open(PATH_RULES, "w", encoding="utf-8") as f:
+        json.dump(d1, f, indent=4, ensure_ascii=False)

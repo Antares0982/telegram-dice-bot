@@ -2,6 +2,7 @@
 # Only define handlers and dicts that store info
 
 
+from copy import error
 import time
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -23,6 +24,7 @@ else:
 GROUP_KP_DICT: Dict[int, int]
 CARDS_DICT: Dict[int, Dict[int, GameCard]]
 ON_GAME: List[GroupGame]
+GROUP_RULES: Dict[int, GroupRule]
 
 ID_POOL: List[int] = []
 
@@ -48,6 +50,7 @@ try:
     CURRENT_CARD_DICT = readcurrentcarddict()
     SKILL_DICT = readskilldict()
     JOB_DICT = createcard.JOB_DICT
+    GROUP_RULES = readrules()
 except:
     updater.bot.send_message(
         chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
@@ -131,6 +134,14 @@ def findallplayercards(plid: int) -> List[Tuple[int, int]]:
             if CARDS_DICT[gpid][cdid].playerid == plid:
                 ans.append((gpid, cdid))
     return ans
+
+
+def initrules(gpid: int) -> None:
+    """如果`gpid`对应的群没有Rules，创建一个新的`GroupRule`对象。"""
+    if gpid in GROUP_RULES:
+        return
+    GROUP_RULES[gpid] = GroupRule()
+    writerules(GROUP_RULES)
 
 
 def getskilllevelfromdict(card1: GameCard, keys: str) -> int:
@@ -375,10 +386,14 @@ def recallmsg(update: Update) -> bool:
 
 
 def errorHandler(update: Update,  message: str, needrecall: bool = False) -> False:
-    if isgroupmsg(update) and isadmin(update, BOT_ID) and needrecall:
+    """指令无法执行时，调用的函数。
+    固定返回`False`，并回复错误信息。
+    如果`needrecall`为`True`，在Bot是对应群管理的情况下将删除那条消息。"""
+    if needrecall and isgroupmsg(update) and isadmin(update, BOT_ID):
         recallmsg(update)
     else:
         update.message.reply_text(message)
+    return False
 
 
 def changeKP(gpid: int, newkpid: int = 0) -> bool:
@@ -417,7 +432,7 @@ def changeKP(gpid: int, newkpid: int = 0) -> bool:
 
 
 def start(update: Update, context: CallbackContext) -> None:
-    """显示bot的帮助信息"""
+    """显示bot的帮助信息，群聊时不显示"""
     if isprivatemsg(update):  # private message
         update.message.reply_text(HELP_TEXT)
     else:
@@ -437,6 +452,7 @@ def addkp(update: Update, context: CallbackContext) -> bool:
     gpid = update.effective_chat.id
     kpid = update.message.from_user.id
     global GROUP_KP_DICT
+    initrules(gpid)
     if gpid in GROUP_KP_DICT:
         # 更改所有原KP拥有的权限，包括NPC卡的拥有者
         if not isingroup(update, GROUP_KP_DICT[gpid]):
@@ -513,16 +529,14 @@ def reload(update, context) -> bool:
         CURRENT_CARD_DICT = readcurrentcarddict()
         ID_POOL = []
         addIDpool(ID_POOL)
-
     except:
         return errorHandler(update, "读取文件出现问题，请检查json文件！")
     update.message.reply_text('成功重新读取文件。')
-    time.sleep(1)  # Wait for 1 secs
     return True
 
 
 def showuserlist(update: Update, context: CallbackContext) -> bool:
-    """显示所有信息。拒绝无权限者使用这一指令。"""
+    """显示所有信息。无权限者无法使用这一指令。"""
     if isgroupmsg(update):  # Group msg: do nothing, even sender is USER or KP
         return errorHandler(update, "Sorry, I didn't understand that command.", True)
     if update.effective_chat.id == ADMIN_ID:  # 全部显示
@@ -583,7 +597,51 @@ def getid(update: Update, context: CallbackContext) -> int:
     return chatid
 
 
-def newcard(update: Update, context: CallbackContext):
+def setrule(update: Update, context: CallbackContext) -> bool:
+    """设置游戏的规则。
+    一个群里游戏有自动生成的默认规则，使用本指令可以修改这些规则。
+
+    `/setrule --args`修改规则。`--args`格式如下：
+
+    `rulename1:str --rules1:List[int] rulename2:str --rule2:List[int] ...`
+
+    一次可以修改多项规则。
+    有可能会出现部分规则设置成功，但部分规则设置失败的情况，
+    查看返回的信息可以知道哪些部分已经成功修改。"""
+    if isprivatemsg(update):
+        return errorHandler(update, "请在群内用该指令设置规则")
+    gpid = update.effective_chat.id
+    initrules(gpid)
+    if not isfromkp(update):
+        return errorHandler(update, "没有权限", True)
+    if len(context.args) == 0:
+        return errorHandler(update, "需要参数", True)
+    if botdice.isint(context.args[0]):
+        return errorHandler(update, "参数无效", True)
+    gprule = GROUP_RULES[gpid]
+    ruledict: Dict[str, List[int]] = {}
+    i = 0
+    while i < len(context.args):
+        j = i+1
+        tplist: List[int] = []
+        while j < len(context.args):
+            if botdice.isint(context.args[j]):
+                tplist.append(int(context.args[j]))
+                j += 1
+            else:
+                break
+        ruledict[context.args[i]] = tplist
+        i = j
+    del i, j
+    msg, ok = gprule.changeRules(ruledict)
+    writerules(GROUP_RULES)
+    if not ok:
+        return errorHandler(update, msg)
+    update.message.reply_text(msg)
+    return True
+
+
+def newcard(update: Update, context: CallbackContext) -> bool:
     plid = update.effective_chat.id
     if isgroupmsg(update):  # 只接受私聊消息
         return errorHandler(update, "发送私聊消息创建角色卡。")
@@ -593,6 +651,7 @@ def newcard(update: Update, context: CallbackContext):
     if not botdice.isint(msg) or int(msg) >= 0:
         return errorHandler(update, "无效群id。如果你不知道groupid，在群里发送 /getid 获取群id。使用'/newcard groupid'来创建新角色卡。")
     gpid = int(msg)
+    initrules(gpid)
     # 符合建卡条件，开始处理
     # 检查(pl)是否已经有卡
     if gpid in CARDS_DICT:
@@ -1408,25 +1467,26 @@ def setname(update: Update, context: CallbackContext) -> bool:
 
 
 def startgame(update: Update, context: CallbackContext) -> bool:
+    """开始一场游戏。
+
+    这一指令将拷贝本群内所有卡，之后将用拷贝的卡片副本进行游戏，修改属性将不会影响到游戏外的原卡属性。
+    如果要正常结束游戏，使用`/endgame`可以将游戏的角色卡数据覆写到原本的数据上。
+    如果要放弃这些游戏内进行的修改，使用`/abortgame`会直接删除这些副本副本"""
     if isprivatemsg(update):
-        update.message.reply_text("Game can only be started in a group.")
-        return False
+        return errorHandler(update, "游戏需要在群里进行")
     if update.effective_chat.id not in GROUP_KP_DICT:
-        update.message.reply_text("This group does not have a KP.")
-        return False
-    if update.message.from_user.id != GROUP_KP_DICT[update.effective_chat.id]:
-        update.message.reply_text("Only KP can start a game.")
-        return False
+        return errorHandler(update, "这个群没有KP")
+    if not isfromkp(update):
+        return errorHandler(update, "游戏应由KP发起", True)
     gpid = update.effective_chat.id
     kpid = update.message.from_user.id
-    global CARDS_DICT, ON_GAME
     for games in ON_GAME:
         if games.kpid == kpid:
-            update.message.reply_text(
-                "一个KP一次只能同时主持一场游戏。")
-            return False
+            return errorHandler(update, "一个KP一次只能同时主持一场游戏。")
+    if popallempties(CARDS_DICT):
+        writecards(CARDS_DICT)
     if gpid not in CARDS_DICT:
-        update.message.reply_text("在没有卡片的情况下开始游戏。")
+        update.message.reply_text("注意！本群没有卡片。游戏开始。")
         ON_GAME.append(
             GroupGame(groupid=update.effective_chat.id, kpid=kpid, cards=[]))
         writegameinfo(ON_GAME)
@@ -1435,14 +1495,12 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     for cdid in CARDS_DICT[gpid]:
         cardcheckinfo = createcard.showchecks(CARDS_DICT[gpid][cdid])
         if cardcheckinfo != "All pass.":
-            update.message.reply_text(
-                "卡片: "+str(cdid)+"还没有准备好。因为：\n"+cardcheckinfo)
-            return False
+            return errorHandler(update, "卡片: "+str(cdid)+"还没有准备好。因为：\n"+cardcheckinfo)
         gamecards.append(CARDS_DICT[gpid][cdid].__dict__)
     ON_GAME.append(GroupGame(groupid=update.effective_chat.id,
                              kpid=kpid, cards=gamecards))
     writegameinfo(ON_GAME)
-    update.message.reply_text("Game start!")
+    update.message.reply_text("游戏开始！")
     return True
 
 
@@ -1488,13 +1546,13 @@ def endgame(update: Update, context: CallbackContext) -> bool:
             for cardi in gamecards:
                 if cardi.playerid in CURRENT_CARD_DICT and CURRENT_CARD_DICT[cardi.playerid][0] == gpid and CURRENT_CARD_DICT[cardi.playerid][1] == cardi.id:
                     CURRENT_CARD_DICT.pop(cardi.playerid)
-                    writecurrentcarddict(CURRENT_CARD_DICT)
                 cardi.playerid = kpid
                 if cardi.id not in CARDS_DICT[gpid]:
                     CARDS_DICT[gpid][cardi.id] = cardi
                     continue
                 CARDS_DICT[gpid].pop(cardi.id)
                 CARDS_DICT[gpid][cardi.id] = cardi
+            writecurrentcarddict(CURRENT_CARD_DICT)
             del t
             update.message.reply_text("游戏结束！")
             writecards(CARDS_DICT)
@@ -1591,26 +1649,29 @@ def switch(update: Update, context: CallbackContext):
 
 
 def switchkp(update: Update, context: CallbackContext):
+    """用于KP切换游戏中进行对抗时使用的NPC卡片。
+
+    `/switchkp --cardid` 切换到id为cardid的卡并控制。"""
     game, ok = findgamewithkpid(update.message.from_user.id)
     if not ok:
-        update.message.reply_text("Game not found.")
-        return False
+        return errorHandler(update, "没找到游戏", True)
     num = context.args[0]
-    if not botdice.isint(num):
-        update.message.reply_text("Invalid input.")
-        return False
-    num = int(num)
-    if num >= len(game.kpcards):
-        update.message.reply_text("You don't have so many card.")
-        return False
-    game.kpctrl = num
-    update.message.reply_text(
-        "Switched to card " + str(num)+", card name is: " + game.kpcards[num].info["name"])
-    writegameinfo(ON_GAME)
-    return True
+    if not botdice.isint(num) or int(num) < 0:
+        return errorHandler(update, "无效输入", True)
+    cdid = int(num)
+    for i in range(len(game.kpcards)):
+        cardi = game.kpcards[i]
+        if cardi.id == cdid:
+            game.kpctrl = i
+            update.message.reply_text(
+                "切换到卡" + str(num)+"，角色名称：" + cardi.info["name"])
+            writegameinfo(ON_GAME)
+            return True
+    return errorHandler(update, "没有找到这张卡", True)
 
 
 def showmycards(update: Update, context: CallbackContext) -> bool:
+    """显示自己所持的卡"""
     pass
 
 # /tempcheck --tpcheck:int: add temp check
@@ -1618,28 +1679,28 @@ def showmycards(update: Update, context: CallbackContext) -> bool:
 
 
 def tempcheck(update: Update, context: CallbackContext):
+    """增加一个临时的检定修正。该指令只能在游戏中使用。"""
     if len(context.args) == 0:
-        update.message.reply_text("No argument found.")
-        return False
+        return errorHandler(update, "没有参数", True)
     if update.effective_chat.id > 0:
-        update.message.reply_text("Change tempcheck in a group.")
-        return False
-    if not botdice.isint(context.args[0]) or int(context.args[0]) <= 0:
-        update.message.reply_text("Temp check should be positive integer.")
-        return False
+        return errorHandler(update, "在群里设置临时检定")
+    if not botdice.isint(context.args[0]):
+        return errorHandler(update, "临时检定修正应当是整数", True)
     game, ok = findgame(update.effective_chat.id)
     if not ok:
-        update.message.reply_text("No game found.")
-        return False
+        return errorHandler(update, "没有进行中的游戏", True)
     if update.effective_chat.id not in GROUP_KP_DICT or GROUP_KP_DICT[update.effective_chat.id] != update.message.from_user.id:
-        update.message.reply_text("Only kp can set temp check.")
-        return False
-    if len(context.args) >= 3 and botdice.isint(context.args[1]) and 0 <= int(context.args[1]) and int(context.args[1]) < len(game.cards):
-        game.cards[int(context.args[1])].tempstatus[context.args[2]] = int(
-            context.args[0])
+        return errorHandler(update, "KP才可以设置临时检定", True)
+    if len(context.args) >= 3 and botdice.isint(context.args[1]) and 0 <= int(context.args[1]):
+        card, ok = findcardfromgamewithid(game, int(context.args[1]))
+        if not ok:
+            return errorHandler(update, "找不到这张卡", True)
+        card.tempstatus[context.args[2]] = int(context.args[0])
+        update.message.reply_text(
+            "新增了对id为"+context.args[1]+"卡的检定修正\n修正项："+context.args[2]+"修正值："+context.args[0])
     else:
         game.tpcheck = int(context.args[0])
-    update.message.reply_text("Add temp check successfully.")
+        update.message.reply_text("新增了仅限一次的全局检定修正："+context.args[0])
     writegameinfo(ON_GAME)
     return True
 
@@ -1652,6 +1713,7 @@ def roll(update: Update, context: CallbackContext):
     dicename = context.args[0]
     gpid = update.effective_chat.id
     if isgroupmsg(update):  # Group msg
+        initrules(gpid)
         game, ok = findgame(gpid)
         if not ok or dicename.find('d') >= 0:
             rttext = botdice.commondice(dicename)
@@ -1828,22 +1890,18 @@ def showkp(update: Update, context: CallbackContext) -> bool:
         kpid = update.effective_chat.id
         # args[1] should be group id
         if len(context.args) < 2:
-            update.message.reply_text("需要群ID。")
-            return False
+            return errorHandler(update, "需要群ID")
         gpid = context.args[1]
         if not botdice.isint(gpid):
-            update.message.reply_text("无效ID。")
-            return False
+            return errorHandler(update, "无效ID")
         gpid = int(gpid)
         if gpid not in CARDS_DICT:
-            update.message.reply_text("这个群没有卡。")
-            return False
+            return errorHandler(update, "这个群没有卡")
         ans: List[GameCard] = []
         for cdid in CARDS_DICT[gpid]:
             ans.append(CARDS_DICT[gpid][cdid])
         if len(ans) == 0:
-            update.message.reply_text("No card found.")
-            return False
+            return errorHandler(update, "没有找到卡")
         for i in ans:
             update.message.reply_text(showcardinfo(i))
         return True
@@ -1851,8 +1909,7 @@ def showkp(update: Update, context: CallbackContext) -> bool:
         kpid = update.effective_chat.id
         game, ok = findgamewithkpid(kpid)
         if not ok:
-            update.message.reply_text("Game not found.")
-            return False
+            return errorHandler(update, "没有找到游戏")
         for i in game.cards:
             update.message.reply_text(showcardinfo(i))
         return True
@@ -1860,8 +1917,7 @@ def showkp(update: Update, context: CallbackContext) -> bool:
         kpid = update.effective_chat.id
         cards = findkpcards(kpid)
         if len(cards) == 0:
-            update.message.reply_text("You have no cards as a kp.")
-            return False
+            return errorHandler(update, "你没有控制的卡")
         for i in range(len(cards)):
             update.message.reply_text(showcardinfo(cards[i]))
         return True
@@ -2403,6 +2459,7 @@ def addcard(update: Update, context: CallbackContext) -> bool:
     if t["groupid"] == 0:
         update.message.reply_text("需要groupid！")
         return False
+    initrules(t["groupid"])
     if not isfromkp(update):
         if t["playerid"] != 0:
             update.message.reply_text("不可以设置playerid")
