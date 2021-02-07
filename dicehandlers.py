@@ -1,11 +1,10 @@
 # -*- coding:utf-8 -*-
-# Only define handlers and dicts that store info
 
-
-from copy import error
 import time
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.base import TelegramObject
+from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext, Updater
 
 from cfg import *
@@ -33,7 +32,24 @@ CURRENT_CARD_DICT: Dict[int, Tuple[int, int]]
 SKILL_DICT: dict
 JOB_DICT: dict
 
+SKILL_PAGES: List[List[str]]
+
 DETAIL_DICT: Dict[int, str] = {}  # 临时地存储详细信息
+
+IDENTIFIER = str(time.time())  # 在每个按钮的callback加上该标志，如果标志不相等则不处理
+
+
+def createSkillPages(d: dict) -> List[List[List[str]]]:
+    """创建技能的分页列表，用于添加兴趣技能"""
+    # 一页16个，分四行
+    skillPaged: List[List[str]] = [[]]
+    for key in d:
+        if key == "克苏鲁神话":
+            continue
+        if len(skillPaged[len(skillPaged)-1]) == 16:
+            skillPaged.append([])
+        skillPaged[len(skillPaged)-1].append(key)
+    return skillPaged
 
 
 def addIDpool(idpool: List[int]):
@@ -49,6 +65,7 @@ try:
     GROUP_KP_DICT, CARDS_DICT, ON_GAME = readinfo()
     CURRENT_CARD_DICT = readcurrentcarddict()
     SKILL_DICT = readskilldict()
+    SKILL_PAGES = createSkillPages(SKILL_DICT)
     JOB_DICT = createcard.JOB_DICT
     GROUP_RULES = readrules()
 except:
@@ -171,15 +188,15 @@ def skillcantouchmax(card1: GameCard) -> Tuple[bool, bool]:
     return ans1, True
 
 
-def getskilllevelfromdict(card1: GameCard, keys: str) -> int:
+def getskilllevelfromdict(card1: GameCard, key: str) -> int:
     """从技能表中读取的技能初始值。
 
     如果是母语和闪避这样的与卡信息相关的技能，用卡信息来计算初始值"""
-    if keys in SKILL_DICT:
-        return SKILL_DICT[keys]
-    if keys == "母语":
+    if key in SKILL_DICT:
+        return SKILL_DICT[key]
+    if key == "母语":
         return card1.data["EDU"]
-    if keys == "闪避":
+    if key == "闪避":
         return card1.data["DEX"]//2
     return -1
 
@@ -199,17 +216,17 @@ def makeIntButtons(lower: int, upper: int, keystr1: str, keystr2: str, step: int
     rtbuttons = [[]]
     if (lower//step)*step != lower:
         rtbuttons[0].append(InlineKeyboardButton(
-            str(lower), callback_data=keystr1+" "+keystr2+" "+str(lower)))
+            str(lower), callback_data=IDENTIFIER+" "+keystr1+" "+keystr2+" "+str(lower)))
     t = step+(lower//step)*step
     for i in range(t, upper, step):
         if len(rtbuttons[len(rtbuttons)-1]) == column:
             rtbuttons.append([])
         rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(str(i),
-                                                                callback_data=keystr1+" "+keystr2+" "+str(i)))
+                                                                callback_data=IDENTIFIER+" "+keystr1+" "+keystr2+" "+str(i)))
     if len(rtbuttons[len(rtbuttons)-1]) == column:
         rtbuttons.append([])
     rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(str(upper),
-                                                            callback_data=keystr1+" "+keystr2+" "+str(upper)))
+                                                            callback_data=IDENTIFIER+" "+keystr1+" "+keystr2+" "+str(upper)))
     return rtbuttons
 
 
@@ -335,7 +352,7 @@ def modifycardinfo(card1: GameCard, attrname: str, val: str) -> Tuple[str, bool]
 
     因为:obj:`card1`的属性中有字典，`attrname`可能是其属性里的某项，所以可能还要遍历:obj:`card1`的所有字典。"""
     if attrname in card1.__dict__:
-        rtmsg, ok = modifythisdict(card1.__dict__)
+        rtmsg, ok = modifythisdict(card1.__dict__, attrname, val)
         if not ok:
             return rtmsg, ok
         return "卡id："+str(card1.id)+"的属性："+attrname+"修改为"+val, True
@@ -419,6 +436,8 @@ def errorHandler(update: Update,  message: str, needrecall: bool = False) -> Fal
     if needrecall and isgroupmsg(update) and isadmin(update, BOT_ID):
         recallmsg(update)
     else:
+        if message == "找不到卡。":
+            message += "请使用 /switch 切换当前操控的卡再试。"
         update.message.reply_text(message)
     return False
 
@@ -572,7 +591,7 @@ def showuserlist(update: Update, context: CallbackContext) -> bool:
             rttext += "None"
         else:
             for keys in GROUP_KP_DICT:
-                rttext += keys + ": "+str(GROUP_KP_DICT[keys])+"\n"
+                rttext += str(keys) + ": "+str(GROUP_KP_DICT[keys])+"\n"
         update.message.reply_text(rttext)
         if not CARDS_DICT:
             update.message.reply_text("CARDS: None")
@@ -712,7 +731,7 @@ def newcard(update: Update, context: CallbackContext) -> bool:
         update.message.reply_text(
             "如果你愿意，可以使用 /discard 来删除这张角色卡。设定年龄后则不能再删除这张卡。")
     update.message.reply_text(
-        "长按/setage 并输入一个数字来设定年龄。如果需要帮助，使用/createcardhelp 来获取帮助。")
+        "长按 /setage 并输入一个数字来设定年龄。如果需要帮助，使用 /createcardhelp 来获取帮助。")
     CARDS_DICT[new_card.groupid][new_card.id] = new_card
     writecards(CARDS_DICT)
     if plid in CURRENT_CARD_DICT:
@@ -772,7 +791,7 @@ def discard(update: Update, context: CallbackContext):
             else:
                 cardname: str = str(cdid)
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(cardname,
-                                                                    callback_data="discard "+str(gpid)+" "+str(cdid)))
+                                                                    callback_data=IDENTIFIER+" "+"discard "+str(gpid)+" "+str(cdid)))
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text("请点击要删除的卡片：", reply_markup=rp_markup)
         return True
@@ -817,7 +836,7 @@ def setage(update: Update, context: CallbackContext):
     age = int(age)
     cardi, ok = findcard(update.effective_chat.id)
     if not ok:
-        return errorHandler(update, "找不到卡")
+        return errorHandler(update, "找不到卡。")
     if "AGE" in cardi.info and cardi.info["AGE"] > 0:
         return errorHandler(update, "已经设置过年龄了。")
     if age < 17 or age > 99:
@@ -944,7 +963,7 @@ def setjob(update: Update, context: CallbackContext) -> bool:
             if len(rtbuttons[len(rtbuttons)-1]) == 3:
                 rtbuttons.append([])
             rtbuttons[len(
-                rtbuttons)-1].append(InlineKeyboardButton(keys, callback_data="job "+keys))
+                rtbuttons)-1].append(InlineKeyboardButton(keys, callback_data=IDENTIFIER+" "+"job "+keys))
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         # Then the task is given to func button()
         update.message.reply_text(
@@ -1163,6 +1182,36 @@ def addcredit(update: Update, context: CallbackContext, card1: GameCard) -> bool
     return True
 
 
+def showskillpages(page: int, card1: GameCard) -> Tuple[str, List[List[InlineKeyboardButton]]]:
+    page
+    thispageskilllist = SKILL_PAGES[page]
+    rttext = "添加/修改兴趣技能，目前的数值/基础值如下："
+    rtbuttons = [[]]
+    for key in thispageskilllist:
+        if key in card1.skill or key in card1.suggestskill:
+            continue
+        if len(rtbuttons[len(rtbuttons)-1]) == 4:
+            rtbuttons.append([])
+        if key in card1.interest:
+            rttext += "（已有技能）"+key+"："+str(card1.interest[key])+"\n"
+            rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(text=key,
+                                                                    callback_data=IDENTIFIER+" cgintskill "+key))
+            continue
+        rttext += key+"："+str(getskilllevelfromdict(card1, key))+"\n"
+        rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(text=key,
+                                                                callback_data=IDENTIFIER+" addintskill "+key))
+    if page == 0:
+        rtbuttons.append([InlineKeyboardButton(
+            text="下一页", callback_data=IDENTIFIER+" addintskill page 1")])
+    elif page == len(SKILL_PAGES)-1:
+        rtbuttons.append([InlineKeyboardButton(
+            text="上一页", callback_data=IDENTIFIER+" addintskill page "+str(page-1))])
+    else:
+        rtbuttons.append([InlineKeyboardButton(text="上一页", callback_data=IDENTIFIER+" addintskill page "+str(
+            page-1)), InlineKeyboardButton(text="下一页", callback_data=IDENTIFIER+" addintskill page "+str(page+1))])
+    return rttext, rtbuttons
+
+
 def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool:
     """表示指令/addskill 中没有参数的情况。
     创建技能按钮来完成技能的添加。
@@ -1181,7 +1230,7 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
                 if len(rtbuttons[len(rtbuttons)-1]) == 4:
                     rtbuttons.append([])
                 rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys +
-                                                                        ": "+str(card1.skill[keys]), callback_data="cgmainskill "+keys))
+                                                                        ": "+str(card1.skill[keys]), callback_data=IDENTIFIER+" "+"cgmainskill "+keys))
             rp_markup = InlineKeyboardMarkup(rtbuttons)
             update.message.reply_text("You have points:"+str(
                 card1.skill["points"])+"\nPlease choose a skill to increase:", reply_markup=rp_markup)
@@ -1191,7 +1240,7 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
             if len(rtbuttons[len(rtbuttons)-1]) == 4:
                 rtbuttons.append([])
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys+": " +
-                                                                    str(card1.suggestskill[keys]), callback_data="addsgskill "+keys))
+                                                                    str(card1.suggestskill[keys]), callback_data=IDENTIFIER+" "+"addsgskill "+keys))
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text("You have points:"+str(
             card1.skill["points"])+"\nPlease choose a main skill:", reply_markup=rp_markup)
@@ -1201,20 +1250,26 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
         update.message.reply_text("You don't have any points left!")
         return False
     # GOOD TRAP: add interest skill.
+    # 显示第一页，每个参数后面带一个当前页码标记
+    rttext, rtbuttons = showskillpages(0, card1)
+    rp_markup = InlineKeyboardMarkup(rtbuttons)
+    update.message.reply_text(rttext, reply_markup=rp_markup)
+    return True
+    """
     if "母语" not in card1.skill:
         if "母语" in card1.interest:
             rtbuttons[0].append(InlineKeyboardButton(
-                "母语: "+str(card1.interest["母语"]), callback_data="cgintskill "+"母语"))
+                "母语: "+str(card1.interest["母语"]), callback_data=IDENTIFIER+" "+"cgintskill "+"母语"))
         else:
             rtbuttons[0].append(InlineKeyboardButton(
-                "母语: "+str(getskilllevelfromdict(card1, "母语")), callback_data="cgintskill "+"母语"))
+                "母语: "+str(getskilllevelfromdict(card1, "母语")), callback_data=IDENTIFIER+" "+"cgintskill "+"母语"))
     if "闪避" not in card1.skill:
         if "闪避" in card1.interest:
             rtbuttons[0].append(InlineKeyboardButton(
-                "闪避: "+str(card1.interest["闪避"]), callback_data="cgintskill "+"闪避"))
+                "闪避: "+str(card1.interest["闪避"]), callback_data=IDENTIFIER+" "+"cgintskill "+"闪避"))
         else:
             rtbuttons[0].append(InlineKeyboardButton(
-                "闪避: "+str(getskilllevelfromdict(card1, "闪避")), callback_data="cgintskill "+"闪避"))
+                "闪避: "+str(getskilllevelfromdict(card1, "闪避")), callback_data=IDENTIFIER+" "+"cgintskill "+"闪避"))
     for keys in SKILL_DICT:
         if keys in card1.skill or keys in card1.suggestskill or keys == "克苏鲁神话":
             continue
@@ -1222,14 +1277,15 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
             rtbuttons.append([])
         if keys in card1.interest:
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys+": " +
-                                                                    str(card1.interest[keys]), callback_data="cgintskill "+keys))
+                                                                    str(card1.interest[keys]), callback_data=IDENTIFIER+" "+"cgintskill "+keys))
         else:
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys+": "+str(
-                getskilllevelfromdict(card1, keys)), callback_data="addintskill "+keys))
+                getskilllevelfromdict(card1, keys)), callback_data=IDENTIFIER+" "+"addintskill "+keys))
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     update.message.reply_text("You have points:"+str(
         card1.interest["points"])+"\nPlease choose a interest skill:", reply_markup=rp_markup)
     return True
+    """
 
 
 def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool:
@@ -1240,7 +1296,6 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
     # Show button for numbers
     skillname = context.args[0]
     m = getskilllevelfromdict(card1, skillname)
-
     if skillname in card1.skill:  # GOOD TRAP: cgmainskill
         mm = skillmaxval(skillname, card1, True)
         rtbuttons = makeIntButtons(m, mm, "cgmainskill", skillname)
@@ -1269,7 +1324,6 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
         update.message.reply_text(
             "Add main skill, skill name is: "+skillname, reply_markup=rp_markup)
         return True
-    # GOOD TRAP: addintskill
     mm = skillmaxval(skillname, card1, False)
     rtbuttons = makeIntButtons(m, mm, "addintskill", skillname)
     rp_markup = InlineKeyboardMarkup(rtbuttons)
@@ -1332,7 +1386,7 @@ def addskill(update: Update, context: CallbackContext) -> bool:
     plid = update.effective_chat.id
     card1, ok = findcard(plid)
     if not ok:
-        return errorHandler(update, "找不到卡")
+        return errorHandler(update, "找不到卡。")
     if card1.skill["points"] == -1:
         return errorHandler(update, "信息不完整，无法添加技能")
     if card1.skill["points"] == 0 and card1.interest["points"] == 0 and len(context.args) == 0:
@@ -1362,168 +1416,224 @@ def addskill(update: Update, context: CallbackContext) -> bool:
     return addskill2(update, context, card1)
 
 
+def buttonjob(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    jobname = args[1]
+    card1.info["job"] = jobname
+    query.edit_message_text(
+        text="Job is set to "+jobname+", now you can choose skills using /addskill.")
+    if not createcard.generatePoints(card1, jobname):
+        query.edit_message_text(
+            "Some error occured when generating skill points!")
+        return False
+    for i in range(3, len(JOB_DICT[jobname])):  # Classical jobs
+        card1.suggestskill[JOB_DICT[jobname][i]
+                           ] = getskilllevelfromdict(card1, JOB_DICT[jobname][i])  # int
+    writecards(CARDS_DICT)
+    return True
+
+
+def buttonaddmainskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    if len(args) == 3:
+        skvalue = int(args[2])
+        needpt = skvalue - getskilllevelfromdict(card1, args[1])
+        card1.skill[args[1]] = skvalue
+        card1.skill["points"] -= needpt
+        query.edit_message_text(
+            text="Main skill "+args[1]+" set to "+str(skvalue)+".")
+        writecards(CARDS_DICT)
+        return True
+    m = getskilllevelfromdict(card1, args[1])
+    mm = card1.skill["points"]+m
+    rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+    rp_markup = InlineKeyboardMarkup(rtbuttons)
+    query.edit_message_text(
+        "Add main skill, skill name is: "+args[1], reply_markup=rp_markup)
+    return True
+
+
+def buttoncgmainskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    if len(args) == 3:
+        skvalue = int(args[2])
+        needpt = skvalue - card1.skill[args[1]]
+        card1.skill[args[1]] = skvalue
+        card1.skill["points"] -= needpt
+        query.edit_message_text(
+            text="Main skill "+args[1]+" set to "+str(skvalue)+".")
+        writecards(CARDS_DICT)
+        return True
+    m = getskilllevelfromdict(card1, args[1])
+    mm = card1.skill["points"]+card1.skill[args[1]]
+    rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+    rp_markup = InlineKeyboardMarkup(rtbuttons)
+    query.edit_message_text(
+        "Change main skill level, skill name is: "+args[1], reply_markup=rp_markup)
+    return True
+
+
+def buttonaddsgskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    if len(args) == 3:
+        skvalue = int(args[2])
+        needpt = skvalue - getskilllevelfromdict(card1, args[1])
+        card1.skill[args[1]] = skvalue
+        card1.skill["points"] -= needpt
+        query.edit_message_text(
+            text="Main skill "+args[1]+" set to "+str(skvalue)+".")
+        card1.suggestskill.pop(args[1])
+        writecards(CARDS_DICT)
+        return True
+    m = getskilllevelfromdict(card1, args[1])
+    mm = card1.skill["points"]+m
+    rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+    rp_markup = InlineKeyboardMarkup(rtbuttons)
+    query.edit_message_text(
+        "Add suggested skill, skill name is: "+args[1], reply_markup=rp_markup)
+    return True
+
+
+def buttonaddintskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    """响应KeyboardButton的addintskill请求。
+
+    因为使用的是能翻页的列表，所以有可能位置1的参数是:str:`page`，
+    且位置2的参数是页码。"""
+    if args[1] == "page":
+        rttext, rtbuttons = showskillpages(int(args[2]), card1)
+        query.edit_message_text(rttext)
+        query.edit_message_reply_markup(InlineKeyboardMarkup(rtbuttons))
+        return True
+    if len(args) == 3:
+        skvalue = int(args[2])
+        needpt = skvalue - getskilllevelfromdict(card1, args[1])
+        card1.interest[args[1]] = skvalue
+        card1.interest["points"] -= needpt
+        query.edit_message_text(
+            text="Interest skill "+args[1]+" set to "+str(skvalue)+".")
+        writecards(CARDS_DICT)
+        return True
+    m = getskilllevelfromdict(card1, args[1])
+    mm = card1.interest["points"]+m
+    rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+    rp_markup = InlineKeyboardMarkup(rtbuttons)
+    query.edit_message_text(
+        "Add interest skill, skill name is: "+args[1], reply_markup=rp_markup)
+    return True
+
+
+def buttoncgintskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    if len(args) == 3:
+        skvalue = int(args[2])
+        needpt = skvalue - card1.interest[args[1]]
+        card1.interest[args[1]] = skvalue
+        card1.interest["points"] -= needpt
+        query.edit_message_text(
+            text="Interest skill "+args[1]+" set to "+str(skvalue)+".")
+        writecards(CARDS_DICT)
+        return True
+    m = getskilllevelfromdict(card1, args[1])
+    try:
+        mm = card1.interest["points"]+card1.interest[args[1]]
+    except:
+        card1.interest[args[1]] = m
+        mm = card1.interest["points"]+m
+        writecards(CARDS_DICT)
+    rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+    rp_markup = InlineKeyboardMarkup(rtbuttons)
+    query.edit_message_text(
+        "Change interest skill level, skill name is: "+args[1], reply_markup=rp_markup)
+    return True
+
+
+def buttonstrdec(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    strdecval = int(args[2])
+    card1, rttext, needcon = createcard.choosedec(card1, strdecval)
+    writecards(CARDS_DICT)
+    if needcon:
+        rttext += "\n使用 /setcondec 来设置CON（体质）下降值。"
+    query.edit_message_text(rttext)
+    return True
+
+
+def buttoncondec(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    condecval = int(args[2])
+    card1, rttext = createcard.choosedec2(card1, condecval)
+    writecards(CARDS_DICT)
+    query.edit_message_text(rttext)
+    return True
+
+
+def buttondiscard(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    plid = update.effective_chat.id
+    gpid, cdid = int(args[1]), int(args[2])
+    if plid in CURRENT_CARD_DICT and CURRENT_CARD_DICT[plid][0] == gpid and CURRENT_CARD_DICT[plid][1] == cdid:
+        CURRENT_CARD_DICT.pop(plid)
+        writecurrentcarddict(CURRENT_CARD_DICT)
+    if gpid not in CARDS_DICT or cdid not in CARDS_DICT[gpid] or CARDS_DICT[gpid][cdid].playerid != plid or not CARDS_DICT[gpid][cdid].discard:
+        query.edit_message_text("没有找到卡片。")
+        return False
+    detailinfo = "删除了：\n"+str(CARDS_DICT[gpid][cdid])
+    DETAIL_DICT[plid] = detailinfo
+    CARDS_DICT[gpid].pop(cdid)
+    if len(CARDS_DICT[gpid]) == 0:
+        CARDS_DICT.pop(gpid)
+    query.edit_message_text("删除了一张卡片，使用 /details 查看详细信息。\n该删除操作不可逆。")
+    return True
+
+
+def buttonswitch(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    plid = update.effective_chat.id
+    gpid, cdid = int(args[1]), int(args[2])
+    if gpid not in CARDS_DICT or cdid not in CARDS_DICT[gpid] or CARDS_DICT[gpid][cdid].playerid != plid:
+        query.edit_message_text("没有找到卡片。")
+        return False
+    CURRENT_CARD_DICT[plid] = (gpid, cdid)
+    writecurrentcarddict(CURRENT_CARD_DICT)
+    cardi = CARDS_DICT[gpid][cdid]
+    if "name" not in cardi.info or cardi.info["name"] == "":
+        query.edit_message_text("修改成功，现在操作的卡是："+str(cdid))
+    else:
+        query.edit_message_text("修改成功，现在操作的卡是："+cardi.info["name"])
+    return True
+
+
 def button(update: Update, context: CallbackContext):
     """所有按钮请求经该函数处理。功能十分复杂，拆分成多个子函数来处理。
     接收到按钮的参数后，转到对应的子函数处理。"""
     if isgroupmsg(update):
         return False
-    plid = update.effective_chat.id
     query = update.callback_query
     query.answer()
     args = query.data.split(" ")
+    identifier = args[0]
+    if identifier != IDENTIFIER:
+        query.edit_message_text(text="该请求已经过期。")
+        return False
+    args = args[1:]
+    plid = update.effective_chat.id
     card1, ok = findcard(plid)
-    if not ok:
-        query.edit_message_text(text="Can't find card.")
+    if not ok and args[0] != "switch" and args[0] != "discard":
+        query.edit_message_text(text="找不到卡。")
         return False
     # receive types: job, skill, sgskill, intskill, cgskill, addmainskill, addintskill, addsgskill
     if args[0] == "job":  # Job in buttons must be classical
-        jobname = args[1]
-        card1.info["job"] = jobname
-        query.edit_message_text(
-            text="Job is set to "+jobname+", now you can choose skills using /addskill.")
-        if not createcard.generatePoints(card1, jobname):
-            query.edit_message_text(
-                "Some error occured when generating skill points!")
-            return False
-        for i in range(3, len(JOB_DICT[jobname])):  # Classical jobs
-            card1.suggestskill[JOB_DICT[jobname][i]
-                               ] = getskilllevelfromdict(card1, JOB_DICT[jobname][i])  # int
-        writecards(CARDS_DICT)
-        return True
+        return buttonjob(query, update, card1, args)
     # Increase skills already added, because sgskill is none. second arg is skillname
     if args[0] == "addmainskill":
-        if len(args) == 3:
-            skvalue = int(args[2])
-            needpt = skvalue - getskilllevelfromdict(card1, args[1])
-            card1.skill[args[1]] = skvalue
-            card1.skill["points"] -= needpt
-            query.edit_message_text(
-                text="Main skill "+args[1]+" set to "+str(skvalue)+".")
-            writecards(CARDS_DICT)
-            return True
-        m = getskilllevelfromdict(card1, args[1])
-        mm = card1.skill["points"]+m
-        rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
-        rp_markup = InlineKeyboardMarkup(rtbuttons)
-        query.edit_message_text(
-            "Add main skill, skill name is: "+args[1], reply_markup=rp_markup)
-        return True
+        return buttonaddmainskill(query, update, card1, args)
     if args[0] == "cgmainskill":
-        if len(args) == 3:
-            skvalue = int(args[2])
-            needpt = skvalue - card1.skill[args[1]]
-            card1.skill[args[1]] = skvalue
-            card1.skill["points"] -= needpt
-            query.edit_message_text(
-                text="Main skill "+args[1]+" set to "+str(skvalue)+".")
-            writecards(CARDS_DICT)
-            return True
-        m = getskilllevelfromdict(card1, args[1])
-        mm = card1.skill["points"]+card1.skill[args[1]]
-        rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
-        rp_markup = InlineKeyboardMarkup(rtbuttons)
-        query.edit_message_text(
-            "Change main skill level, skill name is: "+args[1], reply_markup=rp_markup)
-        return True
+        return buttoncgmainskill(query, update, card1, args)
     if args[0] == "addsgskill":
-        if len(args) == 3:
-            skvalue = int(args[2])
-            needpt = skvalue - getskilllevelfromdict(card1, args[1])
-            card1.skill[args[1]] = skvalue
-            card1.skill["points"] -= needpt
-            query.edit_message_text(
-                text="Main skill "+args[1]+" set to "+str(skvalue)+".")
-            card1.suggestskill.pop(args[1])
-            writecards(CARDS_DICT)
-            return True
-        m = getskilllevelfromdict(card1, args[1])
-        mm = card1.skill["points"]+m
-        rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
-        rp_markup = InlineKeyboardMarkup(rtbuttons)
-        query.edit_message_text(
-            "Add suggested skill, skill name is: "+args[1], reply_markup=rp_markup)
-        return True
+        return buttonaddsgskill(query, update, card1, args)
     if args[0] == "addintskill":
-        if len(args) == 3:
-            skvalue = int(args[2])
-            needpt = skvalue - getskilllevelfromdict(card1, args[1])
-            card1.interest[args[1]] = skvalue
-            card1.interest["points"] -= needpt
-            query.edit_message_text(
-                text="Interest skill "+args[1]+" set to "+str(skvalue)+".")
-            writecards(CARDS_DICT)
-            return True
-        m = getskilllevelfromdict(card1, args[1])
-        mm = card1.interest["points"]+m
-        rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
-        rp_markup = InlineKeyboardMarkup(rtbuttons)
-        query.edit_message_text(
-            "Add interest skill, skill name is: "+args[1], reply_markup=rp_markup)
-        return True
+        return buttonaddintskill(query, update, card1, args)
     if args[0] == "cgintskill":
-        if len(args) == 3:
-            skvalue = int(args[2])
-            needpt = skvalue - card1.interest[args[1]]
-            card1.interest[args[1]] = skvalue
-            card1.interest["points"] -= needpt
-            query.edit_message_text(
-                text="Interest skill "+args[1]+" set to "+str(skvalue)+".")
-            writecards(CARDS_DICT)
-            return True
-        m = getskilllevelfromdict(card1, args[1])
-        try:
-            mm = card1.interest["points"]+card1.interest[args[1]]
-        except:
-            card1.interest[args[1]] = m
-            mm = card1.interest["points"]+m
-            writecards(CARDS_DICT)
-        rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
-        rp_markup = InlineKeyboardMarkup(rtbuttons)
-        query.edit_message_text(
-            "Change interest skill level, skill name is: "+args[1], reply_markup=rp_markup)
-        return True
+        return buttoncgintskill(query, update, card1, args)
     if args[0] == "strdec":
-        strdecval = int(args[2])
-        card1, rttext, needcon = createcard.choosedec(card1, strdecval)
-        writecards(CARDS_DICT)
-        if needcon:
-            rttext += "\n使用 /setcondec 来设置CON（体质）下降值。"
-        query.edit_message_text(rttext)
-        return True
+        return buttonstrdec(query, update, card1, args)
     if args[0] == "condec":
-        condecval = int(args[2])
-        card1, rttext = createcard.choosedec2(card1, condecval)
-        writecards(CARDS_DICT)
-        query.edit_message_text(rttext)
-        return True
+        return buttoncondec(query, update, card1, args)
     if args[0] == "discard":
-        gpid, cdid = int(args[1]), int(args[2])
-        if plid in CURRENT_CARD_DICT and CURRENT_CARD_DICT[plid][0] == gpid and CURRENT_CARD_DICT[plid][1] == cdid:
-            CURRENT_CARD_DICT.pop(plid)
-            writecurrentcarddict(CURRENT_CARD_DICT)
-        if gpid not in CARDS_DICT or cdid not in CARDS_DICT[gpid] or CARDS_DICT[gpid][cdid].playerid != plid or not CARDS_DICT[gpid][cdid].discard:
-            query.edit_message_text("没有找到卡片。")
-            return False
-        detailinfo = "删除了：\n"+str(CARDS_DICT[gpid][cdid])
-        DETAIL_DICT[plid] = detailinfo
-        CARDS_DICT[gpid].pop(cdid)
-        if len(CARDS_DICT[gpid]) == 0:
-            CARDS_DICT.pop(gpid)
-        query.edit_message_text("删除了一张卡片，使用 /details 查看详细信息。\n该删除操作不可逆。")
-        return True
+        return buttondiscard(query, update, card1, args)
     if args[0] == "switch":
-        gpid, cdid = int(args[1]), int(args[2])
-        if gpid not in CARDS_DICT or cdid not in CARDS_DICT[gpid] or CARDS_DICT[gpid][cdid].playerid != plid:
-            query.edit_message_text("没有找到卡片。")
-            return False
-        CURRENT_CARD_DICT[plid] = (gpid, cdid)
-        writecurrentcarddict(CURRENT_CARD_DICT)
-        cardi = CARDS_DICT[gpid][cdid]
-        if "name" not in cardi.info or cardi.info["name"] == "":
-            query.edit_message_text("修改成功，现在操作的卡是："+str(cdid))
-        else:
-            query.edit_message_text("修改成功，现在操作的卡是："+cardi.info["name"])
-        return True
+        return buttonswitch(query, update, card1, args)
     # HIT BAD TRAP
     return False
 
@@ -1542,10 +1652,6 @@ def setname(update: Update, context: CallbackContext) -> bool:
     card1.cardcheck["check5"] = True
     writecards(CARDS_DICT)
     return True
-
-
-# game
-# 有KP，且所有卡准备完成时，由KP开始游戏。如果需要更改一些信息，用/abortgame
 
 
 def startgame(update: Update, context: CallbackContext) -> bool:
@@ -1587,12 +1693,10 @@ def startgame(update: Update, context: CallbackContext) -> bool:
 
 
 def abortgame(update: Update, context: CallbackContext) -> bool:
-    if update.effective_chat.id > 0:
-        update.message.reply_text("Game can only be aborted in a group.")
-        return False
+    if isprivatemsg(update):
+        return errorHandler(update, "发送群聊消息来中止游戏")
     if update.effective_chat.id in GROUP_KP_DICT and update.message.from_user.id != GROUP_KP_DICT[update.effective_chat.id]:
-        update.message.reply_text("Only KP can abort a game.")
-        return False
+        return errorHandler(update, "只有KP可以中止游戏", True)
     global ON_GAME
     for i in range(len(ON_GAME)):
         if ON_GAME[i].groupid == update.effective_chat.id:
@@ -1693,7 +1797,7 @@ def switch(update: Update, context: CallbackContext):
                     writecurrentcarddict(CURRENT_CARD_DICT)
                     update.message.reply_text(rttext)
                     return True
-            update.message.reply_text("找不到卡。")
+            update.message.reply_text("找不到这张卡。")
             return False
     mycardslist = findallplayercards(plid)
     if len(mycardslist) == 0:
@@ -1723,7 +1827,7 @@ def switch(update: Update, context: CallbackContext):
         if len(rtbuttons[len(rtbuttons)-1]) == 4:
             rtbuttons.append([])
         rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(
-            cardiname, callback_data="switch "+str(gpid)+" "+str(cdid)))
+            cardiname, callback_data=IDENTIFIER+" "+"switch "+str(gpid)+" "+str(cdid)))
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     update.message.reply_text("请选择要切换控制的卡：", reply_markup=rp_markup)
     # 交给按钮来完成
@@ -1914,7 +2018,7 @@ def show(update: Update, context: CallbackContext) -> bool:
     /show --attrname: 显示卡片的某项具体属性
     """
     if len(context.args) == 0:
-        return errorHandler(update, "需要参数")
+        return errorHandler(update, "需要参数。如果不会使用，请查看帮助： /help show")
     if isprivatemsg(update):
         plid = update.effective_chat.id
         card1, ok = findcard(plid)
@@ -2187,7 +2291,7 @@ def modify(update: Update, context: CallbackContext) -> bool:
         if len(context.args) == 3 or context.args[3] != "game":
             cardi, ok = findcardwithid(card_id)
             if not ok:
-                return errorHandler(update, "找不到卡片")
+                return errorHandler(update, "找不到该ID对应的卡。")
             rtmsg, ok = modifycardinfo(cardi, context.args[1], context.args[2])
             if not ok:
                 update.message.reply_text(rtmsg)
@@ -2218,7 +2322,7 @@ def modify(update: Update, context: CallbackContext) -> bool:
     if len(context.args) <= 3 or context.args[3] != "game":
         cardi, ok = findcardwithid(card_id)
         if not ok:
-            return errorHandler(update, "找不到卡片")
+            return errorHandler(update, "找不到该ID对应的卡。")
         if GROUP_KP_DICT[cardi.groupid] != kpid:
             return errorHandler(update, "没有权限", True)
         rtmsg, ok = modifycardinfo(cardi, context.args[1], context.args[2])
