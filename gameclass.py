@@ -114,8 +114,8 @@ class GroupRule:
         self.skillmax: List[int] = [80, 90, 1]
         # 0位描述一般技能上限，1位描述专精技能上限，2位描述专精技能个数，3位描述至少到什么年龄才能使用此设置，如果没有设置的话默认100
         self.skillmaxAged: List[int] = [80, 90, 1, 100]
-        # 1,3,5……位描述技能分段位置，单调递增，最后一个数必须是100。在大于skillCost[2*i-1]但小于等于skillCost[2*i+1]时，每一技能点花费skillCost[2*i]
-        self.skillCost: List[int] = [1, 100]
+        # 1,3,5……位描述技能分段位置，单调递增，最后一个数必须是100。在大于skillcost[2*i-1]但小于等于skillcost[2*i+1]时，每一技能点花费skillcost[2*i]
+        self.skillcost: List[int] = [1, 100]
         # 在检定需要骰出大于等于50时，greatsuccess[0]~greatsuccess[1]算大成功，否则greatsuccess[3]~greatsuccess[4]算大成功
         self.greatsuccess: List[int] = [1, 1, 1, 1]
         # 在检定需要骰出大于等于50时，greatfail[0]~greatfail[1]算大失败，否则greatfail[3]~greatfail[4]算大失败
@@ -144,23 +144,25 @@ class GroupRule:
                     return rttext+"skillmaxAged 参数有误", False
                 rttext += "skillmaxAged设置成功，值："+str(cgrules[key])+"\n"
                 self.__dict__[key] = cgrules[key]
-            elif key == "skillCost":
+            elif key == "skillcost":
                 if len(cgrules[key]) & 1 != 0 or len(cgrules[key]) == 0:
-                    return rttext+"skillCost 参数长度有误", False
+                    return rttext+"skillcost 参数长度应当是偶数", False
                 i = 0
                 while i+2 < len(cgrules[key]):
                     if cgrules[key][i+2] <= cgrules[key][i]:
-                        return rttext+"skillCost 参数有误", False
+                        return rttext+"skillcost 参数有误", False
                     i += 2
                 i = 1
                 while i+2 < len(cgrules[key]):
                     if cgrules[key][i+2] <= cgrules[key][i]:
-                        return rttext+"skillCost 参数有误", False
+                        return rttext+"skillcost 参数有误，技能点数低时应该消耗更少", False
                     i += 2
                 del i
-                if cgrules[key][0] <= 0 or cgrules[key][1] <= 0 or cgrules[key][len(cgrules[key])-1] != 100:
-                    return rttext+"skillCost 参数有误", False
-                rttext += "skillCost设置成功，值："+str(cgrules[key])+"\n"
+                if cgrules[key][0] <= 0 or cgrules[key][1] <= 0:
+                    return rttext+"skillcost 参数有误", False
+                if cgrules[key][len(cgrules[key])-1] != 100:
+                    return rttext+"skillcost 最后一个参数应该是100", False
+                rttext += "skillcost设置成功，值："+str(cgrules[key])+"\n"
                 self.__dict__[key] = cgrules[key]
             elif key == "greatsuccess":
                 if len(cgrules[key]) != 4:
@@ -187,6 +189,66 @@ class GroupRule:
 
     def __str__(self):
         rttext = ""
-        for key in self.__dict__:
-            rttext += key+": "+str(self.__dict__[key])+"\n"
+        rttext += "通常技能上限："+str(self.skillmax[0])+"\n"
+        if self.skillmax[2] != 0:
+            rttext += "有"+str(self.skillmax[2]) + \
+                "项技能上限为"+str(self.skillmax[1])+"\n"
+        if self.skillmaxAged[3] == 100:
+            rttext += "高年龄段的技能上限增强：关闭\n"
+        else:
+            rttext += "高年龄段的技能上限增强：开启\n"
+            rttext += "年龄大于等于" + \
+                str(self.skillmaxAged[3])+"时技能上限为" + \
+                str(self.skillmaxAged[0])+"\n"
+            if self.skillmaxAged[2] != 0:
+                rttext += "有" + \
+                    str(self.skillmaxAged[2])+"项技能上限为" + \
+                    str(self.skillmaxAged[1])+"\n"
+        rttext += "技能点数消耗规则：\n"
+        for i in range(0, len(self.skillcost), 2):
+            rttext += "当点数小于等于" + \
+                str(self.skillcost[i+1])+"时，消耗"+str(self.skillcost[i])+"点\n"
+        rttext += "大成功范围：\n"
+        if self.greatsuccess[0] == self.greatsuccess[2] and self.greatsuccess[1] == self.greatsuccess[3]:
+            if self.greatsuccess[0] == self.greatsuccess[1]:
+                rttext += "骰出"+str(self.greatsuccess[0])+"点\n"
+            else:
+                rttext += "骰出" + \
+                    str(self.greatsuccess[0])+"至" + \
+                    str(self.greatsuccess[1])+"点\n"
+        else:
+            rttext += "当检定点数大于等于50时，"
+            if self.greatsuccess[0] == self.greatsuccess[1]:
+                rttext += "骰出"+str(self.greatsuccess[0])+"点\n"
+            else:
+                rttext += "骰出" + \
+                    str(self.greatsuccess[0])+"至" + \
+                    str(self.greatsuccess[1])+"点\n"
+            rttext += "当检定点数低于50时，"
+            if self.greatsuccess[2] == self.greatsuccess[3]:
+                rttext += "骰出"+str(self.greatsuccess[2])+"点\n"
+            else:
+                rttext += "骰出" + \
+                    str(self.greatsuccess[2])+"至" + \
+                    str(self.greatsuccess[3])+"点\n"
+        rttext += "大失败范围：\n"
+        if self.greatfail[0] == self.greatfail[2] and self.greatfail[1] == self.greatfail[3]:
+            if self.greatfail[0] == self.greatfail[1]:
+                rttext += "骰出"+str(self.greatfail[0])+"点\n"
+            else:
+                rttext += "骰出" + \
+                    str(self.greatfail[0])+"至"+str(self.greatfail[1])+"点\n"
+        else:
+            rttext += "当检定点数大于等于50时，"
+            if self.greatfail[0] == self.greatfail[1]:
+                rttext += "骰出"+str(self.greatfail[0])+"点\n"
+            else:
+                rttext += "骰出" + \
+                    str(self.greatfail[0])+"至"+str(self.greatfail[1])+"点\n"
+            rttext += "当检定点数低于50时，"
+            if self.greatfail[2] == self.greatfail[3]:
+                rttext += "骰出"+str(self.greatfail[2])+"点\n"
+            else:
+                rttext += "骰出" + \
+                    str(self.greatfail[2])+"至"+str(self.greatfail[3])+"点\n"
         return rttext

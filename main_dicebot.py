@@ -5,15 +5,15 @@ import logging
 import signal
 import sys
 import os
-
-from telegram.ext import CallbackQueryHandler, MessageHandler, Filters, CommandHandler
+from telegram import Update
+from telegram.ext import CallbackQueryHandler, MessageHandler, Filters, CommandHandler, CallbackContext
 
 from gameclass import *
 from botdicts import *
-from dicehandlers import *
+import dicehandlers
 
 
-dispatcher = updater.dispatcher
+dispatcher = dicehandlers.updater.dispatcher
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -26,77 +26,84 @@ def bot(update: Update, context: CallbackContext) -> bool:
 
     `/bot restart`将调用`reload`方法重新加载所有数据。"""
     if update.message.from_user.id != ADMIN_ID:
-        return errorHandler(update, "没有权限", True)
+        return dicehandlers.errorHandler(update, "没有权限", True)
     if len(context.args) == 0:
-        return errorHandler(update, "参数无效", True)
+        return dicehandlers.errorHandler(update, "参数无效", True)
     inst = context.args[0]
     if inst == "stop":
         # 寻找所有群
         gpids: List[int] = []
-        for gpid in CARDS_DICT:
+        for gpid in dicehandlers.CARDS_DICT:
             gpids.append(gpid)
-        for gpid in GROUP_KP_DICT:
+        for gpid in dicehandlers.GROUP_KP_DICT:
             if gpid not in gpids:
                 gpids.append(gpid)
         for gpid in gpids:
             context.bot.send_message(chat_id=gpid, text="Bot程序终止！")
-        context.bot.send_message(chat_id=ADMIN_ID, text="进程被指令终止。")
+        dicehandlers.sendtoAdmin("进程被指令终止。")
         # 结束进程，先写入所有数据
-        writecards(CARDS_DICT)
-        writecurrentcarddict(CURRENT_CARD_DICT)
-        writekpinfo(GROUP_KP_DICT)
-        writegameinfo(ON_GAME)
+        writecards(dicehandlers.CARDS_DICT)
+        writecurrentcarddict(dicehandlers.CURRENT_CARD_DICT)
+        writekpinfo(dicehandlers.GROUP_KP_DICT)
+        writegameinfo(dicehandlers.ON_GAME)
         pid = os.getpid()
         if sys.platform == "win32":  # windows
             os.kill(pid, signal.SIGBREAK)
         else:  # Other
             os.kill(pid, signal.SIGKILL)
-        return errorHandler(update, "关闭失败！")
+        return dicehandlers.errorHandler(update, "关闭失败！")
     if inst == "restart":
-        return reload(update, context)
-    return errorHandler(update, "没有这一指令", True)
+        return dicehandlers.reload(update, context)
+    return dicehandlers.errorHandler(update, "没有这一指令", True)
 
 
 def main() -> None:
     dispatcher.add_handler(CommandHandler('bot', bot))
 
-    dispatcher.add_handler(CommandHandler('start', start))
-    dispatcher.add_handler(CommandHandler('addkp', addkp))
-    dispatcher.add_handler(CommandHandler('transferkp', transferkp))
-    dispatcher.add_handler(CommandHandler('delkp', delkp))
-    dispatcher.add_handler(CommandHandler('reload', reload))
-    dispatcher.add_handler(CommandHandler('showuserlist', showuserlist))
-    dispatcher.add_handler(CommandHandler('getid', getid))
-    dispatcher.add_handler(CommandHandler('newcard', newcard))
-    dispatcher.add_handler(CommandHandler('discard', discard))
-    dispatcher.add_handler(CommandHandler('details', details))
-    dispatcher.add_handler(CommandHandler('setage', setage))
-    dispatcher.add_handler(CommandHandler('setstrdec', setstrdec))
-    dispatcher.add_handler(CommandHandler('setcondec', setcondec))
-    dispatcher.add_handler(CommandHandler('setjob', setjob))
-    dispatcher.add_handler(CommandHandler('addskill', addskill))
-    dispatcher.add_handler(CommandHandler('setname', setname))
-    dispatcher.add_handler(CommandHandler('startgame', startgame))
-    dispatcher.add_handler(CommandHandler('abortgame', abortgame))
-    dispatcher.add_handler(CommandHandler('endgame', endgame))
-    dispatcher.add_handler(CommandHandler('switch', switch))
-    dispatcher.add_handler(CommandHandler('switchkp', switchkp))
-    dispatcher.add_handler(CommandHandler('tempcheck', tempcheck))
-    dispatcher.add_handler(CommandHandler('roll', roll))
-    dispatcher.add_handler(CommandHandler('show', show))
-    dispatcher.add_handler(CommandHandler('showkp', showkp))
-    dispatcher.add_handler(CommandHandler('showcard', showcard))
-    dispatcher.add_handler(CommandHandler('showids', showids))
-    dispatcher.add_handler(CommandHandler('modify', modify))
+    dispatcher.add_handler(CommandHandler('start', dicehandlers.start))
+    dispatcher.add_handler(CommandHandler('addkp', dicehandlers.addkp))
     dispatcher.add_handler(CommandHandler(
-        'randombackground', randombackground))
-    dispatcher.add_handler(CommandHandler('setbkground', setbkground))
-    dispatcher.add_handler(CommandHandler('setsex', setsex))
-    dispatcher.add_handler(CommandHandler('sancheck', sancheck))
-    dispatcher.add_handler(CommandHandler('addcard', addcard))
-    dispatcher.add_handler(CallbackQueryHandler(button))
-    dispatcher.add_handler(MessageHandler(Filters.command, unknown))
-    updater.start_polling(clean=True)
+        'transferkp', dicehandlers.transferkp))
+    dispatcher.add_handler(CommandHandler('delkp', dicehandlers.delkp))
+    dispatcher.add_handler(CommandHandler('reload', dicehandlers.reload))
+    dispatcher.add_handler(CommandHandler(
+        'showuserlist', dicehandlers.showuserlist))
+    dispatcher.add_handler(CommandHandler('getid', dicehandlers.getid))
+    dispatcher.add_handler(CommandHandler('showrule', dicehandlers.showrule))
+    dispatcher.add_handler(CommandHandler('setrule', dicehandlers.setrule))
+    dispatcher.add_handler(CommandHandler('newcard', dicehandlers.newcard))
+    dispatcher.add_handler(CommandHandler('discard', dicehandlers.discard))
+    dispatcher.add_handler(CommandHandler('details', dicehandlers.details))
+    dispatcher.add_handler(CommandHandler('setage', dicehandlers.setage))
+    dispatcher.add_handler(CommandHandler('setstrdec', dicehandlers.setstrdec))
+    dispatcher.add_handler(CommandHandler('setcondec', dicehandlers.setcondec))
+    dispatcher.add_handler(CommandHandler('setjob', dicehandlers.setjob))
+    dispatcher.add_handler(CommandHandler('addskill', dicehandlers.addskill))
+    dispatcher.add_handler(CommandHandler('setname', dicehandlers.setname))
+    dispatcher.add_handler(CommandHandler('startgame', dicehandlers.startgame))
+    dispatcher.add_handler(CommandHandler('abortgame', dicehandlers.abortgame))
+    dispatcher.add_handler(CommandHandler('endgame', dicehandlers.endgame))
+    dispatcher.add_handler(CommandHandler('switch', dicehandlers.switch))
+    dispatcher.add_handler(CommandHandler('switchkp', dicehandlers.switchkp))
+    dispatcher.add_handler(CommandHandler('tempcheck', dicehandlers.tempcheck))
+    dispatcher.add_handler(CommandHandler('roll', dicehandlers.roll))
+    dispatcher.add_handler(CommandHandler('show', dicehandlers.show))
+    dispatcher.add_handler(CommandHandler('showkp', dicehandlers.showkp))
+    dispatcher.add_handler(CommandHandler('showcard', dicehandlers.showcard))
+    dispatcher.add_handler(CommandHandler('showids', dicehandlers.showids))
+    dispatcher.add_handler(CommandHandler('modify', dicehandlers.modify))
+    dispatcher.add_handler(CommandHandler(
+        'randombackground', dicehandlers.randombackground))
+    dispatcher.add_handler(CommandHandler(
+        'setbkground', dicehandlers.setbkground))
+    dispatcher.add_handler(CommandHandler('setsex', dicehandlers.setsex))
+    dispatcher.add_handler(CommandHandler('sancheck', dicehandlers.sancheck))
+    dispatcher.add_handler(CommandHandler('addcard', dicehandlers.addcard))
+    dispatcher.add_handler(CommandHandler('help', dicehandlers.helper))
+    dispatcher.add_handler(CallbackQueryHandler(dicehandlers.button))
+    dispatcher.add_handler(MessageHandler(
+        Filters.command, dicehandlers.unknown))
+    dicehandlers.updater.start_polling(clean=True)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+from inspect import isfunction
 import time
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -78,7 +79,11 @@ updater.bot.send_message(chat_id=ADMIN_ID, text="Bot is live!")
 addIDpool(ID_POOL)
 
 
-def getcontextid(update: Update) -> int:
+def sendtoAdmin(msg: str) -> None:
+    updater.bot.send_message(chat_id=ADMIN_ID, text=msg)
+
+
+def getchatid(update: Update) -> int:
     return update.effective_chat.id
 
 
@@ -257,7 +262,7 @@ def findcardfromgame(game: GroupGame, plid: int) -> Tuple[GameCard, bool]:
 
 
 def findcardfromgamewithid(game: GroupGame, cdid: int) -> Tuple[GameCard, bool]:
-    """从`game`中返回:attr:`id`为`cdid`的角色卡"""
+    """从`game`中返回`id`为`cdid`的角色卡"""
     for i in game.cards:
         if i.id == cdid:
             return i, True
@@ -265,15 +270,13 @@ def findcardfromgamewithid(game: GroupGame, cdid: int) -> Tuple[GameCard, bool]:
 
 
 def findDiscardCardsGroupIDTuple(plid: int) -> List[Tuple[int, int]]:
-    """返回`plid`对应的所有:attr:`discard`为`True`的卡的`(groupid, id)`对"""
+    """返回`plid`对应的所有`discard`为`True`的卡的`(groupid, id)`对"""
     ans: List[int] = []
     for gpids in CARDS_DICT:
         for cdids in CARDS_DICT[gpids]:
             if CARDS_DICT[gpids][cdids].playerid == plid:
                 if CARDS_DICT[gpids][cdids].discard:
                     ans.append((gpids, cdids))
-                else:
-                    break
     return ans
 
 
@@ -347,10 +350,24 @@ def modifythisdict(d: dict, attrname: str, val: str) -> Tuple[str, bool]:
     return "类型错误！", False
 
 
-def modifycardinfo(card1: GameCard, attrname: str, val: str) -> Tuple[str, bool]:
-    """修改:obj:`card1`的某项属性。
+def findattrindict(d: dict, key: str) -> dict:
+    """从字典（键为字符串，值为字典或`int`, `str`, `bool`类型）中找到某个键所在的那层字典并返回。
+    搜索子字典时，如果`key`不是`global`，忽略`tempstatus`对应的字典。"""
+    if key in d:
+        return d
+    for k1 in d:
+        if not isinstance(d[k1], dict) or (k1 == "tempstatus" and key != "global"):
+            continue
+        t = findattrindict(d[k1], key)
+        if t:
+            return t
+    return None
 
-    因为:obj:`card1`的属性中有字典，`attrname`可能是其属性里的某项，所以可能还要遍历:obj:`card1`的所有字典。"""
+
+def modifycardinfo(card1: GameCard, attrname: str, val: str) -> Tuple[str, bool]:
+    """修改`card1`的某项属性。
+
+    因为`card1`的属性中有字典，`attrname`可能是其属性里的某项，所以可能还要遍历`card1`的所有字典。"""
     if attrname in card1.__dict__:
         rtmsg, ok = modifythisdict(card1.__dict__, attrname, val)
         if not ok:
@@ -438,7 +455,9 @@ def errorHandler(update: Update,  message: str, needrecall: bool = False) -> Fal
     else:
         if message == "找不到卡。":
             message += "请使用 /switch 切换当前操控的卡再试。"
-        update.message.reply_text(message)
+        elif message.find("参数") != -1:
+            message += "\n如果不会使用这个指令，请使用帮助： `/help --command`"
+        update.message.reply_text(message, parse_mode="MarkdownV2")
     return False
 
 
@@ -486,9 +505,7 @@ def start(update: Update, context: CallbackContext) -> None:
 
 
 def addkp(update: Update, context: CallbackContext) -> bool:
-    """添加KP。
-    在群里发送`/addkp`将自己设置为KP。
-
+    """添加KP。在群里发送`/addkp`将自己设置为KP。
     如果这个群已经有一名群成员是KP，则该指令无效。
 
     若原KP不在群里，该指令可以替换KP。
@@ -497,17 +514,15 @@ def addkp(update: Update, context: CallbackContext) -> bool:
         return errorHandler(update, '发送群消息添加KP')
     gpid = update.effective_chat.id
     kpid = update.message.from_user.id
-    global GROUP_KP_DICT
     initrules(gpid)
+    # 判断是否已经有KP
     if gpid in GROUP_KP_DICT:
-        # 更改所有原KP拥有的权限，包括NPC卡的拥有者
+        # 已有KP
         if not isingroup(update, GROUP_KP_DICT[gpid]):
-            # 更新NPC卡拥有者
-            if not changeKP(gpid, kpid):
+            if not changeKP(gpid, kpid):  # 更新NPC卡拥有者
                 return errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")  # 不应触发
             return True
-        errorHandler(update, '这个群已经有一位KP了,请先让TA发送 /delkp 撤销自己的KP。')
-        return errorHandler(update, '如果需要强制转换KP，请管理员用\'/transferkp kpid\'添加本群成员为KP，或者 /transferkp 将自己设为KP。')
+        return errorHandler(update, '这个群已经有一位KP了，请先让TA发送 /delkp 撤销自己的KP。如果需要强制更换KP，请管理员用\'/transferkp kpid\'添加本群成员为KP，或者 /transferkp 将自己设为KP。')
     # 该群没有KP，可以直接添加KP
     # delkp指令会将KP的卡playerid全部改为0，检查如果有id为0的卡，id设为新kp的id
     for cdid in CARDS_DICT[gpid]:
@@ -521,14 +536,19 @@ def addkp(update: Update, context: CallbackContext) -> bool:
         for cardi in game.kpcards:
             cardi.playerid = kpid
         writegameinfo(ON_GAME)
-    update.message.reply_text("绑定群(id): " +
-                              str(gpid) + "与KP(id): " + str(kpid))
+    update.message.reply_text(
+        "绑定群(id): " + str(gpid) + "与KP(id): " + str(kpid))
     GROUP_KP_DICT[gpid] = kpid  # 更新KP表
     writekpinfo(GROUP_KP_DICT)
     return True
 
 
 def transferkp(update: Update, context: CallbackContext) -> bool:
+    """转移KP权限，只有群管理员可以使用这个指令。
+    当前群没有KP时或当前群KP为管理员时，无法使用。
+    将当前群KP权限转移到指定的`playerid`或自身。
+    如果指定的`playerid`不在群内则无法设定。
+    """
     if isprivatemsg(update):
         return errorHandler(update, "发送群消息强制转移KP权限")
     if not isadmin(update, update.message.from_user.id):
@@ -536,6 +556,8 @@ def transferkp(update: Update, context: CallbackContext) -> bool:
     gpid = update.effective_chat.id
     if gpid not in GROUP_KP_DICT:
         return errorHandler(update, "没有KP", True)
+    if isadmin(update, GROUP_KP_DICT[gpid]):
+        return errorHandler(update, "KP是管理员，无法转移")
     newkpid: int
     if len(context.args) != 0:
         if not botdice.isint(context.args[0]):
@@ -551,9 +573,9 @@ def transferkp(update: Update, context: CallbackContext) -> bool:
 
 
 def delkp(update: Update, context: CallbackContext) -> bool:
-    """撤销自己的KP权限。
-
-    在撤销KP的同时，将自己原本拥有的卡`playerid`全部设置为`0`，以方便新的KP直接使用`/addkp`获取NPC卡。"""
+    """撤销自己的KP权限。只有当前群内KP可以使用该指令。
+    在撤销KP的同时，将自己原本拥有的卡`playerid`全部设置为0，
+    以方便新的KP直接使用`/addkp`获取NPC卡片。"""
     if isprivatemsg(update):
         return errorHandler(update, '发群消息撤销自己的KP权限')
     gpid = update.effective_chat.id
@@ -567,12 +589,15 @@ def delkp(update: Update, context: CallbackContext) -> bool:
     return True
 
 
-def reload(update, context) -> bool:
-    """重新读取文件"""
-    global GROUP_KP_DICT, CARDS_DICT, ON_GAME, CURRENT_CARD_DICT, ID_POOL
+def reload(update: Update, context: CallbackContext) -> bool:
+    """重新读取所有文件，只有bot管理者可以使用"""
+    global GROUP_KP_DICT, CARDS_DICT, ON_GAME, CURRENT_CARD_DICT, ID_POOL, GROUP_RULES
+    if update.message.from_user.id != ADMIN_ID:
+        return errorHandler(update, "没有权限", True)
     try:
         GROUP_KP_DICT, CARDS_DICT, ON_GAME = readinfo()
         CURRENT_CARD_DICT = readcurrentcarddict()
+        GROUP_RULES = readrules()
         ID_POOL = []
         addIDpool(ID_POOL)
     except:
@@ -582,9 +607,9 @@ def reload(update, context) -> bool:
 
 
 def showuserlist(update: Update, context: CallbackContext) -> bool:
-    """显示所有信息。无权限者无法使用这一指令。"""
+    """显示所有信息。非KP无法使用这一指令。"""
     if isgroupmsg(update):  # Group msg: do nothing, even sender is USER or KP
-        return errorHandler(update, "Sorry, I didn't understand that command.", True)
+        return errorHandler(update, "没有这一指令", True)
     if update.effective_chat.id == ADMIN_ID:  # 全部显示
         rttext = "GROUP_KP_LIST:\n"
         if not GROUP_KP_DICT:
@@ -632,15 +657,26 @@ def showuserlist(update: Update, context: CallbackContext) -> bool:
                 update.message.reply_text(
                     "群："+str(ON_GAME[i].groupid)+"正在游戏中")
         return True
-    return errorHandler(update, "Sorry, I didn't understand that command.", True)
+    return errorHandler(update, "没有这一指令", True)
 
 
-def getid(update: Update, context: CallbackContext) -> int:
-    """获取所在聊天环境的id。私聊使用该指令发送用户id，群聊使用该指令发送群id"""
-    chatid = getcontextid(update)
-    context.bot.send_message(parse_mode='HTML', chat_id=chatid,
-                             text="<code>"+str(chatid)+"</code> \n点击即可复制")
-    return chatid
+def getid(update: Update, context: CallbackContext) -> None:
+    """获取所在聊天环境的id。私聊使用该指令发送用户id，群聊使用该指令则发送群id"""
+    chatid = getchatid(update)
+    update.message.reply_text("<code>"+str(chatid) +
+                              "</code> \n点击即可复制", parse_mode='HTML')
+
+
+def showrule(update: Update, context: CallbackContext) -> bool:
+    """显示当前群内的规则。"""
+    if isprivatemsg(update):
+        return errorHandler(update, "请在群内查看规则")
+    gpid = getchatid(update)
+    if gpid not in GROUP_RULES:
+        initrules(gpid)
+    rule = GROUP_RULES[gpid]
+    update.message.reply_text(str(rule))
+    return True
 
 
 def setrule(update: Update, context: CallbackContext) -> bool:
@@ -653,7 +689,26 @@ def setrule(update: Update, context: CallbackContext) -> bool:
 
     一次可以修改多项规则。
     有可能会出现部分规则设置成功，但部分规则设置失败的情况，
-    查看返回的信息可以知道哪些部分已经成功修改。"""
+    查看返回的信息可以知道哪些部分已经成功修改。
+
+    规则的详细说明：
+
+    skillmax：接收长度为3的数组，记为r。`r[0]`是一般技能上限，
+    `r[1]`是个别技能的上限，`r[2]`表示个别技能的个数。
+
+    skillmaxAged：年龄得到的技能上限增加设定。
+    接收长度为4的数组，记为r。`r[0]`至`r[2]`同上，
+    但仅仅在年龄大于`r[3]`时开启该设定。`r[3]`等于100代表不开启该设定。
+
+    skillcost：技能点数分配时的消耗。接收长度为偶数的数组，记为r。
+    若i为偶数（或0），`r[i]`表示技能点小于`r[i+1]`时，
+    需要分配`r[i]`点点数来获得1点技能点。r的最后一项必须是100。
+    例如：`r=[1,80,2,100]`，则从10点升至90点需要花费`1*70+2*10=90`点数。
+
+    greatsuccess：大成功范围。接收长度为4的数组，记为r。
+    `r[0]-r[1]`为检定大于等于50时大成功范围，否则是`r[2]-r[3]`。
+
+    greatfail：大失败范围。同上。"""
     if isprivatemsg(update):
         return errorHandler(update, "请在群内用该指令设置规则")
     gpid = update.effective_chat.id
@@ -720,7 +775,8 @@ def newcard(update: Update, context: CallbackContext) -> bool:
         new_card.id = nid
         ID_POOL.append(nid)
         ID_POOL.sort()
-    update.message.reply_text("角色卡已创建。使用 /details 查看角色卡详细信息。")
+    update.message.reply_text(
+        "角色卡已创建，您的卡id为："+str(new_card.id)+"。使用 /details 查看角色卡详细信息。")
     # 如果有3个属性小于50，则discard=true
     countless50 = 0
     for keys in new_card.data:
@@ -729,7 +785,7 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     if countless50 >= 3:
         new_card.discard = True
         update.message.reply_text(
-            "如果你愿意，可以使用 /discard 来删除这张角色卡。设定年龄后则不能再删除这张卡。")
+            "因为有三项属性小于50，如果你愿意的话可以使用 /discard 来删除这张角色卡。设定年龄后则不能再删除这张卡。")
     update.message.reply_text(
         "长按 /setage 并输入一个数字来设定年龄。如果需要帮助，使用 /createcardhelp 来获取帮助。")
     CARDS_DICT[new_card.groupid][new_card.id] = new_card
@@ -744,6 +800,15 @@ def newcard(update: Update, context: CallbackContext) -> bool:
 
 
 def discard(update: Update, context: CallbackContext):
+    """该指令用于删除角色卡。
+    通过识别卡中`discard`是否为`True`来判断是否可以删除这张卡。
+    如果`discard`为`False`，需要玩家向KP申请，让KP修改`discard`属性为`True`。
+
+    指令格式如下：
+    `/discard (--groupid/--cardid)...`无参数时自动删除一张卡/创建按钮来选择要删除哪张卡；
+    有参数时：
+    若参数为群id（负数），则删除群内所有可删除的卡。
+    若参数为卡id，删除对应的那张卡。"""
     if isgroupmsg(update):
         return errorHandler(update, "发送私聊消息删除卡。")
     plid = update.effective_chat.id  # 发送者
@@ -770,6 +835,10 @@ def discard(update: Update, context: CallbackContext):
                 "删除了"+str(len(trueDiscardTupleList))+"张卡片。\n/details 显示删除的卡片信息。删除操作不可逆。")
         detailinfo = ""
         for gpid, cdid in trueDiscardTupleList:
+            if cdid in ID_POOL:
+                ID_POOL.pop(ID_POOL.index(cdid))
+            else:
+                sendtoAdmin("删除了ID池中未出现的卡，请检查代码")
             detailinfo += "删除卡片：\n" + \
                 str(CARDS_DICT[gpid][cdid])+"\n"  # 获取删除的卡片的详细信息
             CARDS_DICT[gpid].pop(cdid)
@@ -808,6 +877,10 @@ def discard(update: Update, context: CallbackContext):
         detailinfo = "删除卡片：\n"+str(CARDS_DICT[gpid][cdid])+"\n"
         DETAIL_DICT[plid] = detailinfo
         CARDS_DICT[gpid].pop(cdid)
+        if cdid in ID_POOL:
+            ID_POOL.pop(ID_POOL.index(cdid))
+        else:
+            sendtoAdmin("删除了ID池中未出现的卡，请检查代码")
         if len(CARDS_DICT[gpid]) == 0:
             CARDS_DICT.pop(gpid)
         writecards(CARDS_DICT)
@@ -995,7 +1068,7 @@ def setjob(update: Update, context: CallbackContext) -> bool:
 
 
 def skillmaxval(skillname: str, card1: GameCard, ismainskill: bool) -> int:
-    """通过cost规则，返回技能能达到的最高值。该函数主要用于制作按钮"""
+    """通过cost规则，返回技能能达到的最高值。"""
     aged, ok = skillcantouchmax(card1)
     if aged:
         skillrule = GROUP_RULES[card1.groupid].skillmaxAged
@@ -1014,8 +1087,7 @@ def skillmaxval(skillname: str, card1: GameCard, ismainskill: bool) -> int:
         pts = card1.interest["points"]
         if skillname in card1.interest:
             basicval = card1.interest[skillname]
-    initrules(card1.groupid)
-    costrule = GROUP_RULES[card1.groupid].skillCost
+    costrule = GROUP_RULES[card1.groupid].skillcost
     if basicval == -1:
         basicval = getskilllevelfromdict(card1, skillname)
     if len(costrule) <= 2:
@@ -1050,7 +1122,7 @@ def evalskillcost(skillname: str, skillval: int, card1: GameCard, ismainskill: b
     if skillval == basicval:
         return 0
     initrules(card1.groupid)
-    costrule = GROUP_RULES[card1.groupid].skillCost
+    costrule = GROUP_RULES[card1.groupid].skillcost
     if skillval < basicval:
         # 返还技能点，返回负数
         if len(costrule) <= 2:
@@ -1325,7 +1397,7 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
             "Add main skill, skill name is: "+skillname, reply_markup=rp_markup)
         return True
     mm = skillmaxval(skillname, card1, False)
-    rtbuttons = makeIntButtons(m, mm, "addintskill", skillname)
+    rtbuttons = (m, mm, "addintskill", skillname)
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     update.message.reply_text(
         "Add interest skill, skill name is: "+skillname, reply_markup=rp_markup)
@@ -1443,8 +1515,8 @@ def buttonaddmainskill(query: CallbackQuery, update: Update, card1: GameCard, ar
         writecards(CARDS_DICT)
         return True
     m = getskilllevelfromdict(card1, args[1])
-    mm = card1.skill["points"]+m
-    rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+    mm = skillmaxval(args[1], card1, True)
+    rtbuttons = makeIntButtons(m, mm, args[0], args[1])
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     query.edit_message_text(
         "Add main skill, skill name is: "+args[1], reply_markup=rp_markup)
@@ -1462,8 +1534,8 @@ def buttoncgmainskill(query: CallbackQuery, update: Update, card1: GameCard, arg
         writecards(CARDS_DICT)
         return True
     m = getskilllevelfromdict(card1, args[1])
-    mm = card1.skill["points"]+card1.skill[args[1]]
-    rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+    mm = skillmaxval(args[1], card1, True)
+    rtbuttons = makeIntButtons(m, mm, args[0], args[1])
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     query.edit_message_text(
         "Change main skill level, skill name is: "+args[1], reply_markup=rp_markup)
@@ -1482,8 +1554,8 @@ def buttonaddsgskill(query: CallbackQuery, update: Update, card1: GameCard, args
         writecards(CARDS_DICT)
         return True
     m = getskilllevelfromdict(card1, args[1])
-    mm = card1.skill["points"]+m
-    rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+    mm = skillmaxval(args[1], card1, True)
+    rtbuttons = makeIntButtons(m, mm, args[0], args[1])
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     query.edit_message_text(
         "Add suggested skill, skill name is: "+args[1], reply_markup=rp_markup)
@@ -1493,7 +1565,7 @@ def buttonaddsgskill(query: CallbackQuery, update: Update, card1: GameCard, args
 def buttonaddintskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
     """响应KeyboardButton的addintskill请求。
 
-    因为使用的是能翻页的列表，所以有可能位置1的参数是:str:`page`，
+    因为使用的是能翻页的列表，所以有可能位置1的参数是`page`，
     且位置2的参数是页码。"""
     if args[1] == "page":
         rttext, rtbuttons = showskillpages(int(args[2]), card1)
@@ -1510,8 +1582,8 @@ def buttonaddintskill(query: CallbackQuery, update: Update, card1: GameCard, arg
         writecards(CARDS_DICT)
         return True
     m = getskilllevelfromdict(card1, args[1])
-    mm = card1.interest["points"]+m
-    rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+    mm = skillmaxval(args[1], card1, False)
+    rtbuttons = makeIntButtons(m, mm, args[0], args[1])
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     query.edit_message_text(
         "Add interest skill, skill name is: "+args[1], reply_markup=rp_markup)
@@ -1529,13 +1601,8 @@ def buttoncgintskill(query: CallbackQuery, update: Update, card1: GameCard, args
         writecards(CARDS_DICT)
         return True
     m = getskilllevelfromdict(card1, args[1])
-    try:
-        mm = card1.interest["points"]+card1.interest[args[1]]
-    except:
-        card1.interest[args[1]] = m
-        mm = card1.interest["points"]+m
-        writecards(CARDS_DICT)
-    rtbuttons = makeIntButtons(m, min(99, mm), args[0], args[1])
+    mm = skillmaxval(args[1], card1, False)
+    rtbuttons = makeIntButtons(m, mm, args[0], args[1])
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     query.edit_message_text(
         "Change interest skill level, skill name is: "+args[1], reply_markup=rp_markup)
@@ -1572,6 +1639,10 @@ def buttondiscard(query: CallbackQuery, update: Update, card1: GameCard, args: L
     detailinfo = "删除了：\n"+str(CARDS_DICT[gpid][cdid])
     DETAIL_DICT[plid] = detailinfo
     CARDS_DICT[gpid].pop(cdid)
+    if cdid in ID_POOL:
+        ID_POOL.pop(ID_POOL.index(cdid))
+    else:
+        sendtoAdmin("删除了ID池中未出现的卡，请检查代码")
     if len(CARDS_DICT[gpid]) == 0:
         CARDS_DICT.pop(gpid)
     query.edit_message_text("删除了一张卡片，使用 /details 查看详细信息。\n该删除操作不可逆。")
@@ -2018,7 +2089,7 @@ def show(update: Update, context: CallbackContext) -> bool:
     /show --attrname: 显示卡片的某项具体属性
     """
     if len(context.args) == 0:
-        return errorHandler(update, "需要参数。如果不会使用，请查看帮助： /help show")
+        return errorHandler(update, "需要参数")
     if isprivatemsg(update):
         plid = update.effective_chat.id
         card1, ok = findcard(plid)
@@ -2587,98 +2658,82 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
 
 
 def addcard(update: Update, context: CallbackContext) -> bool:
+    """使用已有信息添加一张卡片，模板使用的是NPC/怪物模板。指令格式如下：
+
+    `/addcard --attr_1 --val_1 --attr_2 --val_2 …… --attr_n -- val_n`，
+    其中`attr`是卡的直接属性，或卡的某个属性（字典）中的键。不可以直接添加tempstatus这个属性。
+    `name`和背景信息不支持空格，如果要设置这一项信息，需要之后用别的指令来修改。
+
+    卡的属性只有三种类型的值：`int`, `str`, `bool`，函数会自动判断对应的属性是什么类型，
+    其中`bool`类型`attr`对应的`val`只能是`true`, `True`, `false`, `False`之一。
+
+    如果遇到无法识别的属性，将无法创建卡片。
+    参数中，必须的`attr`之一为`groupid`，如果找不到`groupid`将无法添加卡片。
+    `playerid`会自动识别为发送者，无需填写`playerid`。
+    指令使用者是KP的情况下，才可以指定`playerid`这个属性，否则卡片无效。
+    给定`id`属性的话，在指定的卡id已经被占用的时候，会重新自动选取。"""
     if isgroupmsg(update):
-        update.message.reply_text("向我发送私聊消息来添加卡")
-        return False
+        return errorHandler(update, "向我发送私聊消息来添加卡", True)
     if len(context.args) == 0:
-        update.message.reply_text("需要参数")
-        return False
+        return errorHandler(update, "需要参数")
     if (len(context.args)//2)*2 != len(context.args):
         update.message.reply_text("参数长度应该是偶数")
     t = createcard.templateNewCard()
+    # 遍历args获取attr和val
     for i in range(0, len(context.args), 2):
-        argname = context.args[i]
+        argname: str = context.args[i]
         argval = context.args[i+1]
-        if argname in t and not isinstance(t[argname], dict):
-            if isinstance(t[argname], bool):
-                if argval == "false" or argval == "False":
-                    argval = False
-                elif argval == "true" or argval == "True":
-                    argval = True
-                if not isinstance(argval, bool):
-                    update.message.reply_text(
-                        argname+"应该为bool类型")
-                    return False
-                t[argname] = argval
-            elif isinstance(t[argname], int):
-                if not botdice.isint(argval):
-                    update.message.reply_text(argname+"应该为int类型")
-                    return False
-                t[argname] = int(argval)
+        dt = findattrindict(t, argname)
+        if not dt:  # 可能是技能，否则返回
+            if argname in SKILL_DICT or argname == "母语" or argname == "闪避":
+                dt = t["skill"]
+                dt[argname] = 0  # 这一行是为了防止之后判断类型报错
             else:
-                t[argname] = argval
-        elif argname in t and isinstance(t[argname], dict):
-            update.message.reply_text(
-                argname+" 是dict类型，不可直接赋值")
-            return False
+                return errorHandler(update, "属性 "+argname+" 在角色卡模板中没有找到")
+        if isinstance(dt[argname], dict):
+            return errorHandler(update, argname+"是dict类型，不可直接赋值")
+        if isinstance(dt[argname], bool):
+            if argval == "false" or argval == "False":
+                argval = False
+            elif argval == "true" or argval == "True":
+                argval = True
+            if not isinstance(argval, bool):
+                return errorHandler(update, argname+"应该为bool类型")
+            dt[argname] = argval
+        elif isinstance(dt[argname], int):
+            if not botdice.isint(argval):
+                return errorHandler(update, argname+"应该为int类型")
+            dt[argname] = int(argval)
         else:
-            notattr = True
-            for keys in t:
-                if not isinstance(t[keys], dict) or argname not in t[keys]:
-                    continue
-                notattr = False
-                if isinstance(t[keys][argname], bool):
-                    if argval == "false" or argval == "False":
-                        argval = False
-                    elif argval == "true" or argval == "True":
-                        argval = True
-                    if not isinstance(argval, bool):
-                        update.message.reply_text(
-                            argname+"应该为bool类型")
-                        return False
-                    t[keys][argname] = argval
-                elif isinstance(t[keys][argname], int):
-                    if not botdice.isint(argval):
-                        update.message.reply_text(
-                            argname+"应该为int类型")
-                        return False
-                    t[keys][argname] = int(argval)
-                else:
-                    t[keys][argname] = argval
-            if notattr:
-                if argname not in SKILL_DICT and argname != "闪避" and argname != "母语":
-                    update.message.reply_text(
-                        argname+"角色卡模板中没有找到")
-                    return False
-                if not botdice.isint(argval):
-                    update.message.reply_text(argname+"应该为int类型")
-                    return False
-                t["skill"][argname] = int(argval)
+            dt[argname] = argval
+    # 参数写入完成
+    # 检查groupid是否输入了
     if t["groupid"] == 0:
-        update.message.reply_text("需要groupid！")
-        return False
+        return errorHandler(update, "需要groupid！")
     initrules(t["groupid"])
+    # 检查是否输入了以及是否有权限输入playerid
     if not isfromkp(update):
-        if t["playerid"] != 0:
-            update.message.reply_text("不可以设置playerid")
-            return False
+        if t["playerid"] != 0 and t["playerid"] != update.effective_chat.id:
+            return errorHandler(update, "没有权限设置playerid")
         t["playerid"] = update.effective_chat.id
     else:
         kpid = update.effective_chat.id
         if GROUP_KP_DICT[t["groupid"]] != kpid and t["playerid"] != 0 and t["playerid"] != kpid:
-            update.message.reply_text("不可以设置playerid")
-            return False
+            return errorHandler(update, "没有权限设置playerid")
         if t["playerid"] == 0:
             t["playerid"] = kpid
+    # 生成成功
     card1 = GameCard(t)
+    # 添加id
     if "id" not in context.args or int(context.args[context.args.index("id")+1]) < 0 or card1.id in ID_POOL:
-        update.message.reply_text("无效id或id未设置，自动获取id")
+        update.message.reply_text("输入了已被占用的id，或id未设置。自动获取id")
         nid = 0
         while nid in ID_POOL:
             nid += 1
         card1.id = nid
     ID_POOL.append(card1.id)
     ID_POOL.sort()
+    # 卡检查
     rttext = createcard.showchecks(card1)
     if rttext != "All pass.":
         update.message.reply_text(
@@ -2691,5 +2746,32 @@ def addcard(update: Update, context: CallbackContext) -> bool:
     return True
 
 
+def helper(update: Update, context: CallbackContext) -> True:
+    """查看指令对应函数的说明文档。
+
+    `/help --command`查看指令对应的文档。
+    """
+    if len(context.args) == 0:
+        pass
+        return True
+    allfuncs = globals()
+    funcname = context.args[0]
+    if funcname == "help":
+        funcname = "helper"
+    if funcname in allfuncs and isfunction(allfuncs[funcname]) and allfuncs[funcname].__doc__:
+        rttext: str = allfuncs[funcname].__doc__
+        ind = rttext.find("    ")
+        while ind != -1:
+            rttext = rttext[:ind]+rttext[ind+4:]
+            ind = rttext.find("    ")
+        try:
+            update.message.reply_text(rttext, parse_mode="MarkdownV2")
+        except:
+            update.message.reply_text("Markdown格式parse错误，请检查并改写文档")
+            return False
+        return True
+    return errorHandler(update, "找不到这个指令，或这个指令没有帮助信息。")
+
+
 def unknown(update: Update, context: CallbackContext) -> None:
-    errorHandler(update, "Sorry, I didn't understand that command.", True)
+    errorHandler(update, "没有这一指令", True)
