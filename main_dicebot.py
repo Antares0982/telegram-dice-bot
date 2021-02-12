@@ -20,15 +20,17 @@ logging.basicConfig(
 
 async def timer():
     istime = False
+    clockhour = 3
+    clockmin = 0
     while True:
         nowtime = dicehandlers.time.localtime(dicehandlers.time.time())
-        if not istime and nowtime.tm_hour == 0 and nowtime.tm_min == 0:
+        if not istime and nowtime.tm_hour == clockhour and nowtime.tm_min == clockmin:
             dicehandlers.sendtoAdmin("bot自检中！")
             botcheckdata("bot自检中……")
             istime = True
             continue
         if istime:
-            if nowtime.tm_min != 0:
+            if nowtime.tm_min != clockmin:
                 istime = False
             await asyncio.sleep(10)
             continue
@@ -168,5 +170,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(timer())
     main()
+    asyncio.run(timer())
