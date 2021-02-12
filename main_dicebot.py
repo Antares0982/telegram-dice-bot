@@ -2,14 +2,13 @@
 # version: 1.0.1
 
 import logging
+import asyncio
 import signal
 import sys
 import os
-from telegram import Update
+from telegram import Update, error
 from telegram.ext import CallbackQueryHandler, MessageHandler, Filters, CommandHandler, CallbackContext
 
-from gameclass import *
-from botdicts import *
 import dicehandlers
 
 
@@ -19,33 +18,86 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 
+async def timer():
+    istime = False
+    while True:
+        nowtime = dicehandlers.time.localtime(dicehandlers.time.time())
+        if not istime and nowtime.tm_hour == 0 and nowtime.tm_min == 0:
+            dicehandlers.sendtoAdmin("bot自检中！")
+            botcheckdata("bot自检中……")
+            istime = True
+            continue
+        if istime:
+            if nowtime.tm_min != 0:
+                istime = False
+            await asyncio.sleep(10)
+            continue
+        await asyncio.sleep(30)
+
+
+def botcheckdata(msg: str, recall: bool = True):
+    """进行一次数据自检，检查是否有群因为升级而id变化了"""
+    gpids: dicehandlers.List[int] = []
+    for key in dicehandlers.CARDS_DICT:
+        gpids.append(key)
+    for key in dicehandlers.GROUP_KP_DICT:
+        if key not in gpids:
+            gpids.append(key)
+    for gpid in gpids:
+        try:
+            sendmsg = dicehandlers.updater.bot.send_message(
+                chat_id=gpid, text=msg)
+        except error.ChatMigrated as err:
+            if gpid in dicehandlers.CARDS_DICT:
+                dicehandlers.sendtoAdmin(
+                    "群id发生变化，原群id："+str(gpid)+"变化为"+str(err.new_chat_id))
+                for game in dicehandlers.ON_GAME:
+                    if game.groupid == gpid:
+                        game.groupid = err.new_chat_id
+                        dicehandlers.writegameinfo(dicehandlers.ON_GAME)
+                        break
+                dicehandlers.sendtoAdmin("出现问题，强制转移群数据！！！")
+                dicehandlers.changecardgpid(gpid, err.new_chat_id)
+                dicehandlers.sendtoAdmin("转移群数据完成")
+            if gpid in dicehandlers.GROUP_KP_DICT:
+                dicehandlers.GROUP_KP_DICT[err.new_chat_id] = dicehandlers.GROUP_KP_DICT.pop(
+                    gpid)
+                dicehandlers.writekpinfo(dicehandlers.GROUP_KP_DICT)
+        except:
+            return False
+        else:
+            if recall:
+                sendmsg.delete()
+    dicehandlers.sendtoAdmin("自检完成！")
+    return True
+
+
 def bot(update: Update, context: CallbackContext) -> bool:
     """直接控制控制程序的行为。可以直接调用updater。使用方法：
 
     `/bot stop`将结束程序。
 
     `/bot restart`将调用`reload`方法重新加载所有数据。"""
-    if update.message.from_user.id != ADMIN_ID:
+    if update.message.from_user.id != dicehandlers.ADMIN_ID:
         return dicehandlers.errorHandler(update, "没有权限", True)
     if len(context.args) == 0:
         return dicehandlers.errorHandler(update, "参数无效", True)
     inst = context.args[0]
+    if inst == "check":
+        update.message.reply_text("开始数据自检")
+        if not botcheckdata("bot自检中……"):
+            dicehandlers.sendtoAdmin("出现了未知的错误，请检查报错信息")
+            return False
+        return True
     if inst == "stop":
-        # 寻找所有群
-        gpids: List[int] = []
-        for gpid in dicehandlers.CARDS_DICT:
-            gpids.append(gpid)
-        for gpid in dicehandlers.GROUP_KP_DICT:
-            if gpid not in gpids:
-                gpids.append(gpid)
-        for gpid in gpids:
-            context.bot.send_message(chat_id=gpid, text="Bot程序终止！")
+        if not botcheckdata("Bot程序终止！", False):
+            dicehandlers.sendtoAdmin("出现了未知的错误，请检查报错信息")
         dicehandlers.sendtoAdmin("进程被指令终止。")
         # 结束进程，先写入所有数据
-        writecards(dicehandlers.CARDS_DICT)
-        writecurrentcarddict(dicehandlers.CURRENT_CARD_DICT)
-        writekpinfo(dicehandlers.GROUP_KP_DICT)
-        writegameinfo(dicehandlers.ON_GAME)
+        dicehandlers.writecards(dicehandlers.CARDS_DICT)
+        dicehandlers.writecurrentcarddict(dicehandlers.CURRENT_CARD_DICT)
+        dicehandlers.writekpinfo(dicehandlers.GROUP_KP_DICT)
+        dicehandlers.writegameinfo(dicehandlers.ON_GAME)
         pid = os.getpid()
         if sys.platform == "win32":  # windows
             os.kill(pid, signal.SIGBREAK)

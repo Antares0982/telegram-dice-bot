@@ -7,6 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.base import TelegramObject
 from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext, Updater
+from telegram.message import Message
 
 from cfg import *
 from botdicts import *
@@ -75,7 +76,8 @@ except:
     exit()
 
 # 读取完成
-updater.bot.send_message(chat_id=ADMIN_ID, text="Bot is live!")
+FIRST_MSG: Message = updater.bot.send_message(
+    chat_id=ADMIN_ID, text="Bot is live!")
 addIDpool(ID_POOL)
 
 
@@ -2605,6 +2607,20 @@ def changeid(update: Update, context: CallbackContext) -> bool:
     return True
 
 
+def changecardgpid(oldgpid: int, newgpid: int) -> bool:
+    """函数`changegroup`的具体实现"""
+    if newgpid not in CARDS_DICT:  # 直接将整个字典pop出来
+        CARDS_DICT[newgpid] = CARDS_DICT.pop(oldgpid)
+        for cdid in CARDS_DICT[newgpid]:
+            CARDS_DICT[newgpid][cdid].groupid = newgpid
+    else:  # 因为目标群有卡，不可以直接复制，遍历原群所有键
+        for cdid in CARDS_DICT[oldgpid]:
+            CARDS_DICT[newgpid][cdid] = CARDS_DICT[oldgpid].pop(cdid)
+            CARDS_DICT[newgpid][cdid].groupid = newgpid
+        CARDS_DICT.pop(oldgpid)
+    writecards(CARDS_DICT)
+
+
 def changegroup(update: Update, context: CallbackContext) -> bool:
     """修改卡片的所属群。
     一般只用于卡片创建时输入了错误的群id。
@@ -2618,7 +2634,7 @@ def changegroup(update: Update, context: CallbackContext) -> bool:
     """
     if len(context.args) < 2:
         return errorHandler(update, "至少需要2个参数")
-    if not botdice.isint(context.args[0]) or botdice.isint(context.args[1]):
+    if not botdice.isint(context.args[0]) or not botdice.isint(context.args[1]):
         return errorHandler(update, "参数错误", True)
     newgpid = int(context.args[1])
     if newgpid >= 0:
@@ -2635,16 +2651,7 @@ def changegroup(update: Update, context: CallbackContext) -> bool:
             return errorHandler(update, "原群没有卡片！")
         # 检查权限通过
         numofcards = len(CARDS_DICT[oldgpid])
-        if newgpid not in CARDS_DICT:  # 直接将整个字典pop出来
-            CARDS_DICT[newgpid] = CARDS_DICT.pop(oldgpid)
-            for cdid in CARDS_DICT[newgpid]:
-                CARDS_DICT[newgpid][cdid].groupid = newgpid
-        else:  # 因为目标群有卡，不可以直接复制，遍历原群所有键
-            for cdid in CARDS_DICT[oldgpid]:
-                CARDS_DICT[newgpid][cdid] = CARDS_DICT[oldgpid].pop(cdid)
-                CARDS_DICT[newgpid][cdid].groupid = newgpid
-            CARDS_DICT.pop(oldgpid)
-        writecards(CARDS_DICT)
+        changecardgpid(oldgpid, newgpid)
         update.message.reply_text(
             "操作成功，已经将"+str(numofcards)+"张卡片从群："+str(oldgpid)+"移动到群："+str(newgpid))
         return True
