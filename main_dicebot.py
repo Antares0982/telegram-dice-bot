@@ -71,6 +71,8 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('getid', dicehandlers.getid))
     dispatcher.add_handler(CommandHandler('showrule', dicehandlers.showrule))
     dispatcher.add_handler(CommandHandler('setrule', dicehandlers.setrule))
+    dispatcher.add_handler(CommandHandler(
+        'createcardhelp', dicehandlers.createcardhelp))
     dispatcher.add_handler(CommandHandler('newcard', dicehandlers.newcard))
     dispatcher.add_handler(CommandHandler('discard', dicehandlers.discard))
     dispatcher.add_handler(CommandHandler('details', dicehandlers.details))
@@ -78,7 +80,11 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('setstrdec', dicehandlers.setstrdec))
     dispatcher.add_handler(CommandHandler('setcondec', dicehandlers.setcondec))
     dispatcher.add_handler(CommandHandler('setjob', dicehandlers.setjob))
+    dispatcher.add_handler(CommandHandler(
+        'showjoblist', dicehandlers.showjoblist))
     dispatcher.add_handler(CommandHandler('addskill', dicehandlers.addskill))
+    dispatcher.add_handler(CommandHandler(
+        'showskilllist', dicehandlers.showskilllist))
     dispatcher.add_handler(CommandHandler('setname', dicehandlers.setname))
     dispatcher.add_handler(CommandHandler('startgame', dicehandlers.startgame))
     dispatcher.add_handler(CommandHandler('abortgame', dicehandlers.abortgame))
@@ -92,6 +98,9 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('showcard', dicehandlers.showcard))
     dispatcher.add_handler(CommandHandler('showids', dicehandlers.showids))
     dispatcher.add_handler(CommandHandler('modify', dicehandlers.modify))
+    dispatcher.add_handler(CommandHandler('changeid', dicehandlers.changeid))
+    dispatcher.add_handler(CommandHandler(
+        'changegroup', dicehandlers.changegroup))
     dispatcher.add_handler(CommandHandler(
         'randombackground', dicehandlers.randombackground))
     dispatcher.add_handler(CommandHandler(
