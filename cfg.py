@@ -3,6 +3,7 @@ from configparser import ConfigParser
 cfgparser = ConfigParser()
 cfgparser.read('config.ini')
 
+VERSION = "1.0.9"
 
 PROXY = cfgparser.getboolean("PROXY", "PROXY")  # 大陆登录telegram需要设置代理，否则关闭
 
@@ -38,6 +39,9 @@ CREATE_CARD_HELP = """建卡流程如下：
 6 用 /setname 设置姓名， /setsex 设置性别。
 7 用 /setbkground 设置背景信息，或 /randombackground 设置随机的背景信息。"""
 
-HELP_TEXT = "This is help message, which will be added later."
+HELP_TEXT = "欢迎使用COC dice bot，目前版本：v"+VERSION+"""
+作者：@AntaresChr
+使用 /help 查看指令的帮助。
+"""
 
 del cfgparser

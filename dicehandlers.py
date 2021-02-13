@@ -89,6 +89,12 @@ def getchatid(update: Update) -> int:
     return update.effective_chat.id
 
 
+def getkpid(gpid: int) -> int:
+    if gpid not in GROUP_KP_DICT:
+        return -1
+    return GROUP_KP_DICT[gpid]
+
+
 def isprivatemsg(update: Update) -> bool:
     if update.effective_chat.id > 0:
         return True
@@ -114,7 +120,7 @@ def isfromkp(update: Update) -> bool:
     if isprivatemsg(update):  # 私聊消息，判断是否是kp
         return searchifkp(update.effective_chat.id)
     # 如果是群消息，判断该指令是否来自本群kp
-    if update.effective_chat.id not in GROUP_KP_DICT or GROUP_KP_DICT[update.effective_chat.id] != update.message.from_user.id:
+    if getkpid(update.effective_chat.id) != update.message.from_user.id:
         return False
     return True
 
@@ -123,7 +129,7 @@ def findkpgroups(kpid: int) -> List[int]:
     """返回kp所对应的所有群"""
     ans = []
     for keys in GROUP_KP_DICT:  # key is str(groupid)
-        if GROUP_KP_DICT[keys] == kpid:
+        if getkpid(keys) == kpid:
             ans.append(keys)
     return ans
 
@@ -396,10 +402,12 @@ def modifycardinfo(card1: GameCard, attrname: str, val: str) -> Tuple[str, bool]
 def findkpcards(kpid) -> List[GameCard]:
     """查找`kpid`作为kp，所控制的NPC卡片，并做成列表全部返回"""
     ans = []
-    for i in CARDS_DICT:
-        for cardid in CARDS_DICT[i]:
-            if CARDS_DICT[i][cardid].playerid == kpid and GROUP_KP_DICT[i] == kpid:
-                ans.append(CARDS_DICT[i][cardid])
+    for gpid in CARDS_DICT:
+        if not getkpid(gpid) == kpid:
+            continue
+        for cardid in CARDS_DICT[gpid]:
+            if CARDS_DICT[gpid][cardid].playerid == kpid:
+                ans.append(CARDS_DICT[gpid][cardid])
     return ans
 
 
@@ -476,7 +484,7 @@ def changeKP(gpid: int, newkpid: int = 0) -> bool:
     会转移所有原KP控制的角色卡，包括正在进行的游戏"""
     if newkpid < 0:
         return False
-    oldkpid = GROUP_KP_DICT[gpid]
+    oldkpid = getkpid(gpid)
     if oldkpid == newkpid:
         return False
     for cdid in CARDS_DICT[gpid]:
@@ -527,7 +535,7 @@ def addkp(update: Update, context: CallbackContext) -> bool:
     # 判断是否已经有KP
     if gpid in GROUP_KP_DICT:
         # 已有KP
-        if not isingroup(update, GROUP_KP_DICT[gpid]):
+        if not isingroup(update, getkpid(gpid)):
             if not changeKP(gpid, kpid):  # 更新NPC卡拥有者
                 return errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")  # 不应触发
             return True
@@ -565,9 +573,9 @@ def transferkp(update: Update, context: CallbackContext) -> bool:
     if not isadmin(update, update.message.from_user.id):
         return errorHandler(update, "没有权限", True)
     gpid = update.effective_chat.id
-    if gpid not in GROUP_KP_DICT:
+    if getkpid(gpid) == -1:
         return errorHandler(update, "没有KP", True)
-    if isadmin(update, GROUP_KP_DICT[gpid]):
+    if isadmin(update, getkpid(gpid)):
         return errorHandler(update, "KP是管理员，无法转移")
     newkpid: int
     if len(context.args) != 0:
@@ -576,7 +584,7 @@ def transferkp(update: Update, context: CallbackContext) -> bool:
         newkpid = int(context.args[0])
     else:
         newkpid = update.message.from_user.id
-    if newkpid == GROUP_KP_DICT[gpid]:
+    if newkpid == getkpid(gpid):
         return errorHandler(update, "原KP和新KP相同", True)
     if not changeKP(gpid, newkpid):
         return errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")  # 不应触发
@@ -589,9 +597,9 @@ def delkp(update: Update, context: CallbackContext) -> bool:
     if isprivatemsg(update):
         return errorHandler(update, '发群消息撤销自己的KP权限')
     gpid = update.effective_chat.id
-    if gpid not in GROUP_KP_DICT:
+    if getkpid(gpid) == -1:
         return errorHandler(update, '本群没有KP', True)
-    if update.message.from_user.id != GROUP_KP_DICT[gpid]:
+    if update.message.from_user.id != getkpid(gpid):
         return errorHandler(update, '你不是KP', True)
     if not changeKP(gpid):
         return errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")  # 不应触发
@@ -787,7 +795,7 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     # 检查(pl)是否已经有卡
     if gpid in CARDS_DICT:
         for cdid in CARDS_DICT[gpid]:
-            if CARDS_DICT[gpid][cdid].playerid == plid and GROUP_KP_DICT[gpid] != plid:
+            if CARDS_DICT[gpid][cdid].playerid == plid and getkpid(gpid) != plid:
                 return errorHandler(update, "你在这个群已经有一张卡了！")
     # 符合建卡条件，生成新卡
     if gpid not in CARDS_DICT:
@@ -1859,7 +1867,7 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     如果要放弃这些游戏内进行的修改，使用`/abortgame`会直接删除这些副本副本"""
     if isprivatemsg(update):
         return errorHandler(update, "游戏需要在群里进行")
-    if update.effective_chat.id not in GROUP_KP_DICT:
+    if getkpid(update.effective_chat.id) == -1:
         return errorHandler(update, "这个群没有KP")
     if not isfromkp(update):
         return errorHandler(update, "游戏应由KP发起", True)
@@ -1892,7 +1900,7 @@ def startgame(update: Update, context: CallbackContext) -> bool:
 def abortgame(update: Update, context: CallbackContext) -> bool:
     if isprivatemsg(update):
         return errorHandler(update, "发送群聊消息来中止游戏")
-    if update.effective_chat.id in GROUP_KP_DICT and update.message.from_user.id != GROUP_KP_DICT[update.effective_chat.id]:
+    if update.message.from_user.id != getkpid(gpid):
         return errorHandler(update, "只有KP可以中止游戏", True)
     global ON_GAME
     for i in range(len(ON_GAME)):
@@ -1909,17 +1917,15 @@ def abortgame(update: Update, context: CallbackContext) -> bool:
 
 def endgame(update: Update, context: CallbackContext) -> bool:
     if update.effective_chat.id > 0:
-        update.message.reply_text("Game can only be ended in a group.")
-        return False
-    if update.effective_chat.id not in GROUP_KP_DICT:
-        update.message.reply_text("This group does not have a KP.")
-        return False
-    if update.message.from_user.id != GROUP_KP_DICT[update.effective_chat.id]:
+        return errorHandler(update, "该指令仅用于群聊")
+    if getkpid(update.effective_chat.id) == -1:
+        return errorHandler(update, "这个群没有KP")
+    if update.message.from_user.id != getkpid(update.effective_chat.id):
         update.message.reply_text("Only KP can end a game.")
         return False
     global CARDS_DICT, ON_GAME
     gpid = update.effective_chat.id
-    kpid = GROUP_KP_DICT[gpid]
+    kpid = getkpid(gpid)
     for i in range(len(ON_GAME)):
         if ON_GAME[i].groupid == gpid:
             t = ON_GAME[i]
@@ -2072,7 +2078,7 @@ def tempcheck(update: Update, context: CallbackContext):
     game, ok = findgame(update.effective_chat.id)
     if not ok:
         return errorHandler(update, "没有进行中的游戏", True)
-    if update.effective_chat.id not in GROUP_KP_DICT or GROUP_KP_DICT[update.effective_chat.id] != update.message.from_user.id:
+    if getkpid(update.effective_chat.id) != update.message.from_user.id:
         return errorHandler(update, "KP才可以设置临时检定", True)
     if len(context.args) >= 3 and botdice.isint(context.args[1]) and 0 <= int(context.args[1]):
         card, ok = findcardfromgamewithid(game, int(context.args[1]))
@@ -2116,7 +2122,7 @@ def roll(update: Update, context: CallbackContext):
             writegameinfo(ON_GAME)
         senderid = update.message.from_user.id
         gpid = update.effective_chat.id
-        if senderid != GROUP_KP_DICT[update.effective_chat.id]:
+        if senderid != getkpid(gpid):
             gamecard, ok = findcardfromgame(game, senderid)
         elif game.kpctrl == -1:
             rttext = botdice.commondice(dicename)
@@ -2196,9 +2202,11 @@ def roll(update: Update, context: CallbackContext):
         else:
             rttext += "极难成功"
         if dicename == "心理学" or dicename[:2] == "暗骰":
+            if getkpid(gpid) == -1:
+                return errorHandler(update, "本群没有KP！请先添加一个KP再试！！")
             update.message.reply_text("检定："+dicename+" ???/"+str(test))
             context.bot.send_message(
-                chat_id=GROUP_KP_DICT[gpid], text=rttext)
+                chat_id=getkpid(gpid), text=rttext)
         else:
             update.message.reply_text(rttext)
         return True
@@ -2232,7 +2240,7 @@ def show(update: Update, context: CallbackContext) -> bool:
     gpid = update.effective_chat.id
     senderid = update.message.from_user.id
     # KP
-    if gpid in GROUP_KP_DICT and GROUP_KP_DICT[gpid] == senderid and context.args[0] == "card":
+    if getkpid(gpid) == senderid and context.args[0] == "card":
         return errorHandler(update, "为保护NPC或敌人信息，不可以在群内显示KP整张卡片", True)
     game, ingame = findgame(gpid)
     if not ingame:  # 显示游戏外数据，需要提示
@@ -2340,7 +2348,7 @@ def showcard(update: Update, context: CallbackContext) -> bool:
         # 检查是否合法
         if isfromkp(update):  # KP
             kpid = update.effective_chat.id
-            if kpid != ADMIN_ID and cardi.groupid not in GROUP_KP_DICT or GROUP_KP_DICT[cardi.groupid] != kpid:
+            if kpid != ADMIN_ID and getkpid(cardi.groupid) != kpid:
                 return errorHandler(update, "没有权限")
         else:
             # 非KP，只能显示自己的卡
@@ -2357,8 +2365,8 @@ def showcard(update: Update, context: CallbackContext) -> bool:
         return True
     # 处理群聊消息
     gpid = update.effective_chat.id
-    if cardi.groupid != gpid or cardi.playerid == GROUP_KP_DICT[gpid] or cardi.type != "PL":
-        return errorHandler(update, "没有权限", True)
+    if cardi.groupid != gpid or cardi.playerid == getkpid(gpid) or cardi.type != "PL":
+        return errorHandler(update, "不可显示该卡", True)
     # 有权限，开始处理
     if len(context.args) >= 2:
         if not showattrinfo(update, cardi, context.args[1]):
@@ -2390,7 +2398,7 @@ def showids(update: Update, context: CallbackContext) -> bool:
             rttext = ""
             for cdid in CARDS_DICT[gpid]:
                 cardi = CARDS_DICT[gpid][cdid]
-                if cardi.playerid == GROUP_KP_DICT[gpid] or cardi.type != "PL":
+                if cardi.playerid == getkpid(gpid) or cardi.type != "PL":
                     continue
                 rttext += str(cardi.id)+": "
                 if "name" not in cardi.info or cardi.info["name"] == "":
@@ -2529,7 +2537,7 @@ def modify(update: Update, context: CallbackContext) -> bool:
         cardi, ok = findcardwithid(card_id)
         if not ok:
             return errorHandler(update, "找不到该ID对应的卡。")
-        if GROUP_KP_DICT[cardi.groupid] != kpid:
+        if getkpid(cardi.groupid) != kpid:
             return errorHandler(update, "没有权限", True)
         rtmsg, ok = modifycardinfo(cardi, context.args[1], context.args[2])
         if not ok:
@@ -2578,7 +2586,7 @@ def changeid(update: Update, context: CallbackContext) -> bool:
         return errorHandler(update, "找不到该ID对应的卡")
     plid = update.message.from_user.id
     gpid = cardi.groupid
-    if plid != ADMIN_ID and cardi.playerid != plid and (isprivatemsg(update) or GROUP_KP_DICT[gpid] != plid):
+    if plid != ADMIN_ID and cardi.playerid != plid and getkpid(gpid) != plid:
         return errorHandler(update, "非控制者且没有权限", True)
     # 有修改权限，开始处理
     if oldid in ID_POOL:
@@ -2645,7 +2653,7 @@ def changegroup(update: Update, context: CallbackContext) -> bool:
         if ok:
             return errorHandler(update, "游戏正在进行，无法转移")
         kpid = update.message.from_user.id
-        if GROUP_KP_DICT[oldgpid] != kpid and kpid != ADMIN_ID:
+        if getkpid(oldgpid) != kpid and kpid != ADMIN_ID:
             return errorHandler(update, "没有权限", True)
         if len(CARDS_DICT[oldgpid]) == 0:
             return errorHandler(update, "原群没有卡片！")
@@ -2872,10 +2880,10 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
     if not ok:
         update.message.reply_text("Please do san check in a game.")
         return False
-    if update.message.from_user.id == GROUP_KP_DICT[gpid]:  # KP 进行
+    # KP 进行
+    if update.message.from_user.id == getkpid(gpid):
         if game.kpctrl == -1:
-            update.message.reply_text("Switch to your card.")
-            return False
+            return errorHandler(update, "请先切换到你的卡")
         card1 = game.kpcards[game.kpctrl]
     else:  # 玩家进行
         plid = update.message.from_user.id
@@ -2996,7 +3004,7 @@ def addcard(update: Update, context: CallbackContext) -> bool:
         t["playerid"] = update.effective_chat.id
     else:
         kpid = update.effective_chat.id
-        if GROUP_KP_DICT[t["groupid"]] != kpid and t["playerid"] != 0 and t["playerid"] != kpid:
+        if getkpid(t["groupid"]) != kpid and t["playerid"] != 0 and t["playerid"] != kpid:
             return errorHandler(update, "没有权限设置playerid")
         if t["playerid"] == 0:
             t["playerid"] = kpid
@@ -3027,8 +3035,7 @@ def addcard(update: Update, context: CallbackContext) -> bool:
 def helper(update: Update, context: CallbackContext) -> True:
     """查看指令对应函数的说明文档。
 
-    `/help --command`查看指令对应的文档。
-    """
+    `/help --command`查看指令对应的文档。"""
     if len(context.args) == 0:
         pass
         return True
