@@ -4,6 +4,7 @@ from inspect import isfunction
 import time
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import message
 from telegram.base import TelegramObject
 from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext, Updater
@@ -676,6 +677,29 @@ def showuserlist(update: Update, context: CallbackContext) -> bool:
                     "群："+str(ON_GAME[i].groupid)+"正在游戏中")
         return True
     return errorHandler(update, "没有这一指令", True)
+
+
+def delmsg(update: Update, context: CallbackContext) -> bool:
+    if isprivatemsg(update):
+        return errorHandler(update, "只能用于删除群消息")
+    delnum = 1
+    gpid = update.effective_chat.id
+    if len(context.args) >= 1 and botdice.isint(context.args[0]):
+        delnum = int(context.args[0])
+        if delnum <= 0:
+            return errorHandler(update, "参数错误", True)
+        if delnum > 10:
+            return errorHandler(update, "一次最多删除10条消息")
+    lastmsgid = update.message.message_id
+    while delnum >= 0:
+        try:
+            context.bot.delete_message(chat_id=gpid, message_id=lastmsgid)
+        except:
+            lastmsgid -= 1
+        else:
+            delnum -= 1
+            lastmsgid -= 1
+    return True
 
 
 def getid(update: Update, context: CallbackContext) -> None:
@@ -1900,6 +1924,7 @@ def startgame(update: Update, context: CallbackContext) -> bool:
 def abortgame(update: Update, context: CallbackContext) -> bool:
     if isprivatemsg(update):
         return errorHandler(update, "发送群聊消息来中止游戏")
+    gpid = update.effective_chat.id
     if update.message.from_user.id != getkpid(gpid):
         return errorHandler(update, "只有KP可以中止游戏", True)
     global ON_GAME
