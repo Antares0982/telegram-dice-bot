@@ -122,6 +122,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('reload', dicehandlers.reload))
     dispatcher.add_handler(CommandHandler(
         'showuserlist', dicehandlers.showuserlist))
+    dispatcher.add_handler(CommandHandler('delmsg', dicehandlers.delmsg))
     dispatcher.add_handler(CommandHandler('getid', dicehandlers.getid))
     dispatcher.add_handler(CommandHandler('showrule', dicehandlers.showrule))
     dispatcher.add_handler(CommandHandler('setrule', dicehandlers.setrule))
