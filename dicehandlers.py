@@ -682,6 +682,11 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
         return errorHandler(update, "只能用于删除群消息")
     delnum = 1
     gpid = update.effective_chat.id
+    if not isadmin(update, BOT_ID):
+        return errorHandler(update, "Bot没有管理权限")
+    senderid = update.message.from_user.id
+    if not isfromkp(update) and not isadmin(update, senderid):
+        return errorHandler(update, "没有权限", True)
     if len(context.args) >= 1 and botdice.isint(context.args[0]):
         delnum = int(context.args[0])
         if delnum <= 0:
@@ -692,8 +697,10 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
     while delnum >= 0:
         try:
             context.bot.delete_message(chat_id=gpid, message_id=lastmsgid)
+            print(lastmsgid)
         except:
             lastmsgid -= 1
+            print("jumped")
         else:
             delnum -= 1
             lastmsgid -= 1
