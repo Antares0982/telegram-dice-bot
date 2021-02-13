@@ -697,10 +697,8 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
     while delnum >= 0:
         try:
             context.bot.delete_message(chat_id=gpid, message_id=lastmsgid)
-            print(lastmsgid)
         except:
             lastmsgid -= 1
-            print("jumped")
         else:
             delnum -= 1
             lastmsgid -= 1
