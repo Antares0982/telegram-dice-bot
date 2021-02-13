@@ -4,8 +4,6 @@ from inspect import isfunction
 import time
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram import message
-from telegram.base import TelegramObject
 from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext, Updater
 from telegram.message import Message
