@@ -844,16 +844,10 @@ def abortgame(update: Update, context: CallbackContext) -> bool:
     gpid = update.effective_chat.id
     if update.message.from_user.id != utils.getkpid(gpid):
         return utils.errorHandler(update, "只有KP可以中止游戏", True)
-    for i in range(len(utils.ON_GAME)):
-        if utils.ON_GAME[i].groupid == update.effective_chat.id:
-            t = utils.ON_GAME[i]
-            utils.ON_GAME = utils.ON_GAME[:i]+utils.ON_GAME[i+1:]
-            del t
-            update.message.reply_text("Game aborted.")
-            utils.writegameinfo(utils.ON_GAME)
-            return True
-    update.message.reply_text("Game not found.")
-    return False
+    if not utils.gamepop(gpid):
+        return utils.errorHandler(update, "没有找到游戏", True)
+    update.message.reply_text("游戏已终止！")
+    return True
 
 
 def endgame(update: Update, context: CallbackContext) -> bool:
@@ -866,28 +860,24 @@ def endgame(update: Update, context: CallbackContext) -> bool:
         return False
     gpid = update.effective_chat.id
     kpid = utils.getkpid(gpid)
-    for i in range(len(utils.ON_GAME)):
-        if utils.ON_GAME[i].groupid == gpid:
-            t = utils.ON_GAME[i]
-            utils.ON_GAME = utils.ON_GAME[:i]+utils.ON_GAME[i+1:]
-            utils.writegameinfo(utils.ON_GAME)
-            gamecards = t.cards
-            for cardi in gamecards:
-                if cardi.playerid in utils.CURRENT_CARD_DICT and utils.CURRENT_CARD_DICT[cardi.playerid][0] == gpid and utils.CURRENT_CARD_DICT[cardi.playerid][1] == cardi.id:
-                    utils.CURRENT_CARD_DICT.pop(cardi.playerid)
-                cardi.playerid = kpid
-                if cardi.id not in utils.CARDS_DICT[gpid]:
-                    utils.CARDS_DICT[gpid][cardi.id] = cardi
-                    continue
-                utils.CARDS_DICT[gpid].pop(cardi.id)
-                utils.CARDS_DICT[gpid][cardi.id] = cardi
+    game = utils.gamepop(gpid)
+    if not game:
+        return utils.errorHandler(update, "没找到进行中的游戏。")
+    gamecards = game.cards
+    for cardi in gamecards:
+        if cardi.playerid in utils.CURRENT_CARD_DICT and utils.CURRENT_CARD_DICT[cardi.playerid][0] == gpid and utils.CURRENT_CARD_DICT[cardi.playerid][1] == cardi.id:
+            utils.CURRENT_CARD_DICT.pop(cardi.playerid)
             utils.writecurrentcarddict(utils.CURRENT_CARD_DICT)
-            del t
-            update.message.reply_text("游戏结束！")
-            utils.writecards(utils.CARDS_DICT)
-            return True
-    update.message.reply_text("没找到进行中的游戏。")
-    return False
+        cardi.playerid = kpid
+        if cardi.id not in utils.CARDS_DICT[gpid]:
+            utils.CARDS_DICT[gpid][cardi.id] = cardi
+            continue
+        utils.CARDS_DICT[gpid].pop(cardi.id)
+        utils.CARDS_DICT[gpid][cardi.id] = cardi
+    utils.writecurrentcarddict(utils.CURRENT_CARD_DICT)
+    update.message.reply_text("游戏结束！")
+    utils.writecards(utils.CARDS_DICT)
+    return True
 
 
 # /switch (--id): 切换进行修改操作时控制的卡，可以输入gpid，也可以是cdid

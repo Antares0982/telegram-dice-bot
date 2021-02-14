@@ -542,10 +542,11 @@ def changeKP(gpid: int, newkpid: int = 0) -> bool:
     oldkpid = getkpid(gpid)
     if oldkpid == newkpid:
         return False
-    for cdid in CARDS_DICT[gpid]:
-        cardi = CARDS_DICT[gpid][cdid]
-        if cardi.playerid == oldkpid:
-            cardi.playerid = newkpid
+    if gpid in CARDS_DICT:
+        for cdid in CARDS_DICT[gpid]:
+            cardi = CARDS_DICT[gpid][cdid]
+            if cardi.playerid == oldkpid:
+                cardi.playerid = newkpid
         writecards(CARDS_DICT)
     game, ok = findgame(gpid)
     if ok:
@@ -1014,7 +1015,7 @@ def buttonswitch(query: CallbackQuery, update: Update, card1: GameCard, args: Li
 
 
 def changecardgpid(oldgpid: int, newgpid: int) -> bool:
-    """函数`changegroup`的具体实现"""
+    """函数`changegroup`的具体实现。不会检查oldgpid是否是键"""
     if newgpid not in CARDS_DICT:  # 直接将整个字典pop出来
         CARDS_DICT[newgpid] = CARDS_DICT.pop(oldgpid)
         for cdid in CARDS_DICT[newgpid]:
@@ -1177,6 +1178,18 @@ async def timer():
         await asyncio.sleep(30)
 
 
+def gamepop(gpid: int) -> GroupGame:
+    """终止一场游戏。`/abortgame`的具体实现。"""
+    global ON_GAME
+    for i in range(len(ON_GAME)):
+        if ON_GAME[i].groupid == gpid:
+            t = ON_GAME[i]
+            ON_GAME = ON_GAME[:i]+ON_GAME[i+1:]
+            writegameinfo(ON_GAME)
+            return t
+    return None
+
+
 def botcheckdata(msg: str, recall: bool = True):
     """进行一次数据自检，检查是否有群因为升级而id变化了"""
     gpids: List[int] = []
@@ -1190,15 +1203,21 @@ def botcheckdata(msg: str, recall: bool = True):
             sendmsg = updater.bot.send_message(
                 chat_id=gpid, text=msg)
         except error.ChatMigrated as err:
-            if gpid in CARDS_DICT:
-                sendtoAdmin(
-                    "群id发生变化，原群id："+str(gpid)+"变化为"+str(err.new_chat_id))
-                for game in ON_GAME:
-                    if game.groupid == gpid:
-                        game.groupid = err.new_chat_id
-                        writegameinfo(ON_GAME)
+            sendtoAdmin(
+                "群id发生变化，原群id："+str(gpid)+"变化为"+str(err.new_chat_id))
+            if popallempties(CARDS_DICT):
+                writecards(CARDS_DICT)
+            _, ok = findgame(err.new_chat_id)
+            for game in ON_GAME:
+                if game.groupid == gpid:
+                    if ok:  # 直接丢弃旧的游戏数据
                         break
-                sendtoAdmin("出现问题，强制转移群数据！！！")
+                    game.groupid = err.new_chat_id
+                    writegameinfo(ON_GAME)
+                    break
+            if gpid in CARDS_DICT:
+
+                sendtoAdmin("强制转移群数据中！！")
                 changecardgpid(gpid, err.new_chat_id)
                 sendtoAdmin("转移群数据完成")
             if gpid in GROUP_KP_DICT:
@@ -1211,4 +1230,33 @@ def botcheckdata(msg: str, recall: bool = True):
             if recall:
                 sendmsg.delete()
     sendtoAdmin("自检完成！")
+    return True
+
+
+def cardpop(gpid: int, cdid: int) -> GameCard:
+    if gpid not in CARDS_DICT:
+        return None
+    if cdid not in CARDS_DICT[gpid]:
+        return None
+    plid = CARDS_DICT[gpid][cdid].playerid
+    cgp, cid = CURRENT_CARD_DICT[plid]
+    if cgp == gpid and cid == cdid:
+        CURRENT_CARD_DICT.pop(plid)
+        writecurrentcarddict(CURRENT_CARD_DICT)
+    cardi = CARDS_DICT[gpid].pop(cdid)
+    writecards(CARDS_DICT)
+    return cardi
+
+
+def cardadd(cardi: GameCard) -> bool:
+    gpid = cardi.groupid
+    cdid = cardi.id
+    if gpid not in CARDS_DICT:
+        CARDS_DICT[gpid] = {}
+    if cdid in CARDS_DICT[gpid]:
+        return False
+    CARDS_DICT[gpid][cdid] = cardi
+    writecards(CARDS_DICT)
+    CURRENT_CARD_DICT[cardi.playerid] = (gpid, cdid)
+    writecards(CURRENT_CARD_DICT)
     return True
