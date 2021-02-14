@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
-from typing import List, Dict, Tuple
 import copy
+from typing import Dict, List, Tuple
 
 
 class GameCard:

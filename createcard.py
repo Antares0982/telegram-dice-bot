@@ -1,10 +1,10 @@
 # -*- coding:utf-8 -*-
-from gameclass import GameCard
-from cfg import *
-import numpy as np
-from typing import Tuple
-from botdicts import readjobdict
 
+from typing import Tuple
+
+import numpy as np
+
+from botdicts import *
 
 JOB_DICT = readjobdict()
 

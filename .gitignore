@@ -6,6 +6,7 @@ data/ongame.json
 data/groupkpdict.json
 data/currentcarddict.json
 data/grouprules.json
+data/handlers.json
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

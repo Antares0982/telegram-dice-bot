@@ -1,7 +1,8 @@
 # -*- coding:utf-8 -*-
 import copy
 import json
-from typing import Any, Tuple, List, Dict
+from typing import Any, Dict, List, Tuple
+
 from cfg import *
 from gameclass import *
 
@@ -173,3 +174,18 @@ def writerules(d: Dict[int, GroupRule]) -> None:
         d1[key] = d[key].__dict__
     with open(PATH_RULES, "w", encoding="utf-8") as f:
         json.dump(d1, f, indent=4, ensure_ascii=False)
+
+
+def writehandlers(h: List[str]) -> None:
+    """写入Handlers"""
+    with open(PATH_HANDLERS, 'w', encoding='utf-8') as f:
+        json.dump(h, f, indent=4, ensure_ascii=False)
+
+
+def readhandlers() -> List[str]:
+    """读取全部handlers。
+
+    使用时，先写再读，正常情况下不会有找不到文件的可能"""
+    with open(PATH_HANDLERS, 'r', encoding='utf-8') as f:
+        d = json.load(f)
+    return d
