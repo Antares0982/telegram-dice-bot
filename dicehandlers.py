@@ -1,6 +1,5 @@
 # -*- coding:utf-8 -*-
 
-from botdicts import writegameinfo
 import time
 from typing import Dict, List, Tuple
 
@@ -466,28 +465,21 @@ def details(update: Update, context: CallbackContext):
 def setage(update: Update, context: CallbackContext):
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息设置年龄。")
+    cardi, ok = utils.findcard(update.effective_chat.id)
+    if not ok:
+        return utils.errorHandler(update, "找不到卡。")
+    if "AGE" in cardi.info:
+        return utils.errorHandler(update, "已经设置过年龄了。")
     if len(context.args) == 0:
-        return utils.errorHandler(update, "使用'/setage AGE'来设置年龄。")
+        update.message.reply_text("请输入年龄：")
+        utils.addOP(update.effective_chat.id, "setage")
+        return True
     age = context.args[0]
     if not utils.isint(age):
         return utils.errorHandler(update, "输入无效")
     age = int(age)
-    cardi, ok = utils.findcard(update.effective_chat.id)
-    if not ok:
-        return utils.errorHandler(update, "找不到卡。")
-    if "AGE" in cardi.info and cardi.info["AGE"] > 0:
-        return utils.errorHandler(update, "已经设置过年龄了。")
-    if age < 17 or age > 99:
-        return utils.errorHandler(update, "年龄应当在17-99岁。")
-    cardi.info["AGE"] = age
-    cardi.cardcheck["check1"] = True
-    cardi, detailmsg = utils.generateAgeAttributes(cardi)
-    update.message.reply_text(
-        "年龄设置完成！详细信息如下：\n"+detailmsg+"\n如果年龄不小于40，或小于20，需要使用指令'/setstrdec number'设置STR减值。如果需要帮助，使用 /createcardhelp 来获取帮助。")
-    if cardi.cardcheck["check2"]:
-        utils.generateOtherAttributes(cardi)
-    utils.writecards(utils.CARDS_DICT)
-    return True
+
+    return utils.cardsetage(update, cardi, age)
 
 
 def setstrdec(update: Update, context: CallbackContext):
@@ -705,10 +697,11 @@ def showskilllist(update: Update, context: CallbackContext) -> None:
 def button(update: Update, context: CallbackContext):
     """所有按钮请求经该函数处理。功能十分复杂，拆分成多个子函数来处理。
     接收到按钮的参数后，转到对应的子函数处理。"""
-    if utils.isgroupmsg(update):
-        return False
     query = update.callback_query
     query.answer()
+    if utils.isgroupmsg(update):
+        query.edit_message_text(text="群按钮请求均无效。")
+        return False
     args = query.data.split(" ")
     identifier = args[0]
     if identifier != utils.IDENTIFIER:
@@ -938,8 +931,10 @@ def switchkp(update: Update, context: CallbackContext):
     （私聊群聊皆可）`/switchkp --cardid`：切换到id为cardid的卡并控制。"""
     game, ok = utils.findgamewithkpid(update.message.from_user.id)
     if not ok:
-        return utils.errorHandler(update, "没找到游戏", True)
+        return utils.errorHandler(update, "没有游戏或没有权限", True)
     if len(context.args) == 0:
+        if utils.isgroupmsg(update):
+            return utils.errorHandler(update, "请直接指定要切换的卡id，或者向bot发送私聊消息切换卡！")
         rtbuttons = [[]]
         for cardi in game.kpcards:
             cardiname = utils.getname(cardi)
@@ -1998,6 +1993,8 @@ def textHandler(update: Update, context: CallbackContext) -> bool:
         return True
     if oper == "newcard":
         return utils.textnewcard(update, context)
+    if oper == "setage":
+        return utils.textsetage(update, context)
 
 
 def unknown(update: Update, context: CallbackContext) -> None:

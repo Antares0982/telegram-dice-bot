@@ -535,7 +535,10 @@ def errorHandler(update: Update,  message: str, needrecall: bool = False) -> Fal
             message += "请使用 /switch 切换当前操控的卡再试。"
         elif message.find("参数") != -1:
             message += "\n如果不会使用这个指令，请使用帮助： `/help --command`"
-        update.message.reply_text(message, parse_mode="MarkdownV2")
+        try:
+            update.message.reply_text(message, parse_mode="MarkdownV2")
+        except:
+            update.message.reply_text(message)
     return False
 
 
@@ -1358,6 +1361,23 @@ def getOP(chatid) -> str:
     return OPERATION[chatid]
 
 
+def cardsetage(update: Update, cardi: GameCard, age: int) -> bool:
+    if "AGE" in cardi.info and cardi.info["AGE"] > 0:
+        popOP(update.effective_chat.id)
+        return errorHandler(update, "已经设置过年龄了。")
+    if age < 17 or age > 99:
+        return errorHandler(update, "年龄应当在17-99岁。")
+    cardi.info["AGE"] = age
+    cardi.cardcheck["check1"] = True
+    cardi, detailmsg = generateAgeAttributes(cardi)
+    update.message.reply_text(
+        "年龄设置完成！详细信息如下：\n"+detailmsg+"\n如果年龄不小于40，或小于20，需要使用指令'/setstrdec number'设置STR减值。如果需要帮助，使用 /createcardhelp 来获取帮助。")
+    if cardi.cardcheck["check2"]:
+        generateOtherAttributes(cardi)
+    writecards(CARDS_DICT)
+    return True
+
+
 def textnewcard(update: Update, context: CallbackContext) -> bool:
     text = update.message.text
     plid = update.effective_chat.id
@@ -1365,9 +1385,25 @@ def textnewcard(update: Update, context: CallbackContext) -> bool:
         return errorHandler(update, "无效群id。如果你不知道群id，在群里发送 /getid 获取群id。")
     gpid = int(text)
     if hascard(plid, gpid) and getkpid(gpid) != plid:
+        popOP(plid)
         return errorHandler(update, "你在这个群已经有一张卡了！")
     popOP(plid)
     return getnewcard(update, gpid, plid)
+
+
+def textsetage(update: Update, context: CallbackContext) -> bool:
+    text = update.message.text
+    plid = update.effective_chat.id
+    if not isint(text):
+        return errorHandler(update, "输入无效，请重新输入")
+    cardi, ok = findcard(plid)
+    if not ok:
+        popOP(plid)
+        return errorHandler(update, "找不到卡")
+    if cardsetage(update, cardi, int(text)):
+        popOP(plid)
+        return True
+    return False
 
 
 def countless50discard(cardi: GameCard) -> bool:
