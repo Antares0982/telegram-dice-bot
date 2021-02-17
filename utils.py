@@ -1024,6 +1024,30 @@ def buttonswitch(query: CallbackQuery, update: Update, card1: GameCard, args: Li
     return True
 
 
+def buttonswitchkp(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    kpid = update.effective_chat.id
+    ctrlid = int(args[1])
+    game, ok = findgamewithkpid(kpid)
+    if not ok:
+        query.edit_message_text("没有找到游戏。")
+        return False
+    cardi, ok = findcardfromgamewithid(game, ctrlid)
+    if not ok or cardi.playerid != kpid:
+        query.edit_message_text("没有找到这张npc卡。")
+        return False
+    game.kpctrl = ctrlid
+    writegameinfo(ON_GAME)
+    query.edit_message_text("修改操纵的npc卡成功，id为："+str(ctrlid))
+    return True
+
+
+def getkpctrl(game: GroupGame) -> GameCard:
+    for cardi in game.cards:
+        if cardi.id == game.kpctrl and cardi.playerid == game.kpid:
+            return cardi
+    return None
+
+
 def changecardgpid(oldgpid: int, newgpid: int) -> bool:
     """函数`changegroup`的具体实现。不会检查oldgpid是否是键"""
     if newgpid not in CARDS_DICT:  # 直接将整个字典pop出来

@@ -158,8 +158,6 @@ def showuserlist(update: Update, context: CallbackContext) -> bool:
         gpids = utils.findkpgroups(kpid)
         if len(utils.CARDS_DICT) == 0:
             return utils.errorHandler(update, "没有角色卡")
-        rttext1: str = ""
-        rttext2: str = ""
         for gpid in gpids:
             if gpid not in utils.CARDS_DICT:
                 update.message.reply_text("群: "+str(gpid)+" 没有角色卡")
@@ -184,12 +182,14 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
 
     当因为各种操作产生了过多冗杂消息的时候，使用
     `/delmsg --msgnumber`将会删除：delmsg指令的消息
-    以及该指令上面的msgnumber条指令。例如：
-    `/delmsg 2`将删除包含delmsg指令在内的3条指令。
-    没有参数的时候，`/delmsg`默认删除1条指令。
+    以及该指令上面的msgnumber条消息。例如：
+    `/delmsg 2`将删除包含delmsg指令在内的3条消息。
+    没有参数的时候，`/delmsg`默认删除指令和指令的上一条消息。
 
-    因为要进行连续的删除请求，删除的速度会稍微有些滞后，
-    请不要重复发送该指令，否则可能造成有用的消息丢失。"""
+    因为要进行连续的删除请求，删除的时间会稍微有些滞后，
+    请不要重复发送该指令，否则可能造成有用的消息丢失。
+    如果感觉删除没有完成，请先随意发送一条消息来拉取删除情况，
+    而不是继续用`/delmsg`删除。"""
     delnum = 1
     chatid = update.effective_chat.id
     if utils.isgroupmsg(update) and not utils.isadmin(update, utils.BOT_ID):
@@ -216,7 +216,6 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
             delnum -= 1
             lastmsgid -= 1
     update.effective_chat.send_message("删除完成").delete()
-    print("删除完成")
     return True
 
 
@@ -745,6 +744,8 @@ def button(update: Update, context: CallbackContext):
         return utils.buttondiscard(query, update, card1, args)
     if args[0] == "switch":
         return utils.buttonswitch(query, update, card1, args)
+    if args[0] == "switchkp":
+        return utils.buttonswitchkp(query, update, card1, args)
     # HIT BAD TRAP
     return False
 
@@ -935,20 +936,33 @@ def switch(update: Update, context: CallbackContext):
 def switchkp(update: Update, context: CallbackContext):
     """用于KP切换游戏中进行对抗时使用的NPC卡片。
 
-    `/switchkp --cardid` 切换到id为cardid的卡并控制。"""
+    （仅限私聊时）`/swtichkp`：创建按钮，让KP选择要用的卡。
+    （私聊群聊皆可）`/switchkp --cardid`：切换到id为cardid的卡并控制。"""
     game, ok = utils.findgamewithkpid(update.message.from_user.id)
     if not ok:
         return utils.errorHandler(update, "没找到游戏", True)
     if len(context.args) == 0:
-        return utils.errorHandler(update, "需要卡id", True)
+        rtbuttons = [[]]
+        for cardi in game.kpcards:
+            cardiname = utils.getname(cardi)
+            if cardiname == "None":
+                cardiname = str(cardi.id)
+            if len(rtbuttons[len(rtbuttons)-1]) == 4:
+                rtbuttons.append([])
+            rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(
+                cardiname, callback_data=utils.IDENTIFIER+" "+"switchkp "+str(cardi.id)))
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        update.message.reply_text("请选择要切换控制的卡：", reply_markup=rp_markup)
+        # 交给按钮来完成
+        return True
     num = context.args[0]
     if not utils.isint(num) or int(num) < 0:
         return utils.errorHandler(update, "无效输入", True)
     cdid = int(num)
-    for i in range(len(game.kpcards)):
-        cardi = game.kpcards[i]
+    for cardi in game.kpcards:
         if cardi.id == cdid:
-            game.kpctrl = i
+            if cardi.playerid != game.kpid:
+            game.kpctrl =
             update.message.reply_text(
                 "切换到卡" + str(num)+"，角色名称：" + cardi.info["name"])
             utils.writegameinfo(utils.ON_GAME)
@@ -1171,9 +1185,8 @@ def show(update: Update, context: CallbackContext) -> bool:
             return utils.errorHandler(update, "找不到卡。")
     else:
         if utils.isfromkp(update):
-            if game.kpctrl != -1:
-                cardi = game.kpcards[game.kpctrl]
-            else:
+            cardi = utils.getkpctrl(game)
+            if not cardi:
                 return utils.errorHandler(update, "注意：kpctrl值为-1")
         else:
             cardi, ok = utils.findcardfromgame(game, senderid)
@@ -1788,9 +1801,9 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
         return False
     # KP 进行
     if update.message.from_user.id == utils.getkpid(gpid):
-        if game.kpctrl == -1:
-            return utils.errorHandler(update, "请先切换到你的卡")
-        card1 = game.kpcards[game.kpctrl]
+        card1 = utils.getkpctrl(game)
+        if not card1:
+            return utils.errorHandler(update, "请先用 /switchkp 切换到你的卡")
     else:  # 玩家进行
         plid = update.message.from_user.id
         card1, ok = utils.findcardfromgame(game, plid)
