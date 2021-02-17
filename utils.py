@@ -1,3 +1,5 @@
+# -*- coding:utf-8 -*-
+
 import asyncio
 import time
 
@@ -538,6 +540,18 @@ def errorHandler(update: Update,  message: str, needrecall: bool = False) -> Fal
     return False
 
 
+def changeplids(gpid: int, oldplid: int, newplid: int) -> None:
+    """将某个群中所有`oldid`持有的卡改为`newplid`持有"""
+    if gpid not in CARDS_DICT:
+        return
+    for cdid in CARDS_DICT[gpid]:
+        cardi = CARDS_DICT[gpid][cdid]
+        if cardi.playerid == oldplid:
+            cardi.playerid = newplid
+    writecards(CARDS_DICT)
+    return
+
+
 def changeKP(gpid: int, newkpid: int = 0) -> bool:
     """转移KP权限，接收参数：群id，新KP的id。
 
@@ -547,12 +561,7 @@ def changeKP(gpid: int, newkpid: int = 0) -> bool:
     oldkpid = getkpid(gpid)
     if oldkpid == newkpid:
         return False
-    if gpid in CARDS_DICT:
-        for cdid in CARDS_DICT[gpid]:
-            cardi = CARDS_DICT[gpid][cdid]
-            if cardi.playerid == oldkpid:
-                cardi.playerid = newkpid
-        writecards(CARDS_DICT)
+    changeplids(gpid, oldkpid, newkpid)
     game, ok = findgame(gpid)
     if ok:
         for cardi in game.kpcards:

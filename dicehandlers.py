@@ -1,6 +1,5 @@
 # -*- coding:utf-8 -*-
 
-import inspect
 import time
 from typing import Dict, List, Tuple
 
@@ -42,11 +41,7 @@ def addkp(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, '这个群已经有一位KP了，请先让TA发送 /delkp 撤销自己的KP。如果需要强制更换KP，请管理员用\'/transferkp kpid\'添加本群成员为KP，或者 /transferkp 将自己设为KP。')
     # 该群没有KP，可以直接添加KP
     # delkp指令会将KP的卡playerid全部改为0，检查如果有id为0的卡，id设为新kp的id
-    for cdid in utils.CARDS_DICT[gpid]:
-        cardi = utils.CARDS_DICT[gpid][cdid]
-        if cardi.playerid == 0:
-            cardi.playerid = kpid
-    utils.writecards(utils.CARDS_DICT)
+    utils.changeplids(gpid, 0, kpid)
     game, ok = utils.findgame(gpid)
     if ok:
         game.kpid = kpid
@@ -944,6 +939,8 @@ def switchkp(update: Update, context: CallbackContext):
     game, ok = utils.findgamewithkpid(update.message.from_user.id)
     if not ok:
         return utils.errorHandler(update, "没找到游戏", True)
+    if len(context.args) == 0:
+        return utils.errorHandler(update, "需要卡id", True)
     num = context.args[0]
     if not utils.isint(num) or int(num) < 0:
         return utils.errorHandler(update, "无效输入", True)
