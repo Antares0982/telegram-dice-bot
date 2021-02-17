@@ -959,7 +959,7 @@ def switchkp(update: Update, context: CallbackContext):
     if not utils.isint(num) or int(num) < 0:
         return utils.errorHandler(update, "无效输入", True)
     cdid = int(num)
-    cardi,ok = utils.findcardfromgamewithid(game, cdid)
+    cardi, ok = utils.findcardfromgamewithid(game, cdid)
     if not ok or cardi.playerid != game.kpid:
         return utils.errorHandler(update, "无效id", True)
     game.kpctrl = cdid
@@ -1061,14 +1061,14 @@ def roll(update: Update, context: CallbackContext):
         gpid = update.effective_chat.id
         if senderid != utils.getkpid(gpid):
             gamecard, ok = utils.findcardfromgame(game, senderid)
-        elif game.kpctrl == -1:
-            rttext = utils.commondice(dicename)
-            if rttext == "Invalid input.":
-                return utils.errorHandler(update, "无效输入")
-            update.message.reply_text(rttext)
-            return True
         else:
-            gamecard = game.kpcards[game.kpctrl]
+            gamecard = utils.getkpctrl(game)
+            if not gamecard:
+                rttext = utils.commondice(dicename)
+                if rttext == "Invalid input.":
+                    return utils.errorHandler(update, "无效输入")
+                update.message.reply_text(rttext)
+                return True
         test = 0
         if dicename in gamecard.skill:
             test = gamecard.skill[dicename]
@@ -1123,7 +1123,7 @@ def roll(update: Update, context: CallbackContext):
             test += gamecard.tempstatus[dicename]
         test += tpcheck
         testval = utils.dicemdn(1, 100)[0]
-        rttext = "检定："+dicename+" "+str(testval)+"/"+str(test)+" "
+        rttext = dicename+" 检定/出目："+str(test)+"/"+str(testval)+" "
         greatsuccessrule = utils.GROUP_RULES[gpid].greatsuccess
         greatfailrule = utils.GROUP_RULES[gpid].greatfail
         if (test < 50 and testval >= greatfailrule[2] and testval <= greatfailrule[3]) or (test >= 50 and testval >= greatfailrule[0] and testval <= greatfailrule[1]):
@@ -1141,7 +1141,7 @@ def roll(update: Update, context: CallbackContext):
         if dicename == "心理学" or dicename[:2] == "暗骰":
             if utils.getkpid(gpid) == -1:
                 return utils.errorHandler(update, "本群没有KP！请先添加一个KP再试！！")
-            update.message.reply_text("检定："+dicename+" ???/"+str(test))
+            update.message.reply_text(dicename+" 检定/出目："+str(test)+"/???")
             context.bot.send_message(
                 chat_id=utils.getkpid(gpid), text=rttext)
         else:
