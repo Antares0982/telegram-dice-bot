@@ -205,7 +205,6 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
         if delnum > 10:
             return utils.errorHandler(update, "一次最多删除10条消息")
     lastmsgid = update.message.message_id
-    print(delnum)
     while delnum >= 0:
         if lastmsgid < -100:
             break
@@ -483,9 +482,8 @@ def setage(update: Update, context: CallbackContext):
     cardi.info["AGE"] = age
     cardi.cardcheck["check1"] = True
     cardi, detailmsg = utils.generateAgeAttributes(cardi)
-    utils.DETAIL_DICT[update.effective_chat.id] = detailmsg
     update.message.reply_text(
-        "年龄设置完成！如果需要查看详细信息，使用 /details。如果年龄不小于40，或小于20，需要使用指令'/setstrdec number'设置STR减值。如果需要帮助，使用 /createcardhelp 来获取帮助。")
+        "年龄设置完成！详细信息如下：\n"+detailmsg+"\n如果年龄不小于40，或小于20，需要使用指令'/setstrdec number'设置STR减值。如果需要帮助，使用 /createcardhelp 来获取帮助。")
     if cardi.cardcheck["check2"]:
         utils.generateOtherAttributes(cardi)
     utils.writecards(utils.CARDS_DICT)
@@ -658,8 +656,7 @@ def showjoblist(update: Update, context: CallbackContext) -> None:
 def addskill(update: Update, context: CallbackContext) -> bool:
     """该函数用于增加/修改技能。
 
-    增加技能这一功能非常复杂，它的详细功能被拆分为4个函数。
-    该函数只做基础的检查工作。检查通过后给4个拆分出的函数调用。"""
+    `/addskill`：生成按钮，玩家按照提示一步步操作。"""
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发私聊消息来增改技能", True)
     plid = update.effective_chat.id
@@ -1039,7 +1036,7 @@ def roll(update: Update, context: CallbackContext):
     只接受第一个空格前的参数`dicename`。
     `dicename`可能是技能名，可能是`3d6`，可能是`1d4+2d10`。
     骰子环境可能是游戏中，游戏外。
-    
+
     `/roll`：默认1d100。
     `/roll --mdn`骰一个mdn的骰子。
     `/roll --test`仅限游戏中可以使用。对`test`进行一次检定。
@@ -1077,7 +1074,7 @@ def roll(update: Update, context: CallbackContext):
         else:
             gamecard = utils.getkpctrl(game)
         if not gamecard:
-            return utils.errorHandler(update, "找不到卡。")
+            return utils.errorHandler(update, "找不到游戏中的卡。")
         # 找卡完成，开始检定
         test = 0
         if dicename in gamecard.skill:
@@ -1125,7 +1122,6 @@ def roll(update: Update, context: CallbackContext):
             else:
                 test = 50
         else:  # HIT BAD TRAP
-            print(len(dicename))
             return utils.errorHandler(update, "无效输入")
         if "global" in gamecard.tempstatus:
             test += gamecard.tempstatus["global"]

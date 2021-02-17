@@ -22,7 +22,7 @@ CARDS_DICT: Dict[int, Dict[int, GameCard]]
 ON_GAME: List[GroupGame]
 GROUP_RULES: Dict[int, GroupRule]
 CURRENT_CARD_DICT: Dict[int, Tuple[int, int]]
-OPERATION: Dict[int, str]
+OPERATION: Dict[int, str] = {}
 
 SKILL_DICT: dict
 JOB_DICT: dict
@@ -278,21 +278,20 @@ def getskilllevelfromdict(card1: GameCard, key: str) -> int:
 
 def makeIntButtons(lower: int, upper: int, keystr1: str, keystr2: str, step: int = 5, column: int = 4) -> List[list]:
     """返回一个InlineKeyboardButton组成的二维列表。按钮的显示文本是整数。
-
-    `lower`表示最小值，`upper`表示最大值，均是按钮的一部分。
-
+    `lower`表示最小值，`upper`表示最大值，均是按钮返回结果的一部分。
     `keystr1`, `keystr2`是`callback_data`的内容，按钮的`callback_data`结构为：
     ```
     keystr1+" "+keystr2+" "+str(integer)
     ```
-    `step`参数表示按钮会遍历大于`lower`但小于`upper`的所有`step`的倍数。
-
+    `step`参数表示按钮会遍历大于`lower`但小于`upper`的所有按钮的间隔。
     `column`参数表示返回的二维列表每行最多有多少个按钮。"""
     rtbuttons = [[]]
     if (lower//step)*step != lower:
         rtbuttons[0].append(InlineKeyboardButton(
             str(lower), callback_data=IDENTIFIER+" "+keystr1+" "+keystr2+" "+str(lower)))
-    t = step+(lower//step)*step
+        t = step+(lower//step)*step
+    else:
+        t = lower
     for i in range(t, upper, step):
         if len(rtbuttons[len(rtbuttons)-1]) == column:
             rtbuttons.append([])
@@ -605,6 +604,9 @@ def skillmaxval(skillname: str, card1: GameCard, ismainskill: bool) -> int:
         maxval = skillrule[1]
     else:
         maxval = skillrule[0]
+    if skillname == "信用":
+        if card1.info["job"] in JOB_DICT:
+            maxval = min(maxval, JOB_DICT[card1.info["job"]][1])
     basicval = -1
     if ismainskill:
         pts = card1.skill["points"]
@@ -781,6 +783,24 @@ def addcredit(update: Update, context: CallbackContext, card1: GameCard) -> bool
     return True
 
 
+def cgcredit(update: Update, context: CallbackContext, card1: GameCard) -> bool:
+    m = 0
+    mm = -1
+    if card1.info["job"] in JOB_DICT:
+        m = JOB_DICT[card1.info["job"]][0]
+        mm = JOB_DICT[card1.info["job"]][1]
+    aged, ok = skillcantouchmax(card1)
+    if aged:
+        skillmaxrule = GROUP_RULES[card1.groupid].skillmaxAged
+    else:
+        skillmaxrule = GROUP_RULES[card1.groupid].skillmax
+    if ok:
+        mm = skillmaxrule[1]
+    else:
+        mm = skillmaxrule[0]
+    mm = skillmaxval("信用", card1, True)
+
+
 def showskillpages(page: int, card1: GameCard) -> Tuple[str, List[List[InlineKeyboardButton]]]:
     page
     thispageskilllist = SKILL_PAGES[page]
@@ -870,11 +890,11 @@ def buttonjob(query: CallbackQuery, update: Update, card1: GameCard, args: List[
 def buttonaddmainskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
     if len(args) == 3:
         skvalue = int(args[2])
-        needpt = skvalue - getskilllevelfromdict(card1, args[1])
+        needpt = evalskillcost(args[1], skvalue, card1, True)
         card1.skill[args[1]] = skvalue
         card1.skill["points"] -= needpt
         query.edit_message_text(
-            text="Main skill "+args[1]+" set to "+str(skvalue)+".")
+            text="主要技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.skill["points"]))
         writecards(CARDS_DICT)
         return True
     m = getskilllevelfromdict(card1, args[1])
@@ -882,18 +902,18 @@ def buttonaddmainskill(query: CallbackQuery, update: Update, card1: GameCard, ar
     rtbuttons = makeIntButtons(m, mm, args[0], args[1])
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     query.edit_message_text(
-        "Add main skill, skill name is: "+args[1], reply_markup=rp_markup)
+        "添加主要技能。剩余技能点："+str(card1.skill["points"])+" 技能名称："+args[1], reply_markup=rp_markup)
     return True
 
 
 def buttoncgmainskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
     if len(args) == 3:
         skvalue = int(args[2])
-        needpt = skvalue - card1.skill[args[1]]
+        needpt = evalskillcost(args[1], skvalue, card1, True)
         card1.skill[args[1]] = skvalue
         card1.skill["points"] -= needpt
         query.edit_message_text(
-            text="Main skill "+args[1]+" set to "+str(skvalue)+".")
+            text="主要技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.skill["points"]))
         writecards(CARDS_DICT)
         return True
     m = getskilllevelfromdict(card1, args[1])
@@ -901,18 +921,18 @@ def buttoncgmainskill(query: CallbackQuery, update: Update, card1: GameCard, arg
     rtbuttons = makeIntButtons(m, mm, args[0], args[1])
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     query.edit_message_text(
-        "Change main skill level, skill name is: "+args[1], reply_markup=rp_markup)
+        "更改主要技能点数。剩余技能点："+str(card1.skill["points"])+" 技能名称："+args[1]+"，当前技能点："+str(card1.skill[args[1]]), reply_markup=rp_markup)
     return True
 
 
 def buttonaddsgskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
     if len(args) == 3:
         skvalue = int(args[2])
-        needpt = skvalue - getskilllevelfromdict(card1, args[1])
+        needpt = evalskillcost(args[1], skvalue, card1, True)
         card1.skill[args[1]] = skvalue
         card1.skill["points"] -= needpt
         query.edit_message_text(
-            text="Main skill "+args[1]+" set to "+str(skvalue)+".")
+            text="主要技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.skill["points"]))
         card1.suggestskill.pop(args[1])
         writecards(CARDS_DICT)
         return True
@@ -921,7 +941,7 @@ def buttonaddsgskill(query: CallbackQuery, update: Update, card1: GameCard, args
     rtbuttons = makeIntButtons(m, mm, args[0], args[1])
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     query.edit_message_text(
-        "Add suggested skill, skill name is: "+args[1], reply_markup=rp_markup)
+        "添加建议技能。剩余技能点："+str(card1.skill["points"])+" 技能名称："+args[1], reply_markup=rp_markup)
     return True
 
 
@@ -937,11 +957,11 @@ def buttonaddintskill(query: CallbackQuery, update: Update, card1: GameCard, arg
         return True
     if len(args) == 3:
         skvalue = int(args[2])
-        needpt = skvalue - getskilllevelfromdict(card1, args[1])
+        needpt = evalskillcost(args[1], skvalue, card1, False)
         card1.interest[args[1]] = skvalue
         card1.interest["points"] -= needpt
         query.edit_message_text(
-            text="Interest skill "+args[1]+" set to "+str(skvalue)+".")
+            text="兴趣技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.interest["points"]))
         writecards(CARDS_DICT)
         return True
     m = getskilllevelfromdict(card1, args[1])
@@ -949,18 +969,18 @@ def buttonaddintskill(query: CallbackQuery, update: Update, card1: GameCard, arg
     rtbuttons = makeIntButtons(m, mm, args[0], args[1])
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     query.edit_message_text(
-        "Add interest skill, skill name is: "+args[1], reply_markup=rp_markup)
+        "添加兴趣技能。剩余技能点："+str(card1.interest["points"])+" 技能名称："+args[1], reply_markup=rp_markup)
     return True
 
 
 def buttoncgintskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
     if len(args) == 3:
         skvalue = int(args[2])
-        needpt = skvalue - card1.interest[args[1]]
+        needpt = evalskillcost(args[1], skvalue, card1, False)
         card1.interest[args[1]] = skvalue
         card1.interest["points"] -= needpt
         query.edit_message_text(
-            text="Interest skill "+args[1]+" set to "+str(skvalue)+".")
+            text="兴趣技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.interest["points"]))
         writecards(CARDS_DICT)
         return True
     m = getskilllevelfromdict(card1, args[1])
@@ -968,7 +988,7 @@ def buttoncgintskill(query: CallbackQuery, update: Update, card1: GameCard, args
     rtbuttons = makeIntButtons(m, mm, args[0], args[1])
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     query.edit_message_text(
-        "Change interest skill level, skill name is: "+args[1], reply_markup=rp_markup)
+        "更改兴趣技能点数。剩余技能点："+str(card1.interest["points"])+" 技能名称："+args[1]+"，当前技能点："+str(card1.interest[args[1]]), reply_markup=rp_markup)
     return True
 
 
@@ -1025,7 +1045,7 @@ def buttonswitch(query: CallbackQuery, update: Update, card1: GameCard, args: Li
 
 
 def buttonswitchkp(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
-    kpid = update.effective_chat.id
+    kpid = update.message.from_user.id
     ctrlid = int(args[1])
     game, ok = findgamewithkpid(kpid)
     if not ok:
@@ -1115,39 +1135,41 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
     # Show button for numbers
     skillname = context.args[0]
     m = getskilllevelfromdict(card1, skillname)
+    if skillname == "信用" and card1.info["job"] in JOB_DICT:
+        m = max(m, JOB_DICT[card1.info["job"]][0])
     if skillname in card1.skill:  # GOOD TRAP: cgmainskill
         mm = skillmaxval(skillname, card1, True)
         rtbuttons = makeIntButtons(m, mm, "cgmainskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
-            "Change skill level, skill name is: "+skillname, reply_markup=rp_markup)
+            "更改主要技能点数。剩余技能点："+str(card1.skill["points"])+" 技能名称："+skillname+"，当前技能点："+str(card1.skill[skillname]), reply_markup=rp_markup)
         return True
     if skillname in card1.suggestskill:  # GOOD TRAP: addsgskill
         mm = skillmaxval(skillname, card1, True)
         rtbuttons = makeIntButtons(m, mm, "addsgskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
-            "Add suggested skill, skill name is: "+skillname, reply_markup=rp_markup)
+            "添加建议技能。剩余技能点："+str(card1.skill["points"])+" 技能名称："+skillname, reply_markup=rp_markup)
         return True
     if skillname in card1.interest:  # GOOD TRAP: cgintskill
         mm = skillmaxval(skillname, card1, False)
         rtbuttons = makeIntButtons(m, mm, "cgintskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
-            "Change interest skill, skill name is: "+skillname, reply_markup=rp_markup)
+            "更改兴趣技能点数。剩余技能点："+str(card1.interest["points"])+" 技能名称："+skillname+"，当前技能点："+str(card1.interest[skillname]), reply_markup=rp_markup)
         return True
     if card1.skill["points"] > 0:  # GOOD TRAP: addmainskill
         mm = skillmaxval(skillname, card1, True)
         rtbuttons = makeIntButtons(m, mm, "addmainskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
-            "Add main skill, skill name is: "+skillname, reply_markup=rp_markup)
+            "添加主要技能。剩余技能点："+str(card1.skill["points"])+" 技能名称："+skillname, reply_markup=rp_markup)
         return True
     mm = skillmaxval(skillname, card1, False)
     rtbuttons = (m, mm, "addintskill", skillname)
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     update.message.reply_text(
-        "Add interest skill, skill name is: "+skillname, reply_markup=rp_markup)
+        "添加兴趣技能。剩余技能点："+str(card1.interest["points"])+" 技能名称："+skillname, reply_markup=rp_markup)
     return True
 
 
@@ -1308,7 +1330,7 @@ def cardadd(cardi: GameCard) -> bool:
     CARDS_DICT[gpid][cdid] = cardi
     writecards(CARDS_DICT)
     CURRENT_CARD_DICT[cardi.playerid] = (gpid, cdid)
-    writecards(CURRENT_CARD_DICT)
+    writecurrentcarddict(CURRENT_CARD_DICT)
     return True
 
 
