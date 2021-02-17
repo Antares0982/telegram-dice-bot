@@ -1,8 +1,6 @@
 import asyncio
 import time
-from typing import List
 
-import numpy as np
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, error
 from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext, Updater
@@ -21,10 +19,8 @@ GROUP_KP_DICT: Dict[int, int]
 CARDS_DICT: Dict[int, Dict[int, GameCard]]
 ON_GAME: List[GroupGame]
 GROUP_RULES: Dict[int, GroupRule]
-
-ID_POOL: List[int] = []
-
 CURRENT_CARD_DICT: Dict[int, Tuple[int, int]]
+OPERATION: Dict[int, str]
 
 SKILL_DICT: dict
 JOB_DICT: dict
@@ -36,7 +32,7 @@ DETAIL_DICT: Dict[int, str] = {}  # 临时地存储详细信息
 IDENTIFIER = str(time.time())  # 在每个按钮的callback加上该标志，如果标志不相等则不处理
 
 
-def createSkillPages(d: dict) -> List[List[List[str]]]:
+def createSkillPages(d: dict) -> List[List[str]]:
     """创建技能的分页列表，用于添加兴趣技能"""
     # 一页16个，分四行
     skillPaged: List[List[str]] = [[]]
@@ -49,12 +45,14 @@ def createSkillPages(d: dict) -> List[List[List[str]]]:
     return skillPaged
 
 
-def addIDpool(idpool: List[int]):
+def getallid() -> List[int]:
     """读取全部卡ID，用于防止卡id重复"""
+    idpool: List[int] = []
     for gpids in CARDS_DICT:
         for cdids in CARDS_DICT[gpids]:
             idpool.append(cdids)
             idpool.sort()
+    return idpool
 
 
 def isint(a: str) -> bool:
@@ -63,6 +61,10 @@ def isint(a: str) -> bool:
     except:
         return False
     return True
+
+
+def sendtoAdmin(msg: str) -> None:
+    updater.bot.send_message(chat_id=ADMIN_ID, text=msg)
 
 
 # 检测json文件能否正常读取
@@ -74,14 +76,12 @@ try:
     JOB_DICT = JOB_DICT
     GROUP_RULES = readrules()
 except:
-    updater.bot.send_message(
-        chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
+    sendtoAdmin("读取文件出现问题，请检查json文件！")
     exit()
 
 # 读取完成
 updater.bot.send_message(
     chat_id=ADMIN_ID, text="Bot is live!")
-addIDpool(ID_POOL)
 
 
 def dicemdn(m: int, n: int) -> List[int]:
@@ -134,10 +134,6 @@ def commondice(dicename) -> str:
             ans += str(ansint[i])
     ans += " = "+str(int(sum(ansint)))
     return ans
-
-
-def sendtoAdmin(msg: str) -> None:
-    updater.bot.send_message(chat_id=ADMIN_ID, text=msg)
 
 
 def getchatid(update: Update) -> int:
@@ -201,10 +197,19 @@ def findcard(plid: int) -> Tuple[GameCard, bool]:
     return CARDS_DICT[gpid][cdid], True
 
 
+def hascard(plid: int, gpid: int) -> bool:
+    """判断一个群内是否已经有pl的卡"""
+    if gpid not in CARDS_DICT:
+        return False
+    for cdid in CARDS_DICT[gpid]:
+        cardi = CARDS_DICT[gpid][cdid]
+        if cardi.playerid == plid:
+            return True
+    return False
+
+
 def findcardwithid(cdid: int) -> Tuple[GameCard, bool]:
     """输入一个卡id，返回这张卡"""
-    if cdid not in ID_POOL:
-        return None, False
     for gpid in CARDS_DICT:
         if cdid in CARDS_DICT[gpid]:
             return CARDS_DICT[gpid][cdid], True
@@ -212,7 +217,7 @@ def findcardwithid(cdid: int) -> Tuple[GameCard, bool]:
 
 
 def findallplayercards(plid: int) -> List[Tuple[int, int]]:
-    """输入一个player的id，返回他的所有卡"""
+    """输入一个player的id，返回他的所有卡的`(groupid, id)`对"""
     ans: List[Tuple[int, int]] = []
     for gpid in CARDS_DICT:
         for cdid in CARDS_DICT[gpid]:
@@ -988,10 +993,6 @@ def buttondiscard(query: CallbackQuery, update: Update, card1: GameCard, args: L
     detailinfo = "删除了：\n"+str(CARDS_DICT[gpid][cdid])
     DETAIL_DICT[plid] = detailinfo
     CARDS_DICT[gpid].pop(cdid)
-    if cdid in ID_POOL:
-        ID_POOL.pop(ID_POOL.index(cdid))
-    else:
-        sendtoAdmin("删除了ID池中未出现的卡，请检查代码")
     if len(CARDS_DICT[gpid]) == 0:
         CARDS_DICT.pop(gpid)
     query.edit_message_text("删除了一张卡片，使用 /details 查看详细信息。\n该删除操作不可逆。")
@@ -1160,6 +1161,7 @@ def addskill3(update: Update, context: CallbackContext, card1: GameCard) -> bool
 
 
 async def timer():
+    """凌晨3点进行一次自检"""
     istime = False
     clockhour = 3
     clockmin = 0
@@ -1190,6 +1192,16 @@ def gamepop(gpid: int) -> GroupGame:
     return None
 
 
+def popallempties(d: Dict[Any, dict]) -> bool:
+    """将二层字典中一层的空值对应的键删除。如果有空值，返回True，否则返回False"""
+    ans: bool = False
+    for key in d:
+        if not d[key]:
+            ans = True
+            d.pop(key)
+    return ans
+
+
 def botcheckdata(msg: str, recall: bool = True):
     """进行一次数据自检，检查是否有群因为升级而id变化了"""
     gpids: List[int] = []
@@ -1216,7 +1228,6 @@ def botcheckdata(msg: str, recall: bool = True):
                     writegameinfo(ON_GAME)
                     break
             if gpid in CARDS_DICT:
-
                 sendtoAdmin("强制转移群数据中！！")
                 changecardgpid(gpid, err.new_chat_id)
                 sendtoAdmin("转移群数据完成")
@@ -1231,6 +1242,12 @@ def botcheckdata(msg: str, recall: bool = True):
                 sendmsg.delete()
     sendtoAdmin("自检完成！")
     return True
+
+
+def getname(cardi: GameCard) -> str:
+    if "name" not in cardi.info or cardi.info["name"] == "":
+        return "None"
+    return cardi.info["name"]
 
 
 def cardpop(gpid: int, cdid: int) -> GameCard:
@@ -1259,4 +1276,82 @@ def cardadd(cardi: GameCard) -> bool:
     writecards(CARDS_DICT)
     CURRENT_CARD_DICT[cardi.playerid] = (gpid, cdid)
     writecards(CURRENT_CARD_DICT)
+    return True
+
+
+def cardget(gpid: int, cdid: int) -> GameCard:
+    if gpid not in CARDS_DICT:
+        return None
+    if cdid not in CARDS_DICT[gpid]:
+        return None
+    return CARDS_DICT[gpid][cdid]
+
+
+def addOP(chatid: int, op: str) -> None:
+    OPERATION[chatid] = op
+
+
+def popOP(chatid) -> str:
+    if chatid not in OPERATION:
+        return ""
+    return OPERATION.pop(chatid)
+
+
+def getOP(chatid) -> str:
+    if chatid not in OPERATION:
+        return ""
+    return OPERATION[chatid]
+
+
+def textnewcard(update: Update, context: CallbackContext) -> bool:
+    text = update.message.text
+    plid = update.effective_chat.id
+    if not isint(text) or int(text) >= 0:
+        return errorHandler(update, "无效群id。如果你不知道群id，在群里发送 /getid 获取群id。")
+    gpid = int(text)
+    if hascard(plid, gpid) and getkpid(gpid) != plid:
+        return errorHandler(update, "你在这个群已经有一张卡了！")
+    popOP(plid)
+    return getnewcard(update, gpid, plid)
+
+
+def countless50discard(cardi: GameCard) -> bool:
+    countless50 = 0
+    for keys in cardi.data:
+        if cardi.data[keys] < 50:
+            countless50 += 1
+    if countless50 >= 3:
+        return True
+    return False
+
+
+def getnewcard(update: Update, gpid: int, plid: int, cdid: int = -1) -> bool:
+    """指令`/newcard`的具体实现"""
+    if gpid not in CARDS_DICT:
+        CARDS_DICT[gpid] = {}
+    new_card, detailmsg = generateNewCard(plid, gpid)
+    allids = getallid()
+    if cdid >= 0 and cdid not in allids:
+        new_card.id = cdid
+    else:
+        if cdid >= 0 and cdid in allids:
+            update.message.reply_text(
+                "输入的ID已经被占用，自动获取ID。可以用 /changeid 更换喜欢的id。")
+        nid = 0
+        while nid in allids:
+            nid += 1
+        new_card.id = nid
+    update.message.reply_text(
+        "角色卡已创建，您的卡id为："+str(new_card.id)+"。详细信息如下：\n"+detailmsg)
+    # 如果有3个属性小于50，则discard=true
+    if countless50discard(new_card):
+        new_card.discard = True
+        update.message.reply_text(
+            "因为有三项属性小于50，如果你愿意的话可以使用 /discard 来删除这张角色卡。设定年龄后则不能再删除这张卡。")
+    update.message.reply_text(
+        "长按 /setage 并输入一个数字来设定年龄。如果需要卡片制作帮助，使用 /createcardhelp 来获取帮助。")
+    if plid in CURRENT_CARD_DICT:
+        update.message.reply_text(
+            "创建新卡时，控制自动切换至新卡。如果需要切换你操作的另一张卡，用 /switch 切换")
+    cardadd(new_card)
     return True

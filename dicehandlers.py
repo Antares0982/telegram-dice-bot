@@ -115,8 +115,6 @@ def reload(update: Update, context: CallbackContext) -> bool:
         utils.GROUP_KP_DICT, utils.CARDS_DICT, utils.ON_GAME = utils.readinfo()
         utils.CURRENT_CARD_DICT = utils.readcurrentcarddict()
         utils.GROUP_RULES = utils.readrules()
-        utils.ID_POOL = []
-        utils.addIDpool(utils.ID_POOL)
     except:
         return utils.errorHandler(update, "读取文件出现问题，请检查json文件！")
     update.message.reply_text('成功重新读取文件。')
@@ -319,71 +317,51 @@ def newcard(update: Update, context: CallbackContext) -> bool:
 
     如果发送者不是KP，那么只能在一个群内拥有最多一张角色卡。
 
-
-    `/newcard --groupid`新建一张卡片，绑定到`groupid`对应的群。
     如果不知道群id，请先发送`/getid`到群里获取id。
-
+    `/newcard`提交创建卡请求，bot会等待你输入`groupid`。
+    `/newcard --groupid`新建一张卡片，绑定到`groupid`对应的群。
     `/newcard --groupid --cardid`新建一张卡片，绑定到`groupid`对应的群的同时，
     将卡片id设置为`cardid`，`cardid`必须是非负整数。
     当指定的卡id已经被别的卡占用的时候，将自动获取未被占用的id。
 
     当生成时有至少三项基础属性低于50时，可以使用`/discard`来放弃并删除这张角色卡。
     创建新卡之后，当前控制卡片会自动切换到新卡，详情参见
-    `/help switch`。"""
-    plid = update.effective_chat.id
-    if utils.isgroupmsg(update):  # 只接受私聊消息
+    `/help switch`。
+
+    角色卡说明
+    一张角色卡具有：
+    `groupid`，`id`，`playerid`基本信息。
+    STR，CON，SIZ，DEX，APP，INT，EDU，LUCK基本属性；
+    职业、姓名、性别、年龄；
+    技能信息；
+    背景故事（描述，重要之人，重要之地，珍视之物，特质，受过的伤，恐惧之物，神秘学物品，第三类接触）；
+    检定修正值；
+    物品，财产；
+    角色类型（PL，NPC）；
+    是否可以被删除；
+    状态（存活，死亡，疯狂等）。"""
+    if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息创建角色卡。")
     if len(context.args) == 0:
-        return utils.errorHandler(update, "使用'/newcard groupid'来创建新角色卡。如果你不知道groupid，在群里发送 /getid 获取群id。如果需要帮助，请使用 /createcardhelp 查看建卡帮助。")
+        update.message.reply_text(
+            "准备创建新卡。\n如果你不知道群id，在群里发送 /getid 获取群id。\n请发送群id：")
+        utils.addOP(update.effective_chat.id, "newcard")
+        return True
     msg = context.args[0]
     if not utils.isint(msg) or int(msg) >= 0:
-        return utils.errorHandler(update, "无效群id。如果你不知道groupid，在群里发送 /getid 获取群id。使用'/newcard groupid'来创建新角色卡。")
+        return utils.errorHandler(update, "无效群id")
     gpid = int(msg)
     utils.initrules(gpid)
-    # 符合建卡条件，开始处理
     # 检查(pl)是否已经有卡
-    if gpid in utils.CARDS_DICT:
-        for cdid in utils.CARDS_DICT[gpid]:
-            if utils.CARDS_DICT[gpid][cdid].playerid == plid and utils.getkpid(gpid) != plid:
-                return utils.errorHandler(update, "你在这个群已经有一张卡了！")
+    plid = update.effective_chat.id
+    if utils.hascard(plid, gpid):
+        return utils.errorHandler(update, "你在这个群已经有一张卡了！")
     # 符合建卡条件，生成新卡
-    if gpid not in utils.CARDS_DICT:
-        utils.CARDS_DICT[gpid] = {}
-    new_card, detailmsg = utils.generateNewCard(plid, gpid)
-    utils.DETAIL_DICT[plid] = detailmsg
-    if len(context.args) > 1 and utils.isint(context.args[1]) and int(context.args[1]) not in utils.ID_POOL and int(context.args[1]) > 0:
-        new_card.id = int(context.args[1])
-    else:
-        if len(context.args) > 1 and utils.isint(context.args[1]) and (int(context.args[1]) in utils.ID_POOL or int(context.args[1]) < 0):
-            update.message.reply_text("输入的ID已经被占用，自动获取ID")
-        nid = 0
-        while nid in utils.ID_POOL:
-            nid += 1
-        new_card.id = nid
-        utils.ID_POOL.append(nid)
-        utils.ID_POOL.sort()
-    update.message.reply_text(
-        "角色卡已创建，您的卡id为："+str(new_card.id)+"。使用 /details 查看角色卡详细信息。")
-    # 如果有3个属性小于50，则discard=true
-    countless50 = 0
-    for keys in new_card.data:
-        if new_card.data[keys] < 50:
-            countless50 += 1
-    if countless50 >= 3:
-        new_card.discard = True
-        update.message.reply_text(
-            "因为有三项属性小于50，如果你愿意的话可以使用 /discard 来删除这张角色卡。设定年龄后则不能再删除这张卡。")
-    update.message.reply_text(
-        "长按 /setage 并输入一个数字来设定年龄。如果需要帮助，使用 /createcardhelp 来获取帮助。")
-    utils.CARDS_DICT[new_card.groupid][new_card.id] = new_card
-    utils.writecards(utils.CARDS_DICT)
-    if plid in utils.CURRENT_CARD_DICT:
-        update.message.reply_text("创建新卡时，控制自动切换至新卡")
-    utils.CURRENT_CARD_DICT[plid] = (new_card.groupid, new_card.id)
-    utils.writecurrentcarddict(utils.CURRENT_CARD_DICT)
-    return True
-
-# (private)/discard (--groupid/--cardid) 删除对应卡片。
+    if len(context.args) > 1:
+        if not utils.isint(context.args[1]) or int(context.args[1]) < 0:
+            return utils.errorHandler(update, "输入的卡片id参数无效，需要是非负整数")
+        return utils.getnewcard(update, gpid, plid, int(context.args[1]))
+    return utils.getnewcard(update, gpid, plid)
 
 
 def discard(update: Update, context: CallbackContext):
@@ -429,10 +407,6 @@ def discard(update: Update, context: CallbackContext):
                 "删除了"+str(len(trueDiscardTupleList))+"张卡片。\n/details 显示删除的卡片信息。删除操作不可逆。")
         detailinfo = ""
         for gpid, cdid in trueDiscardTupleList:
-            if cdid in utils.ID_POOL:
-                utils.ID_POOL.pop(utils.ID_POOL.index(cdid))
-            else:
-                utils.sendtoAdmin("删除了ID池中未出现的卡，请检查代码")
             detailinfo += "删除卡片：\n" + \
                 str(utils.CARDS_DICT[gpid][cdid])+"\n"  # 获取删除的卡片的详细信息
             utils.CARDS_DICT[gpid].pop(cdid)
@@ -471,10 +445,6 @@ def discard(update: Update, context: CallbackContext):
         detailinfo = "删除卡片：\n"+str(utils.CARDS_DICT[gpid][cdid])+"\n"
         utils.DETAIL_DICT[plid] = detailinfo
         utils.CARDS_DICT[gpid].pop(cdid)
-        if cdid in utils.ID_POOL:
-            utils.ID_POOL.pop(utils.ID_POOL.index(cdid))
-        else:
-            utils.sendtoAdmin("删除了ID池中未出现的卡，请检查代码")
         if len(utils.CARDS_DICT[gpid]) == 0:
             utils.CARDS_DICT.pop(gpid)
         utils.writecards(utils.CARDS_DICT)
@@ -991,14 +961,42 @@ def switchkp(update: Update, context: CallbackContext):
 
 def showmycards(update: Update, context: CallbackContext) -> bool:
     """显示自己所持的卡"""
-    pass
+    plid = update.message.from_user.id
+    allcardsTuple = utils.findallplayercards(plid)
+    if len(allcardsTuple) == 0:
+        return utils.errorHandler(update, "找不到卡。")
+    if utils.isgroupmsg(update):
+        # 群消息，只发送本群的卡
+        rttext = ""
+        for gpid, cdid in allcardsTuple:
+            if gpid != update.effective_chat.id:
+                continue
+            cardi = utils.cardget(gpid, cdid)
+            name = utils.getname(cardi)
+            rttext += str(cdid)+": "+name+"\n"
+        if rttext == "":
+            update.message.reply_text("找不到本群的卡。")
+        else:
+            update.message.reply_text(rttext)
+        return True
+    # 私聊消息，发送全部卡
+    rttext = ""
+    for gpid, cdid in allcardsTuple:
+        cardi = utils.cardget(gpid, cdid)
+        name = utils.getname(cardi)
+        rttext += "群id "+str(gpid)+" 卡id "+str(cdid)+":\n"+name+"\n"
+    update.message.reply_text(rttext)
+    return True
+
 
 # /tempcheck --tpcheck:int: add temp check
 # /tempcheck --tpcheck:int (--cardid --dicename): add temp check for one card in a game
 
 
 def tempcheck(update: Update, context: CallbackContext):
-    """增加一个临时的检定修正。该指令只能在游戏中使用。"""
+    """增加一个临时的检定修正。该指令只能在游戏中使用。
+    `/tempcheck --tpcheck`只能用一次的检定修正。使用完后消失
+    `/tempcheck --tpcheck --cardid --dicename`对某张卡，持久生效的检定修正"""
     if len(context.args) == 0:
         return utils.errorHandler(update, "没有参数", True)
     if update.effective_chat.id > 0:
@@ -1030,7 +1028,6 @@ def roll(update: Update, context: CallbackContext):
     只接受第一个空格前的参数`dicename`。
     `dicename`可能是技能名，可能是`3d6`，可能是`1d4+2d10`。
     骰子环境可能是游戏中，游戏外。"""
-    #
     if len(context.args) == 0:
         update.message.reply_text(utils.commondice("1d100"))  # 骰1d100
         return True
@@ -1149,11 +1146,11 @@ def roll(update: Update, context: CallbackContext):
 
 def show(update: Update, context: CallbackContext) -> bool:
     """显示目前操作中的卡片的信息。
-    /show card: 显示当前操作的整张卡片的信息
-    /show --attrname: 显示卡片的某项具体属性
+    `/show card`：显示当前操作的整张卡片的信息；
+    `/show --attrname`：显示卡片的某项具体属性。
     """
     if len(context.args) == 0:
-        return utils.errorHandler(update, "需要参数")
+        return utils.errorHandler(update, "需要参数：card或者attrname其中一个")
     if utils.isprivatemsg(update):
         plid = update.effective_chat.id
         card1, ok = utils.findcard(plid)
@@ -1163,9 +1160,7 @@ def show(update: Update, context: CallbackContext) -> bool:
             update.message.reply_text(utils.showcardinfo(card1))
             return True
         attrname = context.args[0]
-        if not utils.showattrinfo(update, card1, attrname):
-            return False
-        return True
+        return utils.showattrinfo(update, card1, attrname)
     # 群消息
     gpid = update.effective_chat.id
     senderid = update.message.from_user.id
@@ -1200,9 +1195,7 @@ def show(update: Update, context: CallbackContext) -> bool:
         update.message.reply_text("显示游戏中的卡片：")
     else:
         update.message.reply_text("显示游戏外的卡片：")
-    if not utils.showattrinfo(update, cardi, attrname):
-        return False
-    return True
+    return utils.showattrinfo(update, cardi, attrname)
 
 
 def showkp(update: Update, context: CallbackContext) -> bool:
@@ -1512,7 +1505,8 @@ def changeid(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "负数id无效", True)
     if newid == oldid:
         return utils.errorHandler(update, "前后id相同", True)
-    if newid in utils.ID_POOL:
+    addids = utils.getallid()
+    if newid in addids:
         return utils.errorHandler(update, "该ID已经被占用")
     cardi, ok = utils.findcardwithid(oldid)
     if not ok:
@@ -1522,10 +1516,6 @@ def changeid(update: Update, context: CallbackContext) -> bool:
     if plid != utils.ADMIN_ID and cardi.playerid != plid and utils.getkpid(gpid) != plid:
         return utils.errorHandler(update, "非控制者且没有权限", True)
     # 有修改权限，开始处理
-    if oldid in utils.ID_POOL:
-        utils.ID_POOL.pop(utils.ID_POOL.index(oldid))
-    utils.ID_POOL.append(newid)
-    utils.ID_POOL.sort()
     utils.CARDS_DICT[gpid][newid] = utils.CARDS_DICT[gpid].pop(oldid)
     utils.CARDS_DICT[gpid][newid].id = newid
     utils.writecards(utils.CARDS_DICT)
@@ -1930,14 +1920,13 @@ def addcard(update: Update, context: CallbackContext) -> bool:
     # 生成成功
     card1 = utils.GameCard(t)
     # 添加id
-    if "id" not in context.args or int(context.args[context.args.index("id")+1]) < 0 or card1.id in utils.ID_POOL:
+    addids = utils.getallid()
+    if "id" not in context.args or int(context.args[context.args.index("id")+1]) < 0 or card1.id in addids:
         update.message.reply_text("输入了已被占用的id，或id未设置。自动获取id")
         nid = 0
-        while nid in utils.ID_POOL:
+        while nid in addids:
             nid += 1
         card1.id = nid
-    utils.ID_POOL.append(card1.id)
-    utils.ID_POOL.sort()
     # 卡检查
     rttext = utils.showchecks(card1)
     if rttext != "All pass.":
@@ -1982,6 +1971,17 @@ def helper(update: Update, context: CallbackContext) -> True:
             return False
         return True
     return utils.errorHandler(update, "找不到这个指令，或这个指令没有帮助信息。")
+
+
+def textHandler(update: Update, context: CallbackContext) -> bool:
+    """信息处理函数，用于无指令的消息处理。
+    具体指令处理正常完成时再删除掉当前操作状态`OPERATION[chatid]`，处理出错时不删除。"""
+    oper = utils.getOP(update.effective_chat.id)
+    if oper == "":
+        # 不处理
+        return True
+    if oper == "newcard":
+        return utils.textnewcard(update, context)
 
 
 def unknown(update: Update, context: CallbackContext) -> None:

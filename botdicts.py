@@ -1,20 +1,10 @@
 # -*- coding:utf-8 -*-
 import copy
 import json
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from cfg import *
 from gameclass import *
-
-
-def popallempties(d: Dict[Any, dict]) -> bool:
-    """将二层字典中一层的空键删除。如果有空键，返回True，否则返回False"""
-    ans: bool = False
-    for key in d:
-        if not d[key]:
-            ans = True
-            d.pop(key)
-    return ans
 
 
 def writekpinfo(dict1: dict) -> None:
@@ -43,7 +33,6 @@ def writegameinfo(listofobj: List[GroupGame]) -> None:
     savelist: List[dict] = []
     for i in range(len(listofobj)):
         savelist.append(copy.deepcopy(listofobj[i].__dict__))
-        savelist[-1]["gamerule"] = savelist[-1]["gamerule"].__dict__
         tpcards: List[GameCard] = savelist[-1]["cards"]
         savelist[-1]["cards"] = []
         savelist[-1].pop("kpcards")

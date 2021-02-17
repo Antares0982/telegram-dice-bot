@@ -63,7 +63,7 @@ def makehandlerlist() -> List[str]:
     ans: List[str] = []
     for key in dicehandlers.ALL_HANDLER:
         if isfunction(dicehandlers.ALL_HANDLER[key]):
-            if key == "unknown" or key == "button":
+            if key == "unknown" or key == "button" or key == "textHandler":
                 continue
             ans.append(key)
     dicehandlers.utils.writehandlers(ans)
@@ -83,6 +83,8 @@ def main() -> None:
     dispatcher.add_handler(CallbackQueryHandler(dicehandlers.button))
     dispatcher.add_handler(MessageHandler(
         Filters.command, dicehandlers.unknown))
+    dispatcher.add_handler(MessageHandler(Filters.text & (
+        ~Filters.command), dicehandlers.textHandler))
     dicehandlers.utils.updater.start_polling(clean=True)
 
 
