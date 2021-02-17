@@ -323,12 +323,12 @@ def findgamewithkpid(kpid: int) -> Tuple[GroupGame, bool]:
     return None, False
 
 
-def findcardfromgame(game: GroupGame, plid: int) -> Tuple[GameCard, bool]:
+def findcardfromgame(game: GroupGame, plid: int) -> GameCard:
     """从`game`中返回对应的`plid`的角色卡"""
     for i in game.cards:
         if i.playerid == plid:
-            return i, True
-    return None, False
+            return i
+    return None
 
 
 def findcardfromgamewithid(game: GroupGame, cdid: int) -> Tuple[GameCard, bool]:

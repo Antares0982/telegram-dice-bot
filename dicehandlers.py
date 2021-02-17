@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+from botdicts import writegameinfo
 import time
 from typing import Dict, List, Tuple
 
@@ -1037,7 +1038,17 @@ def roll(update: Update, context: CallbackContext):
 
     只接受第一个空格前的参数`dicename`。
     `dicename`可能是技能名，可能是`3d6`，可能是`1d4+2d10`。
-    骰子环境可能是游戏中，游戏外。"""
+    骰子环境可能是游戏中，游戏外。
+    
+    `/roll`：默认1d100。
+    `/roll --mdn`骰一个mdn的骰子。
+    `/roll --test`仅限游戏中可以使用。对`test`进行一次检定。
+    例如，`/roll 力量`会进行一次STR检定。
+    `/roll 射击`进行一次射击检定。
+    检定心理学时结果只会发送给kp。
+    如果要进行一个暗骰，可以输入
+    `/roll 暗骰`进行一次检定为50的暗骰，或者
+    `/roll 暗骰60`进行一次检定为60的暗骰。"""
     if len(context.args) == 0:
         update.message.reply_text(utils.commondice("1d100"))  # 骰1d100
         return True
@@ -1053,22 +1064,21 @@ def roll(update: Update, context: CallbackContext):
                 return utils.errorHandler(update, "无效输入")
             update.message.reply_text(rttext)
             return True
+        # 确认不是基础骰子的计算，转到卡检定
         # 获取临时检定
         tpcheck, game.tpcheck = game.tpcheck, 0
         if tpcheck != 0:
             utils.writegameinfo(utils.ON_GAME)
         senderid = update.message.from_user.id
         gpid = update.effective_chat.id
+        # 获取卡
         if senderid != utils.getkpid(gpid):
-            gamecard, ok = utils.findcardfromgame(game, senderid)
+            gamecard = utils.findcardfromgame(game, senderid)
         else:
             gamecard = utils.getkpctrl(game)
-            if not gamecard:
-                rttext = utils.commondice(dicename)
-                if rttext == "Invalid input.":
-                    return utils.errorHandler(update, "无效输入")
-                update.message.reply_text(rttext)
-                return True
+        if not gamecard:
+            return utils.errorHandler(update, "找不到卡。")
+        # 找卡完成，开始检定
         test = 0
         if dicename in gamecard.skill:
             test = gamecard.skill[dicename]
@@ -1188,7 +1198,9 @@ def show(update: Update, context: CallbackContext) -> bool:
             if not cardi:
                 return utils.errorHandler(update, "注意：kpctrl值为-1")
         else:
-            cardi, ok = utils.findcardfromgame(game, senderid)
+            cardi = utils.findcardfromgame(game, senderid)
+            if not cardi:
+                return utils.errorHandler(update, "找不到卡。")
     # 显示游戏内数据，需要提示是游戏内/外的卡
     if context.args[0] == "card":
         rttext = ""
@@ -1805,10 +1817,9 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
             return utils.errorHandler(update, "请先用 /switchkp 切换到你的卡")
     else:  # 玩家进行
         plid = update.message.from_user.id
-        card1, ok = utils.findcardfromgame(game, plid)
-        if not ok:
-            update.message.reply_text("Can't find card.")
-            return False
+        card1 = utils.findcardfromgame(game, plid)
+        if not card1:
+            return utils.errorHandler(update, "找不到卡。")
     rttext = "检定：理智 "
     sanity = card1.attr["SAN"]
     check = utils.dicemdn(1, 100)[0]
