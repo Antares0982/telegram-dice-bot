@@ -959,15 +959,14 @@ def switchkp(update: Update, context: CallbackContext):
     if not utils.isint(num) or int(num) < 0:
         return utils.errorHandler(update, "无效输入", True)
     cdid = int(num)
-    for cardi in game.kpcards:
-        if cardi.id == cdid:
-            if cardi.playerid != game.kpid:
-            game.kpctrl =
-            update.message.reply_text(
-                "切换到卡" + str(num)+"，角色名称：" + cardi.info["name"])
-            utils.writegameinfo(utils.ON_GAME)
-            return True
-    return utils.errorHandler(update, "没有找到这张卡", True)
+    cardi,ok = utils.findcardfromgamewithid(game, cdid)
+    if not ok or cardi.playerid != game.kpid:
+        return utils.errorHandler(update, "无效id", True)
+    game.kpctrl = cdid
+    update.message.reply_text(
+        "切换到卡" + str(num)+"，角色名称：" + cardi.info["name"])
+    utils.writegameinfo(utils.ON_GAME)
+    return True
 
 
 def showmycards(update: Update, context: CallbackContext) -> bool:
