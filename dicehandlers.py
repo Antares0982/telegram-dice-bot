@@ -511,20 +511,17 @@ def setstrdec(update: Update, context: CallbackContext):
             rtbuttons = utils.makeIntButtons(max(0, 2 - cardi.data["CON"]-cardi.data["DEX"] - cardi.data["STR_CON_DEX_M"]), min(
                 cardi.data["STR"]-1, -cardi.data["STR_CON_DEX_M"]), "strdec", "", 1)
         else:
-            update.message.reply_text("No need to set STR decrease.")
-            return False
+            return utils.errorHandler(update, "无需设置力量下降值")
         rp_markup = InlineKeyboardMarkup(rtbuttons)
-        update.message.reply_text("Set STR decrease: ", reply_markup=rp_markup)
+        update.message.reply_text("设置力量下降值：", reply_markup=rp_markup)
         return True
     dec = context.args[0]
     if not utils.isint(dec):
-        update.message.reply_text("Invalid input.")
-        return False
+        return utils.errorHandler(update, "输入无效")
     dec = int(dec)
     cardi, hintmsg, needcon = utils.choosedec(cardi, dec)
     if hintmsg == "输入无效":
-        update.message.reply_text("Invalid input!")
-        return False
+        return utils.errorHandler(update, hintmsg)
     update.message.reply_text(hintmsg)
     if needcon:
         update.message.reply_text("Use /setcondec to set CON decrease.")
@@ -618,7 +615,7 @@ def setjob(update: Update, context: CallbackContext) -> bool:
     card1.info["job"] = jobname
     if jobname not in utils.JOB_DICT:
         update.message.reply_text(
-            "This job is not in joblist, you can use '/addskill skillname points (main/interest)' to choose skills you like! If interest is appended, the skill will cost interest points.")
+            "这个职业不在职业表内，你可以用'/addskill 技能名 点数 (main/interest)'来选择技能！如果有interest参数，该技能将是兴趣技能并消耗兴趣技能点。")
         card1.skill["points"] = int(card1.data["EDU"]*4)
         utils.writecards(utils.CARDS_DICT)
         return True
@@ -626,12 +623,10 @@ def setjob(update: Update, context: CallbackContext) -> bool:
         card1.suggestskill[utils.JOB_DICT[jobname][i]] = utils.getskilllevelfromdict(
             card1, utils.JOB_DICT[jobname][i])  # int
     update.message.reply_text(
-        "Skill suggestions generated. Use /addskill to add skills.")
+        "用 /addskill 来添加技能。")
     # This trap should not be hit
     if not utils.generatePoints(card1, jobname):
-        update.message.reply_text(
-            "Some error occured when generating skill points!")
-        return False
+        return utils.errorHandler(update, "Some error occured when generating skill points!")
     utils.writecards(utils.CARDS_DICT)
     return True
 
@@ -688,7 +683,7 @@ def showskilllist(update: Update, context: CallbackContext) -> None:
     """显示技能列表"""
     rttext = "技能：基础值\n"
     rttext += "母语：等于EDU\n"
-    rttext += "闪避：等于DEX的一半"
+    rttext += "闪避：等于DEX的一半\n"
     for skill in utils.SKILL_DICT:
         rttext += skill+"："+str(utils.SKILL_DICT[skill])+"\n"
     update.message.reply_text(rttext)
@@ -737,6 +732,8 @@ def button(update: Update, context: CallbackContext):
         return utils.buttonswitch(query, update, card1, args)
     if args[0] == "switchkp":
         return utils.buttonswitchkp(query, update, card1, args)
+    if args[0] == "setsex":
+        return utils.buttonsetsex(query, update, card1, args)
     # HIT BAD TRAP
     return False
 
@@ -744,8 +741,12 @@ def button(update: Update, context: CallbackContext):
 def setname(update: Update, context: CallbackContext) -> bool:
     plid = update.message.from_user.id
     if len(context.args) == 0:
-        update.message.reply_text("Please use '/setname NAME' to set name.")
-        return False
+        if utils.isprivatemsg(update):
+            utils.addOP(update.effective_chat.id, "setname")
+        else:
+            utils.addOP(update.effective_chat.id, "setname "+str(plid))
+        update.message.reply_text("请输入姓名：")
+        return True
     card1, ok = utils.findcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
@@ -1157,8 +1158,14 @@ def roll(update: Update, context: CallbackContext):
 
 def show(update: Update, context: CallbackContext) -> bool:
     """显示目前操作中的卡片的信息。
+    如果有多张卡，用`/switch`切换目前操作的卡。
     `/show card`：显示当前操作的整张卡片的信息；
     `/show --attrname`：显示卡片的某项具体属性。
+    例如，`/show skill`显示主要技能，
+    `/show interest`显示兴趣技能。
+    如果当前卡中没有这个属性，则无法显示。
+    可以显示的属性例子：
+    `STR`,`description`
     """
     if len(context.args) == 0:
         return utils.errorHandler(update, "需要参数：card或者attrname其中一个")
@@ -1717,24 +1724,21 @@ def randombackground(update: Update, context: CallbackContext) -> bool:
 def setsex(update: Update, context: CallbackContext) -> bool:
     plid = update.message.from_user.id
     if len(context.args) == 0:
-        update.message.reply_text("Please use '/setsex sex' to set sex.")
-        return False
+        if utils.isgroupmsg(update):
+            utils.addOP(update.effective_chat.id, "setsex "+str(plid))
+            update.message.reply_text("请输入性别：")
+            return True
+        rtbuttons = [[InlineKeyboardButton("男性", callback_data=utils.IDENTIFIER+" setsex male"), InlineKeyboardButton(
+            "女性", callback_data=utils.IDENTIFIER+" setsex female"), InlineKeyboardButton("其他", callback_data=utils.IDENTIFIER+" setsex other")]]
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        update.message.reply_text("请选择性别：", reply_markup=rp_markup)
+        return True
     card1, ok = utils.findcard(plid)
     if not ok:
         update.message.reply_text("Can't find card.")
         return False
-    if context.args[0] in ["男", "男性", "M", "m", "male", "雄", "雄性", "公"]:
-        card1.info["sex"] = "male"
-        update.message.reply_text("Sex is set to male.")
-    elif context.args[0] in ["女", "女性", "F", "f", "female", "雌", "雌性", "母"]:
-        card1.info["sex"] = "female"
-        update.message.reply_text("Sex is set to female.")
-    else:
-        card1.info["sex"] = context.args[0]
-        update.message.reply_text(
-            "Sex is set to "+context.args[0]+". Maybe you need to explain what this is?")
-    utils.writecards(utils.CARDS_DICT)
-    return True
+
+    utils.cardsetsex(update, card1, context.args[0])
 
 
 # setbkground --bkgroundname --bkgroundinfo...: Need at least 2 args
@@ -1987,14 +1991,26 @@ def helper(update: Update, context: CallbackContext) -> True:
 def textHandler(update: Update, context: CallbackContext) -> bool:
     """信息处理函数，用于无指令的消息处理。
     具体指令处理正常完成时再删除掉当前操作状态`OPERATION[chatid]`，处理出错时不删除。"""
+    if update.message.text == "cancel":
+        utils.popOP(update.effective_chat.id)
+        return True
     oper = utils.getOP(update.effective_chat.id)
+    opers = oper.split(" ")
     if oper == "":
-        # 不处理
+        utils.botchat(update)
         return True
     if oper == "newcard":
         return utils.textnewcard(update, context)
     if oper == "setage":
         return utils.textsetage(update, context)
+    if oper == "setname":  # 私聊情形
+        return utils.textsetname(update, 0)
+    if opers[0] == "setname":  # 群消息情形
+        return utils.textsetname(update, int(opers[1]))
+    if oper == "setsex":
+        return utils.textsetsex(update, 0)
+    if opers[0] == "setsex":
+        return utils.textsetsex(update, int(opers[1]))
 
 
 def unknown(update: Update, context: CallbackContext) -> None:

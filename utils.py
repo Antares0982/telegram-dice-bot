@@ -998,9 +998,11 @@ def buttoncgintskill(query: CallbackQuery, update: Update, card1: GameCard, args
 def buttonstrdec(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
     strdecval = int(args[2])
     card1, rttext, needcon = choosedec(card1, strdecval)
-    writecards(CARDS_DICT)
     if needcon:
         rttext += "\n使用 /setcondec 来设置CON（体质）下降值。"
+    else:
+        generateOtherAttributes(card1)
+    writecards(CARDS_DICT)
     query.edit_message_text(rttext)
     return True
 
@@ -1008,6 +1010,7 @@ def buttonstrdec(query: CallbackQuery, update: Update, card1: GameCard, args: Li
 def buttoncondec(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
     condecval = int(args[2])
     card1, rttext = choosedec2(card1, condecval)
+    generateOtherAttributes(card1)
     writecards(CARDS_DICT)
     query.edit_message_text(rttext)
     return True
@@ -1041,7 +1044,7 @@ def buttonswitch(query: CallbackQuery, update: Update, card1: GameCard, args: Li
     writecurrentcarddict(CURRENT_CARD_DICT)
     cardi = CARDS_DICT[gpid][cdid]
     if "name" not in cardi.info or cardi.info["name"] == "":
-        query.edit_message_text("修改成功，现在操作的卡是："+str(cdid))
+        query.edit_message_text("修改成功，现在操作的卡id是："+str(cdid))
     else:
         query.edit_message_text("修改成功，现在操作的卡是："+cardi.info["name"])
     return True
@@ -1061,6 +1064,27 @@ def buttonswitchkp(query: CallbackQuery, update: Update, card1: GameCard, args: 
     game.kpctrl = ctrlid
     writegameinfo(ON_GAME)
     query.edit_message_text("修改操纵的npc卡成功，id为："+str(ctrlid))
+    return True
+
+
+def buttonsetsex(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+    plid = update.effective_chat.id
+    cardi, ok = findcard(plid)
+    if not ok:
+        query.edit_message_text("找不到卡。")
+        return False
+    sex = args[1]
+    if sex == "other":
+        addOP(plid, "setsex")
+        query.edit_message_text("请输入具体的性别：")
+        return True
+    cardi.info["sex"] = sex
+    rttext = "性别设定为"
+    if sex == "male":
+        rttext += "男性。"
+    else:
+        rttext += "女性。"
+    query.edit_message_text(rttext)
     return True
 
 
@@ -1090,7 +1114,6 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
     创建技能按钮来完成技能的添加。
 
     因为兴趣技能过多，使用可以翻页的按钮列表。"""
-    pass
     rtbuttons = [[]]
     # If card1.skill["points"] is 0, turn to interest.
     # Then it must be main skill. After all main skills are added, add interest skills.
@@ -1105,8 +1128,8 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
                 rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys +
                                                                         ": "+str(card1.skill[keys]), callback_data=IDENTIFIER+" "+"cgmainskill "+keys))
             rp_markup = InlineKeyboardMarkup(rtbuttons)
-            update.message.reply_text("You have points:"+str(
-                card1.skill["points"])+"\nPlease choose a skill to increase:", reply_markup=rp_markup)
+            update.message.reply_text("剩余点数："+str(
+                card1.skill["points"])+"\n请选择一项主要技能用于增加技能点", reply_markup=rp_markup)
             return True
         # GOOD TRAP: addsgskill
         for keys in card1.suggestskill:
@@ -1115,13 +1138,12 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys+": " +
                                                                     str(card1.suggestskill[keys]), callback_data=IDENTIFIER+" "+"addsgskill "+keys))
         rp_markup = InlineKeyboardMarkup(rtbuttons)
-        update.message.reply_text("You have points:"+str(
-            card1.skill["points"])+"\nPlease choose a main skill:", reply_markup=rp_markup)
+        update.message.reply_text("剩余点数："+str(
+            card1.skill["points"])+"\n请选择一项主要技能", reply_markup=rp_markup)
         return True
     # turn to interest.
     if card1.interest["points"] <= 0:  # HIT BAD TRAP
-        update.message.reply_text("You don't have any points left!")
-        return False
+        return errorHandler(update, "你已经没有多余的点数了，如果需要重新设定某项具体技能的点数，用 '/addskill 技能名'")
     # GOOD TRAP: add interest skill.
     # 显示第一页，每个参数后面带一个当前页码标记
     rttext, rtbuttons = showskillpages(0, card1)
@@ -1378,6 +1400,21 @@ def cardsetage(update: Update, cardi: GameCard, age: int) -> bool:
     return True
 
 
+def cardsetsex(update: Update, cardi: GameCard, sex: str) -> bool:
+    if sex in ["男", "男性", "M", "m", "male", "雄", "雄性", "公", "man"]:
+        cardi.info["sex"] = "male"
+        update.message.reply_text("性别设定为男性。")
+    elif sex in ["女", "女性", "F", "f", "female", "雌", "雌性", "母", "woman"]:
+        cardi.info["sex"] = "female"
+        update.message.reply_text("性别设定为女性。")
+    else:
+        cardi.info["sex"] = sex
+        update.message.reply_text(
+            "性别设定为："+sex+"。")
+    writecards(CARDS_DICT)
+    return True
+
+
 def textnewcard(update: Update, context: CallbackContext) -> bool:
     text = update.message.text
     plid = update.effective_chat.id
@@ -1404,6 +1441,33 @@ def textsetage(update: Update, context: CallbackContext) -> bool:
         popOP(plid)
         return True
     return False
+
+
+def textsetname(update: Update, plid: int) -> bool:
+    if plid == 0:  # 私聊情形
+        plid = update.effective_chat.id
+    if update.message.from_user.id != plid:
+        return True  # 不处理
+    popOP(update.effective_chat.id)
+    text = update.message.text
+    cardi, ok = findcard(plid)
+    if not ok:
+        return errorHandler(update, "找不到卡。")
+    cardi.info["name"] = text
+    update.message.reply_text("姓名设置完成："+text)
+
+
+def textsetsex(update: Update, plid: int) -> bool:
+    if plid == 0:  # 私聊情形
+        plid = update.effective_chat.id
+    if update.message.from_user.id != plid:
+        return True
+    popOP(update.effective_chat.id)
+    text = update.message.text
+    cardi, ok = findcard(plid)
+    if not ok:
+        return errorHandler(update, "找不到卡。")
+    return cardsetsex(update, cardi, text)
 
 
 def countless50discard(cardi: GameCard) -> bool:
@@ -1446,3 +1510,15 @@ def getnewcard(update: Update, gpid: int, plid: int, cdid: int = -1) -> bool:
             "创建新卡时，控制自动切换至新卡。如果需要切换你操作的另一张卡，用 /switch 切换")
     cardadd(new_card)
     return True
+
+
+def botchat(update: Update) -> None:
+    if isgroupmsg(update):
+        return
+    text = update.message.text
+    if text[:1] == "我":
+        update.message.reply_text("你"+text[1:])
+        return
+    if text.find("傻逼"):
+        update.message.reply_text("明白了，你是傻逼")
+        return
