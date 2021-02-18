@@ -1519,6 +1519,6 @@ def botchat(update: Update) -> None:
     if text[:1] == "我":
         update.message.reply_text("你"+text[1:])
         return
-    if text.find("傻逼"):
+    if text.find("傻逼") != -1:
         update.message.reply_text("明白了，你是傻逼")
         return

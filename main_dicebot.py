@@ -60,6 +60,7 @@ def bot(update: Update, context: CallbackContext) -> bool:
 
 
 def makehandlerlist() -> List[str]:
+    """获得全部handlers同时，写入文件"""
     ans: List[str] = []
     for key in dicehandlers.ALL_HANDLER:
         if isfunction(dicehandlers.ALL_HANDLER[key]):
