@@ -34,6 +34,59 @@ DETAIL_DICT: Dict[int, str] = {}  # 临时地存储详细信息
 IDENTIFIER = str(time.time())  # 在每个按钮的callback加上该标志，如果标志不相等则不处理
 
 
+def cardpop(gpid: int, cdid: int) -> GameCard:
+    if gpid not in CARDS_DICT:
+        return None
+    if cdid not in CARDS_DICT[gpid]:
+        return None
+    plid = CARDS_DICT[gpid][cdid].playerid
+    cgp, cid = CURRENT_CARD_DICT[plid]
+    if cgp == gpid and cid == cdid:
+        CURRENT_CARD_DICT.pop(plid)
+        writecurrentcarddict(CURRENT_CARD_DICT)
+    cardi = CARDS_DICT[gpid].pop(cdid)
+    writecards(CARDS_DICT)
+    return cardi
+
+
+def cardadd(cardi: GameCard) -> bool:
+    gpid = cardi.groupid
+    cdid = cardi.id
+    if gpid not in CARDS_DICT:
+        CARDS_DICT[gpid] = {}
+    if cdid in CARDS_DICT[gpid]:
+        return False
+    CARDS_DICT[gpid][cdid] = cardi
+    writecards(CARDS_DICT)
+    CURRENT_CARD_DICT[cardi.playerid] = (gpid, cdid)
+    writecurrentcarddict(CURRENT_CARD_DICT)
+    return True
+
+
+def cardget(gpid: int, cdid: int) -> GameCard:
+    if gpid not in CARDS_DICT:
+        return None
+    if cdid not in CARDS_DICT[gpid]:
+        return None
+    return CARDS_DICT[gpid][cdid]
+
+
+def addOP(chatid: int, op: str) -> None:
+    OPERATION[chatid] = op
+
+
+def popOP(chatid) -> str:
+    if chatid not in OPERATION:
+        return ""
+    return OPERATION.pop(chatid)
+
+
+def getOP(chatid) -> str:
+    if chatid not in OPERATION:
+        return ""
+    return OPERATION[chatid]
+
+
 def createSkillPages(d: dict) -> List[List[str]]:
     """创建技能的分页列表，用于添加兴趣技能"""
     # 一页16个，分四行
@@ -84,6 +137,8 @@ except:
 # 读取完成
 updater.bot.send_message(
     chat_id=ADMIN_ID, text="Bot is live!")
+
+# dice相关
 
 
 def dicemdn(m: int, n: int) -> List[int]:
@@ -1328,59 +1383,6 @@ def getname(cardi: GameCard) -> str:
     if "name" not in cardi.info or cardi.info["name"] == "":
         return "None"
     return cardi.info["name"]
-
-
-def cardpop(gpid: int, cdid: int) -> GameCard:
-    if gpid not in CARDS_DICT:
-        return None
-    if cdid not in CARDS_DICT[gpid]:
-        return None
-    plid = CARDS_DICT[gpid][cdid].playerid
-    cgp, cid = CURRENT_CARD_DICT[plid]
-    if cgp == gpid and cid == cdid:
-        CURRENT_CARD_DICT.pop(plid)
-        writecurrentcarddict(CURRENT_CARD_DICT)
-    cardi = CARDS_DICT[gpid].pop(cdid)
-    writecards(CARDS_DICT)
-    return cardi
-
-
-def cardadd(cardi: GameCard) -> bool:
-    gpid = cardi.groupid
-    cdid = cardi.id
-    if gpid not in CARDS_DICT:
-        CARDS_DICT[gpid] = {}
-    if cdid in CARDS_DICT[gpid]:
-        return False
-    CARDS_DICT[gpid][cdid] = cardi
-    writecards(CARDS_DICT)
-    CURRENT_CARD_DICT[cardi.playerid] = (gpid, cdid)
-    writecurrentcarddict(CURRENT_CARD_DICT)
-    return True
-
-
-def cardget(gpid: int, cdid: int) -> GameCard:
-    if gpid not in CARDS_DICT:
-        return None
-    if cdid not in CARDS_DICT[gpid]:
-        return None
-    return CARDS_DICT[gpid][cdid]
-
-
-def addOP(chatid: int, op: str) -> None:
-    OPERATION[chatid] = op
-
-
-def popOP(chatid) -> str:
-    if chatid not in OPERATION:
-        return ""
-    return OPERATION.pop(chatid)
-
-
-def getOP(chatid) -> str:
-    if chatid not in OPERATION:
-        return ""
-    return OPERATION[chatid]
 
 
 def cardsetage(update: Update, cardi: GameCard, age: int) -> bool:
