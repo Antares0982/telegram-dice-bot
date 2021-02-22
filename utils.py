@@ -20,6 +20,7 @@ else:
 GROUP_KP_DICT: Dict[int, int]
 CARDS_DICT: Dict[int, Dict[int, GameCard]]
 ON_GAME: List[GroupGame]
+HOLD_GAME: List[GroupGame]
 GROUP_RULES: Dict[int, GroupRule]
 CURRENT_CARD_DICT: Dict[int, Tuple[int, int]]
 OPERATION: Dict[int, str] = {}
@@ -124,7 +125,7 @@ def sendtoAdmin(msg: str) -> None:
 
 # 检测json文件能否正常读取
 try:
-    GROUP_KP_DICT, CARDS_DICT, ON_GAME = readinfo()
+    GROUP_KP_DICT, CARDS_DICT, ON_GAME, HOLD_GAME = readinfo()
     CURRENT_CARD_DICT = readcurrentcarddict()
     SKILL_DICT = readskilldict()
     SKILL_PAGES = createSkillPages(SKILL_DICT)
@@ -1323,6 +1324,18 @@ def gamepop(gpid: int) -> GroupGame:
             t = ON_GAME[i]
             ON_GAME = ON_GAME[:i]+ON_GAME[i+1:]
             writegameinfo(ON_GAME)
+            return t
+    return None
+
+
+def holdgamepop(gpid) -> GroupGame:
+    """pop一场暂停的游戏。`/continuegame`的具体实现。"""
+    global HOLD_GAME
+    for i in range(len(HOLD_GAME)):
+        if HOLD_GAME[i].groupid == gpid:
+            t = HOLD_GAME[i]
+            HOLD_GAME = HOLD_GAME[:i]+HOLD_GAME[i+1:]
+            writeholdgameinfo(HOLD_GAME)
             return t
     return None
 

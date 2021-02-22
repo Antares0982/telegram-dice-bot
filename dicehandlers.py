@@ -10,11 +10,8 @@ import utils
 
 
 def start(update: Update, context: CallbackContext) -> None:
-    """显示bot的帮助信息，群聊时不显示"""
-    if utils.isprivatemsg(update):  # private message
-        update.message.reply_text(utils.HELP_TEXT)
-    else:
-        update.message.reply_text("Dice bot已启用！")
+    """显示bot的帮助信息"""
+    update.message.reply_text(utils.HELP_TEXT)
 
 
 def addkp(update: Update, context: CallbackContext) -> bool:
@@ -107,7 +104,7 @@ def reload(update: Update, context: CallbackContext) -> bool:
     if update.message.from_user.id != utils.ADMIN_ID:
         return utils.errorHandler(update, "没有权限", True)
     try:
-        utils.GROUP_KP_DICT, utils.CARDS_DICT, utils.ON_GAME = utils.readinfo()
+        utils.GROUP_KP_DICT, utils.CARDS_DICT, utils.ON_GAME, utils.HOLD_GAME = utils.readinfo()
         utils.CURRENT_CARD_DICT = utils.readcurrentcarddict()
         utils.GROUP_RULES = utils.readrules()
     except:
@@ -798,11 +795,41 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     return True
 
 
+def holdgame(update: Update, context: CallbackContext) -> bool:
+    if utils.isprivatemsg(update):
+        return utils.errorHandler(update, "发送群消息暂停游戏")
+    gpid = update.effective_chat.id
+    if not utils.isfromkp(update):
+        return utils.errorHandler(update, "只有KP可以中止游戏", True)
+    game = utils.gamepop(gpid)
+    if not game:
+        return utils.errorHandler(update, "没有找到游戏", True)
+    utils.HOLD_GAME.append(game)
+    utils.writeholdgameinfo(utils.HOLD_GAME)
+    update.message.reply_text("游戏暂停，用 /continuegame 恢复游戏")
+    return True
+
+
+def continuegame(update: Update, context: CallbackContext) -> bool:
+    if utils.isprivatemsg(update):
+        return utils.errorHandler(update, "发送群消息继续游戏")
+    gpid = update.effective_chat.id
+    if not utils.isfromkp(update):
+        return utils.errorHandler(update, "只有KP可以继续游戏", True)
+    game = utils.holdgamepop(gpid)
+    if not game:
+        return utils.errorHandler(update, "没有找到游戏", True)
+    utils.ON_GAME.append(game)
+    utils.writegameinfo(utils.ON_GAME)
+    update.message.reply_text("游戏继续！")
+    return True
+
+
 def abortgame(update: Update, context: CallbackContext) -> bool:
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "发送群聊消息来中止游戏")
     gpid = update.effective_chat.id
-    if update.message.from_user.id != utils.getkpid(gpid):
+    if not utils.isfromkp(update):
         return utils.errorHandler(update, "只有KP可以中止游戏", True)
     if not utils.gamepop(gpid):
         return utils.errorHandler(update, "没有找到游戏", True)
@@ -1160,15 +1187,15 @@ def roll(update: Update, context: CallbackContext):
 
 def show(update: Update, context: CallbackContext) -> bool:
     """显示目前操作中的卡片的信息。
-    如果有多张卡，用`/switch`切换目前操作的卡。
+    （如果有多张卡，用`/switch`切换目前操作的卡。）
     `/show card`：显示当前操作的整张卡片的信息；
     `/show --attrname`：显示卡片的某项具体属性。
+    回复某人消息，并使用本指令`/show card或--attrname`：同上，但显示的是被回复者的卡片的信息
     例如，`/show skill`显示主要技能，
     `/show interest`显示兴趣技能。
     如果当前卡中没有这个属性，则无法显示。
     可以显示的属性例子：
-    `STR`,`description`
-    """
+    `STR`,`description`,`SAN`,`MAGIC`,`name`,`item`,`job`"""
     if len(context.args) == 0:
         return utils.errorHandler(update, "需要参数：card或者attrname其中一个")
     if utils.isprivatemsg(update):
@@ -1184,8 +1211,12 @@ def show(update: Update, context: CallbackContext) -> bool:
     # 群消息
     gpid = update.effective_chat.id
     senderid = update.message.from_user.id
-    # KP
-    if utils.getkpid(gpid) == senderid and context.args[0] == "card":
+    if update.message.reply_to_message:
+        rpplid = update.message.reply_to_message.from_user.id
+        if utils.getkpid(gpid) == rpplid:
+            return utils.errorHandler(update, "不可以查看KP卡片信息", True)
+        senderid = rpplid  # 直接修改senderid，继续套用下面的代码。上一步保证了rpplid不会是kpid
+    elif utils.getkpid(gpid) == senderid and context.args[0] == "card":
         return utils.errorHandler(update, "为保护NPC或敌人信息，不可以在群内显示KP整张卡片", True)
     game, ingame = utils.findgame(gpid)
     if not ingame:  # 显示游戏外数据，需要提示
@@ -1196,7 +1227,7 @@ def show(update: Update, context: CallbackContext) -> bool:
         if utils.isfromkp(update):
             cardi = utils.getkpctrl(game)
             if not cardi:
-                return utils.errorHandler(update, "注意：kpctrl值为-1")
+                return utils.errorHandler(update, "先用 /switchkp 切换KP操作的卡")
         else:
             cardi = utils.findcardfromgame(game, senderid)
             if not cardi:
@@ -1220,7 +1251,7 @@ def show(update: Update, context: CallbackContext) -> bool:
 
 
 def showkp(update: Update, context: CallbackContext) -> bool:
-    """这一指令是为KP设计的。
+    """这一指令是为KP设计的。不能在群聊中使用。
 
     `/showkp game`: 显示发送者主持的游戏中所有的卡
     `/showkp card`: 显示发送者作为KP控制的所有卡
@@ -1273,7 +1304,7 @@ def showcard(update: Update, context: CallbackContext) -> bool:
     """显示某张卡的信息。
 
     `/showcard --cardid (--attrname)`: 显示卡id为`cardid`的卡片的信息。
-    如果第二个参数存在，则显示这一项数据。
+    如果第二个参数存在，则显示这一项数据。群聊时使用该指令，优先查看游戏内的卡片。
 
     显示前会检查发送者是否有权限显示这张卡。在这些情况下，无法显示卡：
 
@@ -1285,9 +1316,19 @@ def showcard(update: Update, context: CallbackContext) -> bool:
     if not utils.isint(context.args[0]):
         return utils.errorHandler(update, "参数不是整数", True)
     cdid = int(context.args[0])
-    cardi, ok = utils.findcardwithid(cdid)
-    if not ok:
-        return utils.errorHandler(update, "没有这张卡", True)
+    cardi = None
+    if utils.isgroupmsg(update):
+        game, ok = utils.findgame(update.effective_chat.id)
+        if ok:
+            cardi, ok = utils.findcardfromgamewithid(game, cdid)
+            if ok:
+                update.message.reply_text("显示游戏内的卡片")
+    if not cardi:
+        cardi, ok = utils.findcardwithid(cdid)
+        if ok:
+            update.message.reply_text("显示游戏外的卡片")
+        else:
+            return utils.errorHandler(update, "没有这张卡", True)
     if utils.isprivatemsg(update):
         # 检查是否合法
         if utils.isfromkp(update):  # KP
@@ -1301,9 +1342,7 @@ def showcard(update: Update, context: CallbackContext) -> bool:
                 return utils.errorHandler(update, "没有权限")
         # 有权限，开始处理
         if len(context.args) >= 2:
-            if not utils.showattrinfo(update, cardi, context.args[1]):
-                return False
-            return True
+            return utils.showattrinfo(update, cardi, context.args[1])
         # 显示整张卡
         update.message.reply_text(utils.showcardinfo(cardi))
         return True
@@ -1313,9 +1352,7 @@ def showcard(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "不可显示该卡", True)
     # 有权限，开始处理
     if len(context.args) >= 2:
-        if not utils.showattrinfo(update, cardi, context.args[1]):
-            return False
-        return True
+        return utils.showattrinfo(update, cardi, context.args[1])
     update.message.reply_text(utils.showcardinfo(cardi))
     return True
 

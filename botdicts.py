@@ -42,9 +42,22 @@ def writegameinfo(listofobj: List[GroupGame]) -> None:
     with open(PATH_ONGAME, "w", encoding="utf-8") as f:
         json.dump(savelist, f, indent=4, ensure_ascii=False)
 
+def writeholdgameinfo(listofobj: List[GroupGame]) -> None:
+    """用于HOLD_GAME写入"""
+    savelist: List[dict] = []
+    for i in range(len(listofobj)):
+        savelist.append(copy.deepcopy(listofobj[i].__dict__))
+        tpcards: List[GameCard] = savelist[-1]["cards"]
+        savelist[-1]["cards"] = []
+        savelist[-1].pop("kpcards")
+        for i in tpcards:
+            savelist[-1]["cards"].append(i.__dict__)
+    with open(PATH_HOLDGAME, "w", encoding="utf-8") as f:
+        json.dump(savelist, f, indent=4, ensure_ascii=False)
 
-def readinfo() -> Tuple[Dict[int, int], Dict[int, Dict[int, GameCard]], List[GroupGame]]:
-    """读取三个文件的数据：GROUP_KP_DICT, CARDS_DICT, ON_GAME"""
+
+def readinfo() -> Tuple[Dict[int, int], Dict[int, Dict[int, GameCard]], List[GroupGame], List[GroupGame]]:
+    """读取四个文件的数据：GROUP_KP_DICT, CARDS_DICT, ON_GAME, HOLD_GAME"""
     # 如果文件不存在，则创建新文件
     # group-kp
     try:
@@ -97,7 +110,22 @@ def readinfo() -> Tuple[Dict[int, int], Dict[int, Dict[int, GameCard]], List[Gro
     for i in range(len(ongamelistdict)):
         ongamelist.append(GroupGame(ongamelistdict[i]))
     print("game info: passed")
-    return gpkpdict, gamecardlist, ongamelist
+    # games are holding
+    try:
+        f = open(PATH_HOLDGAME, "r", encoding="utf-8")
+        f.close()
+    except FileNotFoundError:
+        with open(PATH_HOLDGAME, "w", encoding="utf-8") as f:
+            json.dump([], f, indent=4, ensure_ascii=False)
+        print("File does not exist, create new file")
+        holdgamelistdict = []
+    else:
+        with open(PATH_HOLDGAME, "r", encoding="utf-8") as f:
+            holdgamelistdict = json.load(f)
+    holdgamelist: List[GroupGame] = []
+    for i in range(len(holdgamelistdict)):
+        holdgamelist.append(GroupGame(holdgamelistdict[i]))
+    return gpkpdict, gamecardlist, ongamelist, holdgamelist
 
 
 def readskilldict() -> dict:

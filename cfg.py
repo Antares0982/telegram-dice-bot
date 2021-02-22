@@ -26,6 +26,8 @@ PATH_JOBDICT = DATA_PATH+r'jobdict.json'
 PATH_CURRENTCARDDICT = DATA_PATH+r'currentcarddict.json'
 PATH_RULES = DATA_PATH+r'grouprules.json'
 PATH_HANDLERS = DATA_PATH+r'handlers.json'
+PATH_HOLDGAME = DATA_PATH+r'holdgame.json'
+
 ADMIN_ID = cfgparser.getint("ID", "ADMIN_ID")  # BOT控制者的userid
 
 IGNORE_JOB_DICT = cfgparser.getboolean("SETTINGS", "IGNORE_JOB_DICT")
