@@ -45,6 +45,6 @@ CREATE_CARD_HELP = """建卡流程如下：
 HELP_TEXT = "欢迎使用COC dice bot，目前版本：v"+VERSION+"""
 作者：@AntaresChr
 使用 /help 查看指令的帮助。
-"""
+（私聊时偶尔触发嘴臭模式）"""
 
 del cfgparser
