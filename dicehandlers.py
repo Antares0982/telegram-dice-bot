@@ -785,7 +785,9 @@ def startgame(update: Update, context: CallbackContext) -> bool:
         return True
     gamecards = []
     for cdid in utils.CARDS_DICT[gpid]:
-        cardcheckinfo = utils.showchecks(utils.CARDS_DICT[gpid][cdid])
+        cardi = utils.CARDS_DICT[gpid][cdid]
+        utils.generateOtherAttributes(cardi)
+        cardcheckinfo = utils.showchecks(cardi)
         if cardcheckinfo != "All pass.":
             return utils.errorHandler(update, "卡片: "+str(cdid)+"还没有准备好。因为：\n"+cardcheckinfo)
         gamecards.append(utils.CARDS_DICT[gpid][cdid].__dict__)
@@ -1867,6 +1869,51 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
     return True
 
 
+def lp(update: Update, context: CallbackContext) -> bool:
+    """修改LP。KP通过回复某位PL消息并在回复消息中使用本指令即可修改对方卡片的LP。
+
+    使用范例：
+    `/lp +3`恢复3点LP。
+    `/lp -2`扣除2点LP。
+    `/lp 10`将LP设置为10。"""
+    if utils.isprivatemsg(update):
+        return utils.errorHandler(update, "游戏中才可以修改lp。")
+    gpid = update.effective_chat.id
+    kpid = update.message.from_user.id
+    if utils.getkpid(gpid) != kpid:
+        return utils.errorHandler(update, "没有权限", True)
+    if len(context.args) == 0:
+        return utils.errorHandler(update, "需要指定扣除的生命值", True)
+    clp: str = context.args[0]
+    game, ok = utils.findgame(gpid)
+    if not ok:
+        return utils.errorHandler(update, "找不到进行中的游戏", True)
+    rpmsg = update.message.reply_to_message
+    if not rpmsg:
+        return utils.errorHandler(update, "请用回复来选择玩家改变lp")
+    plid = rpmsg.from_user.id
+    cardi = utils.findcardfromgame(game, plid)
+    if not cardi:
+        return utils.errorHandler(update, "找不到这名玩家的卡。")
+    if "LP" not in cardi.attr:
+        utils.generateOtherAttributes(cardi)
+        utils.writecards(utils.CARDS_DICT)
+    if clp[0] == "+" or clp[0] == "-":
+        if not utils.isint(clp[1:]):
+            return utils.errorHandler(update, "参数无效", True)
+    elif not utils.isint(clp):
+        return utils.errorHandler(update, "参数无效", True)
+    originlp = cardi.attr["LP"]
+    if clp[0] == "+":
+        cardi.attr["LP"] += int(clp[1:])
+    elif clp[0] == "-":
+        cardi.attr["LP"] -= int(clp[1:])
+    else:
+        cardi.attr["LP"] = int(clp)
+    update.message.reply_text("生命值从"+str(originlp)+"修改为"+str(cardi.attr["LP"]))
+    return True
+
+
 def addcard(update: Update, context: CallbackContext) -> bool:
     """使用已有信息添加一张卡片，模板使用的是NPC/怪物模板。指令格式如下：
 
@@ -1942,6 +1989,8 @@ def addcard(update: Update, context: CallbackContext) -> bool:
         while nid in addids:
             nid += 1
         card1.id = nid
+    # 生成衍生数值
+    utils.generateOtherAttributes(card1)
     # 卡检查
     rttext = utils.showchecks(card1)
     if rttext != "All pass.":

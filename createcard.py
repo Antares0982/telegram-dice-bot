@@ -33,8 +33,8 @@ def plainNewCard() -> dict:
             "check5": False  # 名字等是否设定完成
         },
         "attr": {
-            "physique": 0,
-            "DB": "",
+            "physique": -100,
+            "DB": "-100",
             "MOV": 0,
             "atktimes": 1,
             "sandown": "0/0",
@@ -108,8 +108,8 @@ def templateNewCard() -> dict:
             "MAGIC": 0,
             "MAXLP": 0,
             "LP": 0,
-            "physique": 0,
-            "DB": "",
+            "physique": -100,
+            "DB": "-100",
             "MOV": 0,
             "atktimes": 1,
             "sandown": "1/1d6",
@@ -333,32 +333,38 @@ def generateOtherAttributes(card: GameCard) -> Tuple[GameCard, str]:
     """获取到年龄之后，通过年龄计算一些衍生数据。"""
     if not card.cardcheck["check2"]:  # This trap should not be hit
         return card, "Please set DATA decrease first"
-    card.attr["SAN"] = card.data["POW"]
+    if "SAN" not in card.attr or card.attr["SAN"]==0:
+        card.attr["SAN"] = card.data["POW"]
     card.attr["MAXSAN"] = 99
-    card.attr["MAGIC"] = card.data["POW"]//5
-    card.attr["MAXLP"] = (card.data["SIZ"]+card.data["CON"])//10
-    card.attr["LP"] = card.attr["MAXLP"]
+    if "MAGIC" not in card.attr or card.attr["MAGIC"]==0:
+        card.attr["MAGIC"] = card.data["POW"]//5
+    if "MAXLP" not in card.attr or card.attr["MAXLP"] ==0:
+        card.attr["MAXLP"] = (card.data["SIZ"]+card.data["CON"])//10
+    if "LP" not in card.attr or card.attr["LP"]==0:
+        card.attr["LP"] = card.attr["MAXLP"]
     rttext = "SAN: " + str(card.attr["SAN"])+"\n"
     rttext += "MAGIC: " + str(card.attr["MAGIC"])+"\n"
     rttext += "LP: " + str(card.attr["LP"])+"\n"
-    if card.data["STR"]+card.data["SIZ"] < 65:
-        card.attr["physique"] = -2
-    elif card.data["STR"]+card.data["SIZ"] < 85:
-        card.attr["physique"] = -1
-    elif card.data["STR"]+card.data["SIZ"] < 125:
-        card.attr["physique"] = 0
-    elif card.data["STR"]+card.data["SIZ"] < 165:
-        card.attr["physique"] = 1
-    elif card.data["STR"]+card.data["SIZ"] < 205:
-        card.attr["physique"] = 2
-    else:
-        card.attr["physique"] = 2+(card.data["STR"]+card.data["SIZ"]-125)//80
-    if card.attr["physique"] <= 0:
-        card.attr["DB"] = str(card.attr["physique"])
-    elif card.attr["physique"] == 1:
-        card.attr["DB"] = "1d4"
-    else:
-        card.attr["DB"] = str(card.attr["physique"]-1)+"d6"
+    if "physique" not in card.attr or card.attr["physique"]==0:
+        if card.data["STR"]+card.data["SIZ"] < 65:
+            card.attr["physique"] = -2
+        elif card.data["STR"]+card.data["SIZ"] < 85:
+            card.attr["physique"] = -1
+        elif card.data["STR"]+card.data["SIZ"] < 125:
+            card.attr["physique"] = 0
+        elif card.data["STR"]+card.data["SIZ"] < 165:
+            card.attr["physique"] = 1
+        elif card.data["STR"]+card.data["SIZ"] < 205:
+            card.attr["physique"] = 2
+        else:
+            card.attr["physique"] = 2+(card.data["STR"]+card.data["SIZ"]-125)//80
+    if "DB" not in card.attr or card.attr["DB"]==0:
+        if card.attr["physique"] <= 0:
+            card.attr["DB"] = str(card.attr["physique"])
+        elif card.attr["physique"] == 1:
+            card.attr["DB"] = "1d4"
+        else:
+            card.attr["DB"] = str(card.attr["physique"]-1)+"d6"
     rttext += "physique: " + str(card.attr["physique"])+"\n"
     return card, rttext
 
