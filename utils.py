@@ -1106,7 +1106,7 @@ def buttonswitch(query: CallbackQuery, update: Update, card1: GameCard, args: Li
 
 
 def buttonswitchkp(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
-    kpid = update.message.from_user.id
+    kpid = update.effective_chat.id
     ctrlid = int(args[1])
     game, ok = findgamewithkpid(kpid)
     if not ok:

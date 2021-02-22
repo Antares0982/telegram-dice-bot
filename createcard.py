@@ -37,7 +37,7 @@ def plainNewCard() -> dict:
             "DB": "",
             "MOV": 0,
             "atktimes": 1,
-            "sandown": "1/1d6",
+            "sandown": "0/0",
             "Armor": ""
         },
         "background": {
