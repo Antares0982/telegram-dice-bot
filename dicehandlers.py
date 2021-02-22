@@ -768,6 +768,8 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     if not utils.isfromkp(update):
         return utils.errorHandler(update, "游戏应由KP发起", True)
     gpid = update.effective_chat.id
+    if utils.isholdinggame(gpid):
+        return continuegame(update, context)  # 检测到游戏暂停中，直接继续
     kpid = update.message.from_user.id
     for games in utils.ON_GAME:
         if games.kpid == kpid:
@@ -796,6 +798,11 @@ def startgame(update: Update, context: CallbackContext) -> bool:
 
 
 def holdgame(update: Update, context: CallbackContext) -> bool:
+    """暂停游戏。
+
+    游戏被暂停时，可以视为游戏不存在，游戏中卡片被暂时保护起来。
+
+    当有中途加入的玩家时，使用该指令先暂停游戏，再继续游戏即可将新的角色卡加入进来。"""
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "发送群消息暂停游戏")
     gpid = update.effective_chat.id
@@ -818,9 +825,14 @@ def continuegame(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "只有KP可以继续游戏", True)
     game = utils.holdgamepop(gpid)
     if not game:
-        return utils.errorHandler(update, "没有找到游戏", True)
+        return utils.errorHandler(update, "没有找到暂停的游戏", True)
     utils.ON_GAME.append(game)
     utils.writegameinfo(utils.ON_GAME)
+    gamecardidlist = utils.getgamecardsid(game)
+    if gpid in utils.CARDS_DICT:
+        for cdid in utils.CARDS_DICT[gpid]:
+            if cdid not in gamecardidlist:
+                utils.addcardtogame(game, utils.CARDS_DICT[gpid][cdid])
     update.message.reply_text("游戏继续！")
     return True
 
@@ -838,13 +850,15 @@ def abortgame(update: Update, context: CallbackContext) -> bool:
 
 
 def endgame(update: Update, context: CallbackContext) -> bool:
+    """结束游戏。
+
+    这一指令会导致所有角色卡的所有权转移给KP，之后玩家无法再操作这张卡片。
+    游戏外的卡片会被游戏内的卡片覆写。
+    如果还没有准备好进行覆写，就不要使用这一指令。"""
     if update.effective_chat.id > 0:
         return utils.errorHandler(update, "该指令仅用于群聊")
-    if utils.getkpid(update.effective_chat.id) == -1:
-        return utils.errorHandler(update, "这个群没有KP")
     if update.message.from_user.id != utils.getkpid(update.effective_chat.id):
-        update.message.reply_text("Only KP can end a game.")
-        return False
+        return utils.errorHandler("只有KP可以结束游戏。")
     gpid = update.effective_chat.id
     kpid = utils.getkpid(gpid)
     game = utils.gamepop(gpid)

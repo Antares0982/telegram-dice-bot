@@ -1328,7 +1328,7 @@ def gamepop(gpid: int) -> GroupGame:
     return None
 
 
-def holdgamepop(gpid) -> GroupGame:
+def holdgamepop(gpid:int) -> GroupGame:
     """pop一场暂停的游戏。`/continuegame`的具体实现。"""
     global HOLD_GAME
     for i in range(len(HOLD_GAME)):
@@ -1339,6 +1339,26 @@ def holdgamepop(gpid) -> GroupGame:
             return t
     return None
 
+
+def isholdinggame(gpid:int)->bool:
+    for game in HOLD_GAME:
+        if game.groupid == gpid:
+            return True
+    return False
+
+def getgamecardsid(game:GroupGame)->List[int]:
+    ans:List[int] = []
+    for cardi in game.cards:
+        ans.append(cardi.id)
+    return ans
+
+def addcardtogame(game:GroupGame, cardi:GameCard)->None:
+    newgamecard = GameCard(cardi.__dict__)
+    game.cards.append(newgamecard)
+    if game.kpid == cardi.playerid:
+        game.kpcards.append(newgamecard)
+    writegameinfo(ON_GAME)
+    
 
 def popallempties(d: Dict[Any, dict]) -> bool:
     """将二层字典中一层的空值对应的键删除。如果有空值，返回True，否则返回False"""
