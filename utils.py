@@ -546,7 +546,7 @@ def isadicename(dicename: str) -> bool:
                     return False
             return True
     # 是数字
-    if int(dicename) > 0:
+    if int(dicename) >= 0:
         return True
     return False
 

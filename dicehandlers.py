@@ -1789,24 +1789,19 @@ def setbkground(update: Update, context: CallbackContext) -> bool:
 
 def sancheck(update: Update, context: CallbackContext) -> bool:
     if utils.isprivatemsg(update):
-        update.message.reply_text("Please do san check in a game.")
-        return False
+        return utils.errorHandler(update, "在群里进行sancheck。")
     if len(context.args) == 0:
-        update.message.reply_text("Need argument.")
-        return False
+        return utils.errorHandler(update, "需要参数", True)
     checkname = context.args[0]
     if checkname.find("/") == -1:
-        update.message.reply_text("Seperate your check with a '/'.")
-        return False
+        return utils.errorHandler(update, "将成功和失败的扣除点数用/分开。")
     checkpass, checkfail = checkname.split(sep='/', maxsplit=1)
     if not utils.isadicename(checkpass) or not utils.isadicename(checkfail):
-        update.message.reply_text("Invalid input.")
-        return False
+        return utils.errorHandler(update, "无效输入")
     gpid = update.effective_chat.id
     game, ok = utils.findgame(gpid)
     if not ok:
-        update.message.reply_text("Please do san check in a game.")
-        return False
+        return utils.errorHandler(update, "找不到游戏", True)
     # KP 进行
     if update.message.from_user.id == utils.getkpid(gpid):
         card1 = utils.getkpctrl(game)
