@@ -27,7 +27,7 @@ def bot(update: Update, context: CallbackContext) -> bool:
     `/bot stop`将结束程序。
 
     `/bot restart`将调用`reload`方法重新加载所有数据。"""
-    if update.message.from_user.id != dicehandlers.utils.ADMIN_ID:
+    if dicehandlers.utils.getmsgfromid(update) != dicehandlers.utils.ADMIN_ID:
         return dicehandlers.utils.errorHandler(update, "没有权限", True)
     if len(context.args) == 0:
         return dicehandlers.utils.errorHandler(update, "参数无效", True)
@@ -67,6 +67,7 @@ def makehandlerlist() -> List[str]:
             if key == "unknown" or key == "button" or key == "textHandler":
                 continue
             ans.append(key)
+    ans.sort()
     dicehandlers.utils.writehandlers(ans)
     return ans
 

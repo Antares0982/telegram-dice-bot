@@ -314,9 +314,9 @@ def choosedec(card: GameCard, strength: int) -> Tuple[GameCard, str, bool]:
     return card, rttext, needCON
 
 
-def choosedec2(card: dict, con: int) -> Tuple[dict, str]:
+def choosedec2(card: GameCard, con: int) -> Tuple[GameCard, str]:
     if card.data["CON"] <= con or "CON_DEX_M" not in card.data:
-        return card, "输入无效", False
+        return card, "输入无效"
     card.data["CON"] -= con
     rttext = "体质减"+str(con)+"点，"
     if con > -card.data["CON_DEX_M"]:

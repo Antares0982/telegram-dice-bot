@@ -51,6 +51,8 @@ def cardpop(gpid: int, cdid: int) -> GameCard:
 
 
 def cardadd(cardi: GameCard) -> bool:
+    if not cardi:
+        return False
     gpid = cardi.groupid
     cdid = cardi.id
     if gpid not in CARDS_DICT:
@@ -109,6 +111,23 @@ def getallid() -> List[int]:
             idpool.append(cdids)
             idpool.sort()
     return idpool
+
+
+def getnewids(n: int) -> List[int]:
+    """获取n个新的卡id，这些id尽可能小"""
+    ids = getallid()
+    ans: List[int] = []
+    nid = 0
+    for i in range(n):
+        while nid in ids:
+            nid += 1
+        ans.append(nid)
+        nid += 1
+    return ans
+
+
+def getoneid() -> int:
+    return getnewids(1)[0]
 
 
 def isint(a: str) -> bool:
@@ -195,7 +214,13 @@ def commondice(dicename) -> str:
 
 
 def getchatid(update: Update) -> int:
+    """返回effective_chat.id"""
     return update.effective_chat.id
+
+
+def getmsgfromid(update: Update) -> int:
+    """返回message.from_user.id"""
+    return update.message.from_user.id
 
 
 def getkpid(gpid: int) -> int:
@@ -205,7 +230,7 @@ def getkpid(gpid: int) -> int:
 
 
 def isprivatemsg(update: Update) -> bool:
-    if update.effective_chat.id > 0:
+    if getchatid(update) > 0:
         return True
     return False
 
@@ -227,9 +252,9 @@ def isfromkp(update: Update) -> bool:
 
     如果是私聊消息，只需要发送者是某群KP即返回True。如果是群聊消息，当发送者是本群KP才返回True"""
     if isprivatemsg(update):  # 私聊消息，判断是否是kp
-        return searchifkp(update.effective_chat.id)
+        return searchifkp(getchatid(update))
     # 如果是群消息，判断该指令是否来自本群kp
-    if getkpid(update.effective_chat.id) != update.message.from_user.id:
+    if getkpid(getchatid(update)) != getmsgfromid(update):
         return False
     return True
 
@@ -243,16 +268,16 @@ def findkpgroups(kpid: int) -> List[int]:
     return ans
 
 
-def findcard(plid: int) -> Tuple[GameCard, bool]:
+def findcard(plid: int) -> GameCard:
     """输入一个player的id，返回该player当前选择中的卡"""
     if plid not in CURRENT_CARD_DICT:
-        return None, False
+        return None
     gpid, cdid = CURRENT_CARD_DICT[plid]
     if gpid not in CARDS_DICT or cdid not in CARDS_DICT[gpid]:
         CURRENT_CARD_DICT.pop(plid)
         writecurrentcarddict(CURRENT_CARD_DICT)
-        return None, False
-    return CARDS_DICT[gpid][cdid], True
+        return None
+    return CARDS_DICT[gpid][cdid]
 
 
 def hascard(plid: int, gpid: int) -> bool:
@@ -266,12 +291,14 @@ def hascard(plid: int, gpid: int) -> bool:
     return False
 
 
-def findcardwithid(cdid: int) -> Tuple[GameCard, bool]:
+def findcardwithid(cdid: int) -> GameCard:
     """输入一个卡id，返回这张卡"""
+    if popallempties(CARDS_DICT):
+        writecards(CARDS_DICT)
     for gpid in CARDS_DICT:
         if cdid in CARDS_DICT[gpid]:
-            return CARDS_DICT[gpid][cdid], True
-    return None, False
+            return CARDS_DICT[gpid][cdid]
+    return None
 
 
 def findallplayercards(plid: int) -> List[Tuple[int, int]]:
@@ -360,22 +387,20 @@ def makeIntButtons(lower: int, upper: int, keystr1: str, keystr2: str, step: int
     return rtbuttons
 
 
-def findgame(gpid: int) -> Tuple[GroupGame, bool]:
+def findgame(gpid: int) -> GroupGame:
     """接收一个groupid，返回对应的GroupGame对象"""
-    global ON_GAME
-    for i in range(len(ON_GAME)):
-        if ON_GAME[i].groupid == gpid:
-            return ON_GAME[i], True
-    return None, False
+    for i in ON_GAME:
+        if i.groupid == gpid:
+            return i
+    return None
 
 
-def findgamewithkpid(kpid: int) -> Tuple[GroupGame, bool]:
+def findgamewithkpid(kpid: int) -> GroupGame:
     """接收一个kpid，返回对应的GroupGame对象"""
-    global ON_GAME
-    for i in range(len(ON_GAME)):
-        if ON_GAME[i].kpid == kpid:
-            return ON_GAME[i], True
-    return None, False
+    for i in ON_GAME:
+        if i.kpid == kpid:
+            return i
+    return None
 
 
 def findcardfromgame(game: GroupGame, plid: int) -> GameCard:
@@ -386,12 +411,12 @@ def findcardfromgame(game: GroupGame, plid: int) -> GameCard:
     return None
 
 
-def findcardfromgamewithid(game: GroupGame, cdid: int) -> Tuple[GameCard, bool]:
+def findcardfromgamewithid(game: GroupGame, cdid: int) -> GameCard:
     """从`game`中返回`id`为`cdid`的角色卡"""
     for i in game.cards:
         if i.id == cdid:
-            return i, True
-    return None, False
+            return i
+    return None
 
 
 def findDiscardCardsGroupIDTuple(plid: int) -> List[Tuple[int, int]]:
@@ -411,6 +436,7 @@ def showcardinfo(card1: GameCard) -> str:  # show full card
 
 
 def showvalwithkey(d: dict, keyname: str) -> Tuple[str, bool]:
+    """输入字典和键，格式化其值为字符串并输出"""
     if keyname not in d:
         return None, False
     val = d[keyname]
@@ -423,7 +449,6 @@ def showvalwithkey(d: dict, keyname: str) -> Tuple[str, bool]:
     if rttext == "":
         rttext = "None"
     return rttext, True
-# find a certain attr to show
 
 
 def showattrinfo(update: Update, card1: GameCard, attrname: str) -> bool:
@@ -450,18 +475,18 @@ def showattrinfo(update: Update, card1: GameCard, attrname: str) -> bool:
 def modifythisdict(d: dict, attrname: str, val: str) -> Tuple[str, bool]:
     """修改一个字典`d`。`d`的键为`str`类型，值为`bool`, `int`, `str`其中之一。
 
-    寻找`attrname`是否在字典中，如果不在字典中或键对应的值是`dict`类型，返回`False`。
-    返回True的同时返回修改前的值的字符串。"""
+    寻找`attrname`是否在字典中，如果不在字典中或键对应的值是`dict`类型，返回不能修改的原因以及`False`。
+    返回True的同时返回修改前的值的格式化。"""
     if isinstance(d[attrname], dict):
         return "不能修改dict类型", False
     if isinstance(d[attrname], bool):
         rtmsg = "False"
         if d[attrname]:
             rtmsg = "True"
-        if val in ["F", "false", "False"]:
+        if val in ["F", "false", "False", "假"]:
             d[attrname] = False
             val = "False"
-        elif val in ["T", "true", "True"]:
+        elif val in ["T", "true", "True", "真"]:
             d[attrname] = True
             val = "True"
         else:
@@ -625,8 +650,8 @@ def changeKP(gpid: int, newkpid: int = 0) -> bool:
     if oldkpid == newkpid:
         return False
     changeplids(gpid, oldkpid, newkpid)
-    game, ok = findgame(gpid)
-    if ok:
+    game = findgame(gpid)
+    if game:
         for cardi in game.kpcards:
             cardi.playerid = newkpid
         game.kpid = newkpid
@@ -895,7 +920,10 @@ def showskillpages(page: int, card1: GameCard) -> Tuple[str, List[List[InlineKey
     return rttext, rtbuttons
 
 
-def buttonjob(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
+    if not card1:
+        query.edit_message_text(text="找不到卡。")
+        return False
     jobname = args[1]
     if len(args) == 2:
         # 切换至显示职业详情
@@ -951,7 +979,10 @@ def buttonjob(query: CallbackQuery, update: Update, card1: GameCard, args: List[
     return True
 
 
-def buttonaddmainskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+def buttonaddmainskill(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
+    if not card1:
+        query.edit_message_text(text="找不到卡。")
+        return False
     if len(args) == 3:
         skvalue = int(args[2])
         needpt = evalskillcost(args[1], skvalue, card1, True)
@@ -970,7 +1001,10 @@ def buttonaddmainskill(query: CallbackQuery, update: Update, card1: GameCard, ar
     return True
 
 
-def buttoncgmainskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+def buttoncgmainskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -> bool:
+    if not card1:
+        query.edit_message_text(text="找不到卡。")
+        return False
     if len(args) == 3:
         skvalue = int(args[2])
         needpt = evalskillcost(args[1], skvalue, card1, True)
@@ -989,7 +1023,10 @@ def buttoncgmainskill(query: CallbackQuery, update: Update, card1: GameCard, arg
     return True
 
 
-def buttonaddsgskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+def buttonaddsgskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -> bool:
+    if not card1:
+        query.edit_message_text(text="找不到卡。")
+        return False
     if len(args) == 3:
         skvalue = int(args[2])
         needpt = evalskillcost(args[1], skvalue, card1, True)
@@ -1009,7 +1046,7 @@ def buttonaddsgskill(query: CallbackQuery, update: Update, card1: GameCard, args
     return True
 
 
-def buttonaddintskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+def buttonaddintskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -> bool:
     """响应KeyboardButton的addintskill请求。
 
     因为使用的是能翻页的列表，所以有可能位置1的参数是`page`，
@@ -1037,7 +1074,10 @@ def buttonaddintskill(query: CallbackQuery, update: Update, card1: GameCard, arg
     return True
 
 
-def buttoncgintskill(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+def buttoncgintskill(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
+    if not card1:
+        query.edit_message_text(text="找不到卡。")
+        return False
     if len(args) == 3:
         skvalue = int(args[2])
         needpt = evalskillcost(args[1], skvalue, card1, False)
@@ -1056,29 +1096,39 @@ def buttoncgintskill(query: CallbackQuery, update: Update, card1: GameCard, args
     return True
 
 
-def buttonstrdec(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+def buttonstrdec(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
+    if not card1:
+        query.edit_message_text(text="找不到卡。")
+        return False
     strdecval = int(args[2])
     card1, rttext, needcon = choosedec(card1, strdecval)
+    if rttext == "输入无效":
+        query.edit_message_text(rttext)
+        return False
     if needcon:
         rttext += "\n使用 /setcondec 来设置CON（体质）下降值。"
     else:
         generateOtherAttributes(card1)
-    writecards(CARDS_DICT)
     query.edit_message_text(rttext)
+    writecards(CARDS_DICT)
     return True
 
 
-def buttoncondec(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
+def buttoncondec(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
+    if not card1:
+        query.edit_message_text(text="找不到卡。")
+        return False
     condecval = int(args[2])
     card1, rttext = choosedec2(card1, condecval)
+    query.edit_message_text(rttext)
+    if rttext == "输入无效":
+        return False
     generateOtherAttributes(card1)
     writecards(CARDS_DICT)
-    query.edit_message_text(rttext)
     return True
 
 
-def buttondiscard(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
-    plid = update.effective_chat.id
+def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
     gpid, cdid = int(args[1]), int(args[2])
     if plid in CURRENT_CARD_DICT and CURRENT_CARD_DICT[plid][0] == gpid and CURRENT_CARD_DICT[plid][1] == cdid:
         CURRENT_CARD_DICT.pop(plid)
@@ -1095,8 +1145,7 @@ def buttondiscard(query: CallbackQuery, update: Update, card1: GameCard, args: L
     return True
 
 
-def buttonswitch(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
-    plid = update.effective_chat.id
+def buttonswitch(query: CallbackQuery, plid: int, args: List[str]) -> bool:
     gpid, cdid = int(args[1]), int(args[2])
     if gpid not in CARDS_DICT or cdid not in CARDS_DICT[gpid] or CARDS_DICT[gpid][cdid].playerid != plid:
         query.edit_message_text("没有找到卡片。")
@@ -1111,15 +1160,14 @@ def buttonswitch(query: CallbackQuery, update: Update, card1: GameCard, args: Li
     return True
 
 
-def buttonswitchkp(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
-    kpid = update.effective_chat.id
+def buttonswitchkp(query: CallbackQuery, kpid: int, args: List[str]) -> bool:
     ctrlid = int(args[1])
-    game, ok = findgamewithkpid(kpid)
-    if not ok:
+    game = findgamewithkpid(kpid)
+    if not game:
         query.edit_message_text("没有找到游戏。")
         return False
-    cardi, ok = findcardfromgamewithid(game, ctrlid)
-    if not ok or cardi.playerid != kpid:
+    cardi = findcardfromgamewithid(game, ctrlid)
+    if not cardi or cardi.playerid != kpid:
         query.edit_message_text("没有找到这张npc卡。")
         return False
     game.kpctrl = ctrlid
@@ -1128,10 +1176,9 @@ def buttonswitchkp(query: CallbackQuery, update: Update, card1: GameCard, args: 
     return True
 
 
-def buttonsetsex(query: CallbackQuery, update: Update, card1: GameCard, args: List[str]) -> bool:
-    plid = update.effective_chat.id
-    cardi, ok = findcard(plid)
-    if not ok:
+def buttonsetsex(query: CallbackQuery, plid: int,  args: List[str]) -> bool:
+    cardi = findcard(plid)
+    if not cardi:
         query.edit_message_text("找不到卡。")
         return False
     sex = args[1]
@@ -1168,6 +1215,32 @@ def changecardgpid(oldgpid: int, newgpid: int) -> bool:
             CARDS_DICT[newgpid][cdid].groupid = newgpid
         CARDS_DICT.pop(oldgpid)
     writecards(CARDS_DICT)
+
+
+def groupcopy(oldgpid: int, newgpid: int, copyall: bool) -> bool:
+    if findgame(oldgpid) or findgame(newgpid):
+        return False
+    kpid = getkpid(oldgpid)
+    if newgpid not in CARDS_DICT:
+        CARDS_DICT[newgpid] = {}
+    if oldgpid in CARDS_DICT:
+        i = 0
+        newids = getnewids(len(CARDS_DICT[oldgpid]))
+        for cdid in CARDS_DICT[oldgpid]:
+            if not copyall and CARDS_DICT[oldgpid][cdid].playerid != kpid:
+                continue
+            nid = newids[i]
+            i += 1
+            CARDS_DICT[newgpid][nid] = GameCard(
+                CARDS_DICT[oldgpid][cdid].__dict__)
+            CARDS_DICT[newgpid][nid].id = nid
+            CARDS_DICT[newgpid][nid].groupid = newgpid
+    popallempties(CARDS_DICT)
+    writecards(CARDS_DICT)
+    GROUP_RULES[newgpid] = GroupRule(
+        copy.deepcopy(GROUP_RULES[oldgpid].__dict__))
+    writerules(GROUP_RULES)
+    return True
 
 
 def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool:
@@ -1394,7 +1467,7 @@ def botcheckdata(msg: str, recall: bool = True):
                 "群id发生变化，原群id："+str(gpid)+"变化为"+str(err.new_chat_id))
             if popallempties(CARDS_DICT):
                 writecards(CARDS_DICT)
-            _, ok = findgame(err.new_chat_id)
+            ok = findgame(err.new_chat_id)
             for game in ON_GAME:
                 if game.groupid == gpid:
                     if ok:  # 直接丢弃旧的游戏数据
@@ -1427,7 +1500,7 @@ def getname(cardi: GameCard) -> str:
 
 def cardsetage(update: Update, cardi: GameCard, age: int) -> bool:
     if "AGE" in cardi.info and cardi.info["AGE"] > 0:
-        popOP(update.effective_chat.id)
+        popOP(getchatid(update))
         return errorHandler(update, "已经设置过年龄了。")
     if age < 17 or age > 99:
         return errorHandler(update, "年龄应当在17-99岁。")
@@ -1459,7 +1532,7 @@ def cardsetsex(update: Update, cardi: GameCard, sex: str) -> bool:
 
 def textnewcard(update: Update, context: CallbackContext) -> bool:
     text = update.message.text
-    plid = update.effective_chat.id
+    plid = getchatid(update)
     if not isint(text) or int(text) >= 0:
         return errorHandler(update, "无效群id。如果你不知道群id，在群里发送 /getid 获取群id。")
     gpid = int(text)
@@ -1472,11 +1545,11 @@ def textnewcard(update: Update, context: CallbackContext) -> bool:
 
 def textsetage(update: Update, context: CallbackContext) -> bool:
     text = update.message.text
-    plid = update.effective_chat.id
+    plid = getchatid(update)
     if not isint(text):
         return errorHandler(update, "输入无效，请重新输入")
-    cardi, ok = findcard(plid)
-    if not ok:
+    cardi = findcard(plid)
+    if not cardi:
         popOP(plid)
         return errorHandler(update, "找不到卡")
     if cardsetage(update, cardi, int(text)):
@@ -1485,29 +1558,35 @@ def textsetage(update: Update, context: CallbackContext) -> bool:
     return False
 
 
+def nameset(cardi: GameCard, name: str) -> None:
+    cardi.info["name"] = name
+    cardi.cardcheck["check5"] = True
+    writecards(CARDS_DICT)
+
+
 def textsetname(update: Update, plid: int) -> bool:
     if plid == 0:  # 私聊情形
-        plid = update.effective_chat.id
-    if update.message.from_user.id != plid:
+        plid = getchatid(update)
+    if getmsgfromid(update) != plid:
         return True  # 不处理
-    popOP(update.effective_chat.id)
+    popOP(getchatid(update))
     text = update.message.text
-    cardi, ok = findcard(plid)
-    if not ok:
+    cardi = findcard(plid)
+    if not cardi:
         return errorHandler(update, "找不到卡。")
-    cardi.info["name"] = text
+    nameset(cardi, text)
     update.message.reply_text("姓名设置完成："+text)
 
 
 def textsetsex(update: Update, plid: int) -> bool:
     if plid == 0:  # 私聊情形
-        plid = update.effective_chat.id
-    if update.message.from_user.id != plid:
+        plid = getchatid(update)
+    if getmsgfromid(update) != plid:
         return True
-    popOP(update.effective_chat.id)
+    popOP(getchatid(update))
     text = update.message.text
-    cardi, ok = findcard(plid)
-    if not ok:
+    cardi = findcard(plid)
+    if not cardi:
         return errorHandler(update, "找不到卡。")
     return cardsetsex(update, cardi, text)
 
@@ -1534,10 +1613,7 @@ def getnewcard(update: Update, gpid: int, plid: int, cdid: int = -1) -> bool:
         if cdid >= 0 and cdid in allids:
             update.message.reply_text(
                 "输入的ID已经被占用，自动获取ID。可以用 /changeid 更换喜欢的id。")
-        nid = 0
-        while nid in allids:
-            nid += 1
-        new_card.id = nid
+        new_card.id = getoneid()
     update.message.reply_text(
         "角色卡已创建，您的卡id为："+str(new_card.id)+"。详细信息如下：\n"+detailmsg)
     # 如果有3个属性小于50，则discard=true
