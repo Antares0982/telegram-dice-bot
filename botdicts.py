@@ -42,6 +42,7 @@ def writegameinfo(listofobj: List[GroupGame]) -> None:
     with open(PATH_ONGAME, "w", encoding="utf-8") as f:
         json.dump(savelist, f, indent=4, ensure_ascii=False)
 
+
 def writeholdgameinfo(listofobj: List[GroupGame]) -> None:
     """用于HOLD_GAME写入"""
     savelist: List[dict] = []

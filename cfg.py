@@ -10,8 +10,8 @@ PROXY = cfgparser.getboolean("PROXY", "PROXY")  # 大陆登录telegram需要设�
 
 PROXY_URL = cfgparser.get("PROXY", "PROXY_URL")  # 代理
 
-TOKEN = cfgparser.get("TOKEN", "TOKEN")  # BOT TOKEN
-
+TOKEN = cfgparser.get("BOT", "TOKEN")  # BOT TOKEN
+BOTUSERNAME = cfgparser.get("BOT", "USERNAME")
 BOT_ID = int(TOKEN.split(":")[0])
 
 # DATA_PATH = r'/home/tgbot/'  # 数据文件存在哪个目录
