@@ -599,7 +599,7 @@ def errorHandler(update: Update,  message: str, needrecall: bool = False) -> Fal
             rtbutton = [[InlineKeyboardButton(
                 "跳转到私聊", callback_data="None", url="t.me/"+BOTUSERNAME)]]
             rp_markup = InlineKeyboardMarkup(rtbutton)
-            msg.edit_reply_markup(rp_markup)
+            msg.edit_reply_markup(reply_markup=rp_markup)
     return False
 
 
