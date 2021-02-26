@@ -354,7 +354,7 @@ def newcard(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "发送私聊消息创建角色卡。")
     if len(context.args) == 0:
         update.message.reply_text(
-            "准备创建新卡。\n如果你不知道群id，在群里发送 /getid 获取群id。\n请发送群id：")
+            "准备创建新卡。\n如果你不知道群id，在群里发送 /getid 即可创建角色卡。\n也可以选择手动输入群id，请发送群id：")
         utils.addOP(utils.getchatid(update), "newcard " +
                     str(update.message.message_id))
         return True
@@ -465,6 +465,9 @@ def discard(update: Update, context: CallbackContext):
 
 
 def link(update: Update, context: CallbackContext) -> bool:
+    """获取群邀请链接，并私聊发送给用户。
+
+    使用该指令必须要满足两个条件：指令发送者和bot都是该群管理员。"""
     if not utils.isgroupmsg(update):
         return utils.errorHandler(update, "在群聊使用该指令。")
     if not utils.isadmin(update, utils.BOT_ID):
@@ -473,17 +476,23 @@ def link(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "没有权限", True)
     adminid = update.message.from_user.id
     gpid = update.effective_chat.id
-    ivlink = context.bot.get_chat(chat_id=gpid).invite_link
+    chat = context.bot.get_chat(chat_id=gpid)
+    ivlink = chat.invite_link
     if not ivlink:
         ivlink = context.bot.export_chat_invite_link(chat_id=gpid)
-    context.bot.send_message(chat_id=adminid, text=ivlink)
-    update.message.reply_text("群邀请链接已经私聊发送。")
+    context.bot.send_message(
+        chat_id=adminid, text="群："+chat.title+"的邀请链接：\n"+ivlink)
+    rtbutton = [[InlineKeyboardButton(
+        text="跳转到私聊", callback_data="None", url="t.me/"+utils.BOTUSERNAME)]]
+    rp_markup = InlineKeyboardMarkup(rtbutton)
+    update.message.reply_text("群邀请链接已经私聊发送。", reply_markup=rp_markup)
     return True
 
 
 def details(update: Update, context: CallbackContext):
     """显示详细信息。
     该指令主要是为了与bot交互时产生尽量少的文本消息而设计。
+    目前版本只有discard指令可能会使用到details。
 
     当一些指令产生了“详细信息”时，这些详细信息会被暂时存储。
     当使用`/details`查看了这些“详细信息”，该“信息”将从存储中删除，即只能读取一次。
@@ -513,14 +522,13 @@ def setage(update: Update, context: CallbackContext):
     if not utils.isint(age):
         return utils.errorHandler(update, "输入无效")
     age = int(age)
-
     return utils.cardsetage(update, cardi, age)
 
 
 def setstrdec(update: Update, context: CallbackContext):
     """设置力量（STR）的减少值。因为年龄的设定，会导致力量属性减少。
     一般而言，年龄导致的需要减少的属性数目至少是两项，其中一项会是力量。
-    它们减少的总值是定值。
+    它们减少的总值是某个定值。
     当只有两项需要下降时，用力量的减少值，就能自动计算出另一项减少值。
     但如果有三项下降，那么其中一项会是体质（CON）。
     那么可能需要再使用`/setcondec`指令。
