@@ -1,4 +1,5 @@
 # -*- coding:utf-8 -*-
+# only define handlers
 
 import time
 from typing import Dict, List, Tuple
@@ -218,6 +219,14 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
 def getid(update: Update, context: CallbackContext) -> None:
     """获取所在聊天环境的id。私聊使用该指令发送用户id，群聊使用该指令则发送群id"""
     chatid = utils.getchatid(update)
+    fromuser = utils.getmsgfromid(update)
+    opers = utils.getOP(fromuser).split(" ")
+    if utils.isgroupmsg(update) and opers[0] == "newcard":
+        if utils.hascard(fromuser, chatid) and utils.getkpid(chatid) != fromuser:
+            utils.popOP(fromuser)
+            return utils.errorHandler(update, "你在这个群已经有一张卡了！")
+        utils.popOP(fromuser)
+        utils.getnewcard(int(opers[1]), chatid, fromuser)
     update.message.reply_text("<code>"+str(chatid) +
                               "</code> \n点击即可复制", parse_mode='HTML')
 
@@ -337,7 +346,7 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     if len(context.args) == 0:
         update.message.reply_text(
             "准备创建新卡。\n如果你不知道群id，在群里发送 /getid 获取群id。\n请发送群id：")
-        utils.addOP(utils.getchatid(update), "newcard")
+        utils.addOP(utils.getchatid(update), "newcard "+str(update.message.message_id))
         return True
     msg = context.args[0]
     if not utils.isint(msg) or int(msg) >= 0:
@@ -352,8 +361,8 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     if len(context.args) > 1:
         if not utils.isint(context.args[1]) or int(context.args[1]) < 0:
             return utils.errorHandler(update, "输入的卡片id参数无效，需要是非负整数")
-        return utils.getnewcard(update, gpid, plid, int(context.args[1]))
-    return utils.getnewcard(update, gpid, plid)
+        return utils.getnewcard(update.message, gpid, plid, int(context.args[1]))
+    return utils.getnewcard(update.message, gpid, plid)
 
 
 def discard(update: Update, context: CallbackContext):
@@ -443,6 +452,23 @@ def discard(update: Update, context: CallbackContext):
         return True
     # 没有可删除的卡
     return utils.errorHandler(update, "找不到可删除的卡。")
+
+
+def link(update:Update, context:CallbackContext)->bool:
+    if not utils.isgroupmsg(update):
+        return utils.errorHandler(update, "在群聊使用该指令。")
+    if not utils.isadmin(update, utils.BOT_ID):
+        return utils.errorHandler(update,"Bot没有权限")
+    if not utils.isadmin(update, update.message.from_user.id):
+        return utils.errorHandler(update, "没有权限", True)
+    adminid = update.message.from_user.id
+    gpid = update.effective_chat.id
+    ivlink = context.bot.get_chat(chat_id=gpid).invite_link
+    if not ivlink:
+        ivlink = context.bot.export_chat_invite_link(chat_id=gpid)
+    context.bot.send_message(chat_id=adminid, text=ivlink)
+    update.message.reply_text("群邀请链接已经私聊发送。")
+    return True
 
 
 def details(update: Update, context: CallbackContext):
@@ -2118,7 +2144,7 @@ def textHandler(update: Update, context: CallbackContext) -> bool:
     if oper == "":
         utils.botchat(update)
         return True
-    if oper == "newcard":
+    if opers[0] == "newcard":
         return utils.textnewcard(update, context)
     if oper == "setage":
         return utils.textsetage(update, context)

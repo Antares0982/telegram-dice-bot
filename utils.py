@@ -34,6 +34,8 @@ DETAIL_DICT: Dict[int, str] = {}  # 临时地存储详细信息
 
 IDENTIFIER = str(time.time())  # 在每个按钮的callback加上该标志，如果标志不相等则不处理
 
+# 数据操作
+
 
 def cardpop(gpid: int, cdid: int) -> GameCard:
     if gpid not in CARDS_DICT:
@@ -230,13 +232,15 @@ def getkpid(gpid: int) -> int:
 
 
 def isprivatemsg(update: Update) -> bool:
-    if getchatid(update) > 0:
+    if update.effective_chat.type == "private":
         return True
     return False
 
 
 def isgroupmsg(update: Update) -> bool:
-    return not isprivatemsg(update)
+    if update.effective_chat.type.find("group") != -1:
+        return True
+    return False
 
 
 def searchifkp(plid: int) -> bool:
@@ -609,6 +613,8 @@ def errorHandler(update: Update,  message: str, needrecall: bool = False) -> Fal
     """指令无法执行时，调用的函数。
     固定返回`False`，并回复错误信息。
     如果`needrecall`为`True`，在Bot是对应群管理的情况下将删除那条消息。"""
+    if not isprivatemsg(update) and not isgroupmsg(update):
+        return False
     if needrecall and isgroupmsg(update) and isadmin(update, BOT_ID):
         recallmsg(update)
     else:
@@ -1527,6 +1533,7 @@ def cardsetsex(update: Update, cardi: GameCard, sex: str) -> bool:
         update.message.reply_text(
             "性别设定为："+sex+"。")
     writecards(CARDS_DICT)
+
     return True
 
 
@@ -1540,7 +1547,7 @@ def textnewcard(update: Update, context: CallbackContext) -> bool:
         popOP(plid)
         return errorHandler(update, "你在这个群已经有一张卡了！")
     popOP(plid)
-    return getnewcard(update, gpid, plid)
+    return getnewcard(update.message, gpid, plid)
 
 
 def textsetage(update: Update, context: CallbackContext) -> bool:
@@ -1601,7 +1608,7 @@ def countless50discard(cardi: GameCard) -> bool:
     return False
 
 
-def getnewcard(update: Update, gpid: int, plid: int, cdid: int = -1) -> bool:
+def getnewcard(msgid: int, gpid: int, plid: int, cdid: int = -1) -> bool:
     """指令`/newcard`的具体实现"""
     if gpid not in CARDS_DICT:
         CARDS_DICT[gpid] = {}
@@ -1611,21 +1618,21 @@ def getnewcard(update: Update, gpid: int, plid: int, cdid: int = -1) -> bool:
         new_card.id = cdid
     else:
         if cdid >= 0 and cdid in allids:
-            update.message.reply_text(
-                "输入的ID已经被占用，自动获取ID。可以用 /changeid 更换喜欢的id。")
+            updater.bot.send_message(
+                chat_id=plid, reply_to_message_id=msgid, text="输入的ID已经被占用，自动获取ID。可以用 /changeid 更换喜欢的id。")
         new_card.id = getoneid()
-    update.message.reply_text(
-        "角色卡已创建，您的卡id为："+str(new_card.id)+"。详细信息如下：\n"+detailmsg)
+    updater.bot.send_message(chat_id=plid, reply_to_message_id=msgid,
+                             text="角色卡已创建，您的卡id为："+str(new_card.id)+"。详细信息如下：\n"+detailmsg)
     # 如果有3个属性小于50，则discard=true
     if countless50discard(new_card):
         new_card.discard = True
-        update.message.reply_text(
-            "因为有三项属性小于50，如果你愿意的话可以使用 /discard 来删除这张角色卡。设定年龄后则不能再删除这张卡。")
-    update.message.reply_text(
-        "长按 /setage 并输入一个数字来设定年龄。如果需要卡片制作帮助，使用 /createcardhelp 来获取帮助。")
+        updater.bot.send_message(chat_id=plid, reply_to_message_id=msgid,
+                                 text="因为有三项属性小于50，如果你愿意的话可以使用 /discard 来删除这张角色卡。设定年龄后则不能再删除这张卡。")
+    updater.bot.send_message(chat_id=plid, reply_to_message_id=msgid,
+                             text="长按 /setage 并输入一个数字来设定年龄。如果需要卡片制作帮助，使用 /createcardhelp 来获取帮助。")
     if plid in CURRENT_CARD_DICT:
-        update.message.reply_text(
-            "创建新卡时，控制自动切换至新卡。如果需要切换你操作的另一张卡，用 /switch 切换")
+        updater.bot.send_message(chat_id=plid, reply_to_message_id=msgid,
+                                 text="创建新卡时，控制自动切换至新卡。如果需要切换你操作的另一张卡，用 /switch 切换")
     cardadd(new_card)
     return True
 
