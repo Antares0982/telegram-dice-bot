@@ -217,23 +217,32 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
 
 
 def getid(update: Update, context: CallbackContext) -> None:
-    """获取所在聊天环境的id。私聊使用该指令发送用户id，群聊使用该指令则发送群id"""
+    """获取所在聊天环境的id。
+    私聊使用该指令发送用户id，群聊使用该指令则发送群id。
+    在创建卡片等待群id时使用该指令，会自动创建卡。"""
     chatid = utils.getchatid(update)
     fromuser = utils.getmsgfromid(update)
-    opers = utils.getOP(fromuser).split(" ")
-    if utils.isgroupmsg(update) and opers[0] == "newcard":
-        if utils.hascard(fromuser, chatid) and utils.getkpid(chatid) != fromuser:
+    opers = utils.getOP(fromuser)
+    msg = update.message.reply_text("<code>"+str(chatid) +
+                                    "</code> \n点击即可复制", parse_mode='HTML')
+    if opers != "":
+        opers = opers.split(" ")
+        if utils.isgroupmsg(update) and opers[0] == "newcard":
             utils.popOP(fromuser)
-            return utils.errorHandler(update, "你在这个群已经有一张卡了！")
-        utils.popOP(fromuser)
-        utils.getnewcard(int(opers[1]), chatid, fromuser)
-    update.message.reply_text("<code>"+str(chatid) +
-                              "</code> \n点击即可复制", parse_mode='HTML')
+            if utils.hascard(fromuser, chatid) and utils.getkpid(chatid) != fromuser:
+                context.bot.send_message(
+                    chat_id=fromuser, text="你在这个群已经有一张卡了！")
+                return
+            utils.getnewcard(int(opers[1]), chatid, fromuser)
+            rtbutton = [[InlineKeyboardButton(
+                text="跳转到私聊", callback_data="None", url="t.me/"+utils.BOTUSERNAME)]]
+            rp_markup = InlineKeyboardMarkup(rtbutton)
+            msg.edit_reply_markup(reply_markup=rp_markup)
 
 
 def showrule(update: Update, context: CallbackContext) -> bool:
     """显示当前群内的规则。
-    更多的信息请查阅setrule指令的帮助：
+    如果想了解群规则的详情，请查阅setrule指令的帮助：
     `/help setrule`"""
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "请在群内查看规则")
@@ -346,7 +355,8 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     if len(context.args) == 0:
         update.message.reply_text(
             "准备创建新卡。\n如果你不知道群id，在群里发送 /getid 获取群id。\n请发送群id：")
-        utils.addOP(utils.getchatid(update), "newcard "+str(update.message.message_id))
+        utils.addOP(utils.getchatid(update), "newcard " +
+                    str(update.message.message_id))
         return True
     msg = context.args[0]
     if not utils.isint(msg) or int(msg) >= 0:
@@ -454,11 +464,11 @@ def discard(update: Update, context: CallbackContext):
     return utils.errorHandler(update, "找不到可删除的卡。")
 
 
-def link(update:Update, context:CallbackContext)->bool:
+def link(update: Update, context: CallbackContext) -> bool:
     if not utils.isgroupmsg(update):
         return utils.errorHandler(update, "在群聊使用该指令。")
     if not utils.isadmin(update, utils.BOT_ID):
-        return utils.errorHandler(update,"Bot没有权限")
+        return utils.errorHandler(update, "Bot没有权限")
     if not utils.isadmin(update, update.message.from_user.id):
         return utils.errorHandler(update, "没有权限", True)
     adminid = update.message.from_user.id
