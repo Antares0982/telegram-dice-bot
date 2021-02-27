@@ -696,7 +696,7 @@ def addskill(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "找不到卡。")
     if card1.skill["points"] == -1:
         return utils.errorHandler(update, "信息不完整，无法添加技能")
-    if card1.skill["points"] == 0 and card1.interest["points"] == 0 and len(context.args) == 0:
+    if card1.skill["points"] == 0 and card1.interest["points"] == 0:
         if len(context.args) == 0 or (context.args[0] not in card1.skill and context.args[0] not in card1.interest):
             return utils.errorHandler(update, "你已经没有技能点了，请添加参数来修改具体的技能！")
     if "job" not in card1.info:
@@ -705,6 +705,8 @@ def addskill(update: Update, context: CallbackContext) -> bool:
         return utils.addcredit(update, context, card1)
     if len(context.args) == 0:  # HIT GOOD TRAP
         return utils.addskill0(update, context, card1)
+    if context.args[0] == "信用" or context.args[0] == "credit":
+        return utils.cgcredit(update, card1)
     skillname = context.args[0]
     # HIT BAD TRAP
     if skillname != "母语" and skillname != "闪避" and (skillname not in utils.SKILL_DICT or skillname == "克苏鲁神话"):
@@ -779,6 +781,11 @@ def button(update: Update, context: CallbackContext):
 
 
 def setname(update: Update, context: CallbackContext) -> bool:
+    """设置角色卡姓名。
+
+    `/setname --name`：直接设定姓名。
+    `/setname`：bot将等待输入姓名。
+    设置的姓名可以带有空格等字符。"""
     plid = utils.getmsgfromid(update)
     card1 = utils.findcard(plid)
     if not card1:
@@ -861,6 +868,7 @@ def holdgame(update: Update, context: CallbackContext) -> bool:
 
 
 def continuegame(update: Update, context: CallbackContext) -> bool:
+    """继续游戏。必须在`/holdgame`之后使用。"""
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "发送群消息继续游戏")
     gpid = utils.getchatid(update)
@@ -2163,9 +2171,9 @@ def textHandler(update: Update, context: CallbackContext) -> bool:
         utils.botchat(update)
         return True
     if opers[0] == "newcard":
-        return utils.textnewcard(update, context)
+        return utils.textnewcard(update)
     if oper == "setage":
-        return utils.textsetage(update, context)
+        return utils.textsetage(update)
     if oper == "setname":  # 私聊情形
         return utils.textsetname(update, 0)
     if opers[0] == "setname":  # 群消息情形

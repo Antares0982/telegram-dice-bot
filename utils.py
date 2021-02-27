@@ -350,6 +350,19 @@ def skillcantouchmax(card1: GameCard) -> Tuple[bool, bool]:
     return ans1, True
 
 
+def getskillmax(card1: GameCard) -> int:
+    aged, ok = skillcantouchmax(card1)
+    if aged:
+        skillmaxrule = GROUP_RULES[card1.groupid].skillmaxAged
+    else:
+        skillmaxrule = GROUP_RULES[card1.groupid].skillmax
+    if ok:
+        mm = skillmaxrule[1]
+    else:
+        mm = skillmaxrule[0]
+    return mm
+
+
 def getskilllevelfromdict(card1: GameCard, key: str) -> int:
     """从技能表中读取的技能初始值。
 
@@ -878,22 +891,19 @@ def addcredit(update: Update, context: CallbackContext, card1: GameCard) -> bool
     return True
 
 
-def cgcredit(update: Update, context: CallbackContext, card1: GameCard) -> bool:
+def cgcredit(update: Update, card1: GameCard) -> bool:
     m = 0
     mm = -1
     if card1.info["job"] in JOB_DICT:
         m = JOB_DICT[card1.info["job"]][0]
         mm = JOB_DICT[card1.info["job"]][1]
-    aged, ok = skillcantouchmax(card1)
-    if aged:
-        skillmaxrule = GROUP_RULES[card1.groupid].skillmaxAged
     else:
-        skillmaxrule = GROUP_RULES[card1.groupid].skillmax
-    if ok:
-        mm = skillmaxrule[1]
-    else:
-        mm = skillmaxrule[0]
-    mm = skillmaxval("信用", card1, True)
+        mm = skillmaxval("信用", card1, True)
+    rtbutton = makeIntButtons(m, mm, "cgmainskill", "credit")
+    rp_markup = InlineKeyboardMarkup(rtbutton)
+    update.message.reply_text(text="修改信用，现在还剩"+str(card1.skill["points"])+"点，当前信用："+str(
+        card1.skill["credit"]), reply_markup=rp_markup)
+    return True
 
 
 def showskillpages(page: int, card1: GameCard) -> Tuple[str, List[List[InlineKeyboardButton]]]:
@@ -1533,11 +1543,10 @@ def cardsetsex(update: Update, cardi: GameCard, sex: str) -> bool:
         update.message.reply_text(
             "性别设定为："+sex+"。")
     writecards(CARDS_DICT)
-
     return True
 
 
-def textnewcard(update: Update, context: CallbackContext) -> bool:
+def textnewcard(update: Update) -> bool:
     text = update.message.text
     plid = getchatid(update)
     if not isint(text) or int(text) >= 0:
@@ -1550,7 +1559,7 @@ def textnewcard(update: Update, context: CallbackContext) -> bool:
     return getnewcard(update.message, gpid, plid)
 
 
-def textsetage(update: Update, context: CallbackContext) -> bool:
+def textsetage(update: Update) -> bool:
     text = update.message.text
     plid = getchatid(update)
     if not isint(text):
@@ -1578,6 +1587,7 @@ def textsetname(update: Update, plid: int) -> bool:
         return True  # 不处理
     popOP(getchatid(update))
     text = update.message.text
+    text = ' '.join(text.split())
     cardi = findcard(plid)
     if not cardi:
         return errorHandler(update, "找不到卡。")
