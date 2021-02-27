@@ -97,6 +97,8 @@ def delkp(update: Update, context: CallbackContext) -> bool:
     if not utils.changeKP(gpid):
         return utils.errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")  # 不应触发
     update.message.reply_text('KP已撤销')
+    if utils.getOP(gpid).find("delcard")!=-1:
+        utils.popOP(gpid)
     return True
 
 
@@ -462,6 +464,27 @@ def discard(update: Update, context: CallbackContext):
         return True
     # 没有可删除的卡
     return utils.errorHandler(update, "找不到可删除的卡。")
+
+
+def delcard(update: Update, context: CallbackContext) -> bool:
+    """KP才能使用该指令，删除一张卡片。一次只能删除一张卡。
+    `/delcard --cardid`：删除id为cardid的卡。"""
+    if len(context.args) == 0:
+        return utils.errorHandler(update, "需要卡id作为参数", True)
+    if not utils.isint(context.args[0]) or int(context.args[0]) < 0:
+        return utils.errorHandler(update, "参数无效", True)
+    cdid = int(context.args[0])
+    cardi = utils.findcardwithid(cdid)
+    if not cardi:
+        return utils.errorHandler(update, "找不到这个id的卡")
+    kpid = utils.getmsgfromid(update)
+    if kpid != utils.getkpid(cardi.groupid):
+        return utils.errorHandler(update, "没有权限")
+    # 开始处理
+    update.message.reply_text(
+        "请确认是否删除卡片："+utils.getname(cardi)+"\n如果确认删除，请回复：确认")
+    utils.addOP(update.effective_chat.id, "delcard "+context.args[0])
+    return True
 
 
 def link(update: Update, context: CallbackContext) -> bool:
@@ -2182,6 +2205,8 @@ def textHandler(update: Update, context: CallbackContext) -> bool:
         return utils.textsetsex(update, 0)
     if opers[0] == "setsex":  # 群消息情形
         return utils.textsetsex(update, int(opers[1]))
+    if opers[0] == "delcard":
+        return utils.textdelcard(update, int(opers[1]))
 
 
 def unknown(update: Update, context: CallbackContext) -> None:

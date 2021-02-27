@@ -905,7 +905,6 @@ def cgcredit(update: Update, card1: GameCard) -> bool:
 
 
 def showskillpages(page: int, card1: GameCard) -> Tuple[str, List[List[InlineKeyboardButton]]]:
-    page
     thispageskilllist = SKILL_PAGES[page]
     rttext = "添加/修改兴趣技能，目前的数值/基础值如下："
     rtbuttons = [[]]
@@ -1507,6 +1506,8 @@ def botcheckdata(msg: str, recall: bool = True):
 
 
 def getname(cardi: GameCard) -> str:
+    """获取角色卡名字信息。
+    角色卡没有名字时，返回字符串`None`"""
     if "name" not in cardi.info or cardi.info["name"] == "":
         return "None"
     return cardi.info["name"]
@@ -1604,6 +1605,24 @@ def textsetsex(update: Update, plid: int) -> bool:
     if not cardi:
         return errorHandler(update, "找不到卡。")
     return cardsetsex(update, cardi, text)
+
+
+def textdelcard(update: Update, cardid: int) -> bool:
+    cardi = findcardwithid(cardid)
+    if not cardi:
+        popOP(update.effective_chat.id)
+        return errorHandler(update, "找不到卡。")
+    kpid = getmsgfromid(update)
+    if kpid != getkpid(cardi.groupid):
+        return True
+    text = update.message.text
+    if text != "确认":
+        popOP(update.effective_chat.id)
+        return errorHandler(update, "已经取消删除卡片操作。")
+    update.message.reply_text("卡片已删除。用 /details 查看被删卡片详情。")
+    DETAIL_DICT[update.effective_chat.id] = showcardinfo(
+        cardpop(cardi.groupid, cardid))
+    return True
 
 
 def countless50discard(cardi: GameCard) -> bool:
