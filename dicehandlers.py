@@ -97,7 +97,7 @@ def delkp(update: Update, context: CallbackContext) -> bool:
     if not utils.changeKP(gpid):
         return utils.errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")  # 不应触发
     update.message.reply_text('KP已撤销')
-    if utils.getOP(gpid).find("delcard")!=-1:
+    if utils.getOP(gpid).find("delcard") != -1:
         utils.popOP(gpid)
     return True
 
