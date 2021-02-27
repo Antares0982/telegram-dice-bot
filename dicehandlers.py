@@ -681,8 +681,6 @@ def showjoblist(update: Update, context: CallbackContext) -> None:
         rttext += job+"\n"
 
 
-# Button. need 0-3 args, if len(args)==0 or 1, show button and listen; if len(args)==3, the third should be "interest/main" to give interest skills
-# Compicated
 def addskill(update: Update, context: CallbackContext) -> bool:
     """该函数用于增加/修改技能。
 
@@ -740,6 +738,8 @@ def button(update: Update, context: CallbackContext):
     接收到按钮的参数后，转到对应的子函数处理。"""
     query = update.callback_query
     query.answer()
+    if query.data == "None":
+        return False
     if utils.isgroupmsg(update):
         return False
     args = query.data.split(" ")
