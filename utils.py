@@ -833,7 +833,6 @@ def addintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update
 
 def cgmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:  # Change main skill level
     """修改主要技能的值。如果将技能点调低，返还技能点数。"""
-
     if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > skillmaxval(skillname, card1, True):
         return errorHandler(update, "目标技能点太高或太低")
     costval = evalskillcost(skillname, skillvalue, card1, True)
@@ -852,7 +851,6 @@ def cgmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Update
 # Change interest skill level
 def cgintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
     """修改兴趣技能的值。如果将技能点调低，返还技能点数。"""
-
     if skillvalue < getskilllevelfromdict(card1, skillname) or skillvalue > skillmaxval(skillname, card1, False):
         return errorHandler(update, "目标技能点太高或太低")
     costval = evalskillcost(skillname, skillvalue, card1, False)
@@ -887,7 +885,7 @@ def addcredit(update: Update, context: CallbackContext, card1: GameCard) -> bool
     rtbuttons = makeIntButtons(m, mm, "addmainskill", "信用")
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     update.message.reply_text(
-        "Add main skill, skill name is: 信用", reply_markup=rp_markup)
+        "添加主要技能。剩余技能点："+str(card1.skill["points"])+" 技能名称：信用", reply_markup=rp_markup)
     return True
 
 
@@ -899,7 +897,7 @@ def cgcredit(update: Update, card1: GameCard) -> bool:
         mm = JOB_DICT[card1.info["job"]][1]
     else:
         mm = skillmaxval("信用", card1, True)
-    rtbutton = makeIntButtons(m, mm, "cgmainskill", "credit")
+    rtbutton = makeIntButtons(m, mm, "cgmainskill", "信用")
     rp_markup = InlineKeyboardMarkup(rtbutton)
     update.message.reply_text(text="修改信用，现在还剩"+str(card1.skill["points"])+"点，当前信用："+str(
         card1.skill["credit"]), reply_markup=rp_markup)
