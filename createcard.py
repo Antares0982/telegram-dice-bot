@@ -333,19 +333,19 @@ def generateOtherAttributes(card: GameCard) -> Tuple[GameCard, str]:
     """获取到年龄之后，通过年龄计算一些衍生数据。"""
     if not card.cardcheck["check2"]:  # This trap should not be hit
         return card, "Please set DATA decrease first"
-    if "SAN" not in card.attr or card.attr["SAN"]==0:
+    if "SAN" not in card.attr or card.attr["SAN"] == 0:
         card.attr["SAN"] = card.data["POW"]
     card.attr["MAXSAN"] = 99
-    if "MAGIC" not in card.attr or card.attr["MAGIC"]==0:
+    if "MAGIC" not in card.attr or card.attr["MAGIC"] == 0:
         card.attr["MAGIC"] = card.data["POW"]//5
-    if "MAXLP" not in card.attr or card.attr["MAXLP"] ==0:
+    if "MAXLP" not in card.attr or card.attr["MAXLP"] == 0:
         card.attr["MAXLP"] = (card.data["SIZ"]+card.data["CON"])//10
-    if "LP" not in card.attr or card.attr["LP"]==0:
+    if "LP" not in card.attr or card.attr["LP"] == 0:
         card.attr["LP"] = card.attr["MAXLP"]
     rttext = "SAN: " + str(card.attr["SAN"])+"\n"
     rttext += "MAGIC: " + str(card.attr["MAGIC"])+"\n"
     rttext += "LP: " + str(card.attr["LP"])+"\n"
-    if "physique" not in card.attr or card.attr["physique"]==0:
+    if "physique" not in card.attr or card.attr["physique"] == 0:
         if card.data["STR"]+card.data["SIZ"] < 65:
             card.attr["physique"] = -2
         elif card.data["STR"]+card.data["SIZ"] < 85:
@@ -357,8 +357,9 @@ def generateOtherAttributes(card: GameCard) -> Tuple[GameCard, str]:
         elif card.data["STR"]+card.data["SIZ"] < 205:
             card.attr["physique"] = 2
         else:
-            card.attr["physique"] = 2+(card.data["STR"]+card.data["SIZ"]-125)//80
-    if "DB" not in card.attr or card.attr["DB"]==0:
+            card.attr["physique"] = 2 + \
+                (card.data["STR"]+card.data["SIZ"]-125)//80
+    if "DB" not in card.attr or card.attr["DB"] == 0:
         if card.attr["physique"] <= 0:
             card.attr["DB"] = str(card.attr["physique"])
         elif card.attr["physique"] == 1:

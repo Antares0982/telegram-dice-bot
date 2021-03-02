@@ -442,8 +442,11 @@ def findDiscardCardsGroupIDTuple(plid: int) -> List[Tuple[int, int]]:
     for gpids in CARDS_DICT:
         for cdids in CARDS_DICT[gpids]:
             if CARDS_DICT[gpids][cdids].playerid == plid:
-                if CARDS_DICT[gpids][cdids].discard:
+                if CARDS_DICT[gpids][cdids].discard or gpids == -1:
                     ans.append((gpids, cdids))
+                    if gpids == -1:
+                        CARDS_DICT[-1][cdids].discard = True
+                        writecards(CARDS_DICT)
     return ans
 
 
@@ -1555,7 +1558,7 @@ def textnewcard(update: Update) -> bool:
         popOP(plid)
         return errorHandler(update, "你在这个群已经有一张卡了！")
     popOP(plid)
-    return getnewcard(update.message, gpid, plid)
+    return getnewcard(update.message.message_id, gpid, plid)
 
 
 def textsetage(update: Update) -> bool:

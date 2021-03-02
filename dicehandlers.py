@@ -323,6 +323,19 @@ def createcardhelp(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(utils.CREATE_CARD_HELP, parse_mode="MarkdownV2")
 
 
+def trynewcard(update: Update, context: CallbackContext) -> bool:
+    """测试建卡，用于熟悉建卡流程。
+    测试创建的卡一定可以删除。
+    创建新卡指令的帮助见`/help newcard`，
+    对建卡过程有疑问，见 `/createcardhelp`。"""
+    if utils.isgroupmsg(update):
+        return utils.errorHandler(update, "发送私聊消息创建角色卡。")
+    utils.initrules(-1)
+    utils.GROUP_KP_DICT[-1] = utils.ADMIN_ID
+    utils.writekpinfo(utils.GROUP_KP_DICT)
+    return utils.getnewcard(update.message.message_id, -1, update.effective_chat.id)
+
+
 def newcard(update: Update, context: CallbackContext) -> bool:
     """随机生成一张新的角色卡。需要一个群id作为参数。
     只接受私聊消息。
@@ -373,8 +386,8 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     if len(context.args) > 1:
         if not utils.isint(context.args[1]) or int(context.args[1]) < 0:
             return utils.errorHandler(update, "输入的卡片id参数无效，需要是非负整数")
-        return utils.getnewcard(update.message, gpid, plid, int(context.args[1]))
-    return utils.getnewcard(update.message, gpid, plid)
+        return utils.getnewcard(update.message.message_id, gpid, plid, int(context.args[1]))
+    return utils.getnewcard(update.message.message_id, gpid, plid)
 
 
 def discard(update: Update, context: CallbackContext):
@@ -655,6 +668,7 @@ def setjob(update: Update, context: CallbackContext) -> bool:
     card1 = utils.findcard(plid)
     if not card1:
         return utils.errorHandler(update, "找不到卡。")
+    utils.checkcard(card1)
     if not card1.cardcheck["check2"]:
         for keys in card1.data:
             if len(keys) > 4:
