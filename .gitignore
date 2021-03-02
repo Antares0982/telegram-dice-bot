@@ -4,7 +4,10 @@ tp/*
 data/cards.json
 data/ongame.json
 data/groupkpdict.json
-
+data/currentcarddict.json
+data/grouprules.json
+data/handlers.json
+data/holdgame.json
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
