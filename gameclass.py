@@ -1,28 +1,51 @@
 # -*- coding:utf-8 -*-
 import copy
-from typing import Dict, List, Tuple
+from io import TextIOWrapper
+from typing import Dict, List, Optional, Tuple
+from dicefunc import *
+
+# 卡信息存储于群中
 
 
 class GameCard:
-    def __init__(self, cardinfo: dict):
+    def __init__(self, carddict: dict = {}):
         self.id: int = 0
         self.playerid: int = 0
+        self.player: Optional[Player] = None  # 需要在载入时赋值
         self.groupid: int = 0
-        self.data: dict = {}
-        self.info: dict = {}
-        self.skill: dict = {}
-        self.interest: dict = {}
-        self.suggestskill: dict = {}
-        self.cardcheck: dict = {}
-        self.attr: dict = {}
-        self.background: dict = {}
-        self.tempstatus: dict = {}
-        self.item: str = ""
+        self.group: Optional[Group] = None  # 需要在载入时赋值
+        self.data: CardData
+        self.info: CardInfo
+        self.skill: Skill
+        self.interest: Skill
+        self.suggestskill: SgSkill
+        self.attr: CardAttr
+        self.background: CardBackground = CardBackground()
+        self.tempstatus: CardStatus = CardStatus()
+        self.item: List[str] = []
         self.assets: str = ""
         self.type: str = ""
         self.discard: bool = False
         self.status: str = ""
-        self.__dict__ = copy.deepcopy(cardinfo)
+        for key in carddict:
+            if key == "data":
+                self.data = CardData(carddict[key])
+            elif key == "info":
+                self.info = CardInfo(carddict[key])
+            elif key == "skill":
+                self.skill = Skill(carddict[key])
+            elif key == "interest":
+                self.interest = Skill(carddict[key])
+            elif key == "suggestskill":
+                self.suggestskill = SgSkill(carddict[key])
+            elif key == "attr":
+                self.attr = CardAttr(carddict[key])
+            elif key == "background":
+                self.background = CardBackground(carddict[key])
+            elif key == "tempstatus":
+                self.tempstatus = CardStatus(carddict[key])
+            else:
+                self.__dict__[key] = carddict[key]
 
     def __str__(self):
         rttext: str = ""
@@ -30,36 +53,28 @@ class GameCard:
         rttext += "playerid: "+str(self.playerid)+"\n"
         rttext += "groupid: "+str(self.groupid)+"\n"
         rttext += "基础数值: "+"\n"
-        for keys in self.data:
-            rttext += keys+": "+str(self.data[keys])+"\n"
+        rttext += str(self.data)+"\n"
         rttext += "信息: "+"\n"
-        for keys in self.info:
-            rttext += keys+": "+str(self.info[keys])+"\n"
+        rttext += str(self.info)+"\n"
         rttext += "技能: "+"\n"
-        for keys in self.skill:
-            rttext += keys+": "+str(self.skill[keys])+"\n"
+        rttext += str(self.skill)+"\n"
         rttext += "兴趣技能: "+"\n"
-        for keys in self.interest:
-            rttext += keys+": "+str(self.interest[keys])+"\n"
+        rttext += str(self.interest)+"\n"
         rttext += "建议技能: "+"\n"
-        for keys in self.suggestskill:
-            rttext += keys+": "+str(self.suggestskill[keys])+"\n"
-        rttext += "角色卡检查: "+"\n"
-        for keys in self.cardcheck:
-            rttext += keys+": "+str(self.cardcheck[keys])+"\n"
+        rttext += str(self.suggestskill)+"\n"
+        # rttext += "角色卡检查: "+"\n"
+        # for keys in self.cardcheck:
+        #     rttext += keys+": "+str(self.cardcheck[keys])+"\n"
         rttext += "其他属性: "+"\n"
-        for keys in self.attr:
-            rttext += keys+": "+str(self.attr[keys])+"\n"
+        rttext += str(self.attr)+"\n"
         rttext += "背景故事: "+"\n"
-        for keys in self.background:
-            rttext += keys+": "+str(self.background[keys])+"\n"
+        rttext += str(self.background)+"\n"
         rttext += "临时检定加成: "+"\n"
-        for keys in self.tempstatus:
-            rttext += keys+": "+str(self.tempstatus[keys])+"\n"
-        rttext += "物品: "+self.item+"\n"
+        rttext += str(self.tempstatus)+"\n"
+        rttext += "物品: "+'，'.join(self.item)+"\n"
         rttext += "资产: "+self.assets+"\n"
         rttext += "角色类型: "+self.type+"\n"
-        rttext += "可删除: "
+        rttext += "玩家是否可删除该卡: "
         if self.discard:
             rttext += "是\n"
         else:
@@ -67,31 +82,265 @@ class GameCard:
         rttext += "状态: "+self.status+"\n"
         return rttext
 
+    def check(self) -> bool:
+        pass
+        return True
+
+    def additem(self, item: str) -> None:
+        self.item.append(item)
+
+    def modify(self, attr: str, val) -> bool:
+        pass
+        return True
+
+
+class Player:
+    def __init__(self, plid: Optional[int] = None):
+        self.cards: Dict[int, GameCard] = {}  # 需要在载入时赋值
+        self.gamecards: Dict[int, GameCard] = {}  # 需要在载入时赋值
+        self.controlling: Optional[GameCard] = None  # 需要在载入时赋值
+        self.id = plid
+        self.kpgroups: Dict[int, Group] = {}
+        self.kpgames: Dict[int, GroupGame] = {}
+
+    def iskp(self, gpid: int) -> bool:
+        if gpid in self.kpgroups:
+            return True
+        return False
+
+    def write(self, f: Optional[TextIOWrapper] = None):
+        if f is None:
+            return
+        pass
+
+
+class Group:
+    def __init__(self, gpid: int, d: dict = {}):
+        self.id: int = gpid
+        self.cards: Dict[int, GameCard] = {}
+        self.game: Optional[GroupGame] = None
+        self.rule: GroupRule = GroupRule()
+        self.holdinggame: Optional[GroupGame] = None
+        self.kp: Optional[Player] = None  # 需要在载入时赋值
+        self.players: Dict[int, Player] = {}
+        for key in d:
+            if key == "game":
+                self.game = GroupGame(d[key])
+            elif key == "rule":
+                self.rule = GroupRule(d[key])
+            elif key == "holdinggame":
+                self.holdinggame = GroupGame(d[key])
+            elif key == "cards":
+                for key2 in d[key]:
+                    self.cards[int(key2)] = GameCard(d[key][key2])
+                    self.cards[int(key2)].group = self
+            else:
+                self.__dict__[key] = d[key]
+
+    def iskp(self, plid: int) -> bool:
+        if self.kp and self.kp.id == plid:
+            return True
+        return False
+
+    def getkp(self) -> Optional[Player]:
+        return self.kp
+
+    def write(self, f: Optional[TextIOWrapper] = None):
+        if f is None:
+            return
+        pass
+
+    def getcard(self, cardid: int) -> Optional[GameCard]:
+        if cardid in self.cards:
+            return self.cards[cardid]
+        return None
+
+
+class CardData:
+    def __init__(self, d: dict = {}):
+        self.STR: int = 0
+        self.SIZ: int = 0
+        self.CON: int = 0
+        self.DEX: int = 0
+        self.APP: int = 0
+        self.POW: int = 0
+        self.INT: int = 0
+        self.EDU: int = 0
+        self.LUCK: int = 0
+        self.TOTAL: int = 0
+        self.datainfo: Optional[str]
+        self.datanames: List[str] = ["STR", "SIZ", "CON",
+                                     "DEX", "POW", "APP", "INT", "EDU"]
+        if not d:
+            self.randdata()
+        else:
+            for key in d:
+                self.__dict__[key] = d[key]
+
+    def total(self) -> int:
+        self.TOTAL = 0
+        for key in self.datanames:
+            self.TOTAL += self.__dict__[key]
+        self.TOTAL += self.LUCK
+        return self.TOTAL
+
+    def randdata(self) -> None:
+        text = ""
+        a, b, c = dicemdn(3, 6)
+        self.STR = 5*(a+b+c)
+        text += get3d6str("STR", a, b, c)
+        a, b, c = dicemdn(3, 6)
+        self.CON = 5*(a+b+c)
+        text += get3d6str("CON", a, b, c)
+        a, b = dicemdn(2, 6)
+        self.SIZ = 5*(a+b+6)
+        text += get2d6_6str("SIZ", a, b)
+        a, b, c = dicemdn(3, 6)
+        self.DEX = 5*(a+b+c)
+        text += get3d6str("DEX", a, b, c)
+        a, b, c = dicemdn(3, 6)
+        self.APP = 5*(a+b+c)
+        text += get3d6str("APP", a, b, c)
+        a, b = dicemdn(2, 6)
+        self.INT = 5*(a+b+6)
+        text += get2d6_6str("INT", a, b)
+        a, b, c = dicemdn(3, 6)
+        self.POW = 5*(a+b+c)
+        text += get3d6str("POW", a, b, c)
+        a, b = dicemdn(2, 6)
+        self.EDU = 5*(a+b+6)
+        text += get2d6_6str("EDU", a, b)
+        self.datainfo = text
+
+    def countless50discard(self) -> bool:
+        countless50 = 0
+        for key in self.datanames:
+            if self.__dict__[key] < 50:
+                countless50 += 1
+        if countless50 >= 3:
+            return True
+        return False
+
+    def modify(self, attr: str, val: int) -> bool:
+        pass
+        return True
+
+
+class CardStatus:
+    def __init__(self):
+        self.STR: int = 0
+        self.SIZ: int = 0
+        self.CON: int = 0
+        self.DEX: int = 0
+        self.POW: int = 0
+        self.INT: int = 0
+        self.EDU: int = 0
+        self.LUCK: int = 0
+        self.global: int = 0
+
+    def modify(self, attr: str, val) -> bool:
+        pass
+        return True
+
+
+class CardInfo:
+    def __init__(self):
+        self.name: str = ""
+        self.age: int = ""
+        self.sex: str = ""
+        self.job: str = ""
+
+    def modify(self, attr: str, val) -> bool:
+        pass
+        return True
+
+
+class Skill:
+    def __init__(self):
+        self.points: int = -1
+        self.skills: Dict[str, int] = {}
+        self.card: Optional[GameCard] = None  # 需要在载入时赋值
+
+    def modify(self, attr: str, val) -> bool:
+        pass
+        return True
+
+    def get(self, skillname: str) -> int:
+        if skillname in self.skills:
+            return self.skills[skillname]
+        return -1
+
+    def set(self, skillname: str, val: int) -> None:
+        self.skills[skillname] = val
+
+
+class SgSkill:
+    def __init__(self):
+        self.skills: Dict[str, int] = {}
+
+
+class CardAttr:
+    def __init__(self, card: GameCard):
+        self.DB: str
+        self.MOV: str
+        self.atktimes: str
+        self.physique: int
+        self.SAN: int
+        self.MAXSAN: int
+        self.LP: int
+        self.MAXLP: int
+
+    def modify(self, attr: str, val) -> bool:
+        pass
+        return True
+
+
+class CardBackground:
+    def __init__(self):
+        self.description: str = ""
+        self.vip: str = ""
+        self.viplace: str = ""
+        self.faith: str = ""
+        self.preciousthing: str = ""
+        self.speciality: str = ""
+        self.dmg: str = ""
+        self.terror: str = ""
+        self.myth: str = ""
+        self.thirdencounter: str = ""
+
+    def modify(self, attr: str, val) -> bool:
+        pass
+        return True
+
+# 保存在群中
+
 
 class GroupGame:  # If defined, game is started.
-    def __init__(self, groupid, cards: List[dict] = None, kpid: int = None):
+    def __init__(self, groupid, cards: Dict[int, dict] = {}, kpid: int = None):
+        self.group: Group = None  # 需要在载入时赋值
         if isinstance(groupid, dict):
             self.groupid: int = groupid["groupid"]
             self.kpid: int = groupid["kpid"]
             self.kpctrl: int = groupid["kpctrl"]
             self.tpcheck: int = groupid["tpcheck"]
             tpcardslist = groupid["cards"]
-            self.cards = []
+            self.cards: Dict[int, GameCard] = {}
             for i in tpcardslist:
-                self.cards.append(GameCard(i))
-            del tpcardslist
+                t = GameCard(tpcardslist[i])
+                self.cards[t.id] = t
+            del tpcardslist, t
         else:
             self.groupid: int = groupid  # Unique, should not be edited after initializing
             self.kpid: int = kpid  # Can be edited
-            self.cards: List[GameCard] = []  # list of GameCard
+            self.cards: Dict[int, GameCard] = {}  # list of GameCard
             for i in cards:
-                self.cards.append(GameCard(i))
+                self.cards[i] = GameCard(cards[i])
             self.kpctrl: int = -1
             self.tpcheck: int = 0
-        self.kpcards: List[GameCard] = []
+        self.kpcards: Dict[int, GameCard] = {}
         for i in self.cards:
-            if i.playerid == self.kpid:
-                self.kpcards.append(i)
+            if self.cards[i].playerid == self.kpid:
+                self.kpcards[i] = self.cards[i]
 
     def __str__(self):
         rttext = ""
@@ -116,9 +365,9 @@ class GroupRule:
         self.skillmaxAged: List[int] = [80, 90, 1, 100]
         # 1,3,5……位描述技能分段位置，单调递增，最后一个数必须是100。在大于skillcost[2*i-1]但小于等于skillcost[2*i+1]时，每一技能点花费skillcost[2*i]
         self.skillcost: List[int] = [1, 100]
-        # 在检定需要骰出大于等于50时，greatsuccess[0]~greatsuccess[1]算大成功，否则greatsuccess[3]~greatsuccess[4]算大成功
+        # 在检定需要骰出大于等于50时，greatsuccess[0]~greatsuccess[1]算大成功，否则greatsuccess[2]~greatsuccess[3]算大成功
         self.greatsuccess: List[int] = [1, 1, 1, 1]
-        # 在检定需要骰出大于等于50时，greatfail[0]~greatfail[1]算大失败，否则greatfail[3]~greatfail[4]算大失败
+        # 在检定需要骰出大于等于50时，greatfail[0]~greatfail[1]算大失败，否则greatfail[2]~greatfail[3]算大失败
         self.greatfail: List[int] = [100, 100, 96, 100]
         for key in rules:
             self.__dict__[key] = rules[key]

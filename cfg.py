@@ -4,7 +4,7 @@ from configparser import ConfigParser
 cfgparser = ConfigParser()
 cfgparser.read('config.ini')
 
-VERSION = "1.0.9"
+VERSION = "1.1.1"
 
 PROXY = cfgparser.getboolean("PROXY", "PROXY")  # 大陆登录telegram需要设置代理，否则关闭
 
@@ -17,7 +17,7 @@ BOT_ID = int(TOKEN.split(":")[0])
 # DATA_PATH = r'/home/tgbot/'  # 数据文件存在哪个目录
 
 DATA_PATH = cfgparser.get("PATH", "DATA_PATH")
-
+GLOBAL_DATA_PATH = cfgparser.get("PATH", "GLOBAL_DATA_PATH")
 PATH_GROUP_KP = DATA_PATH+r'groupkpdict.json'
 PATH_CARDSLIST = DATA_PATH+r'cards.json'
 PATH_ONGAME = DATA_PATH+r'ongame.json'

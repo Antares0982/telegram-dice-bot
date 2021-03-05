@@ -2,45 +2,110 @@
 
 import copy
 import json
-from typing import Any
-
+import os
+import time
+from typing import overload
 from cfg import *
 from gameclass import *
 
 
-def writekpinfo(dict1: dict) -> None:
-    """用于GROUP_KP_DICT写入"""
-    with open(PATH_GROUP_KP, "w", encoding="utf-8") as f:
-        json.dump(dict1, f, indent=4, ensure_ascii=False)
+class DATA:
+    def __init__(self):
+        self.IDENTIFIER = str(time.time())
+        self.groups: Dict[int, Group] = {}
+        self.players: Dict[int, Player] = {}
+        self.joblist: dict
+        self.skilllist: dict
+        self.allids: List[int] = []
+        self.readall()  # 先执行
+        self.readcurrent()  # 后执行
+        self.construct()
+        self.operation: Dict[int, str] = {}
+        # self.readhandlers()
+
+    def readall(self) -> None:
+        for filename in os.listdir(DATA_PATH):
+            if filename.find(".json") != len(filename)-5:
+                continue
+            with open(filename, "r", encoding='utf-8') as f:
+                d = json.load(f)
+            self.groups[int(filename[:len(filename)-5])] = Group(d=d)
+
+    def readcurrent(self) -> None:
+        """读取CURRENT_CARD_DICT"""
+        try:
+            f = open(PATH_CURRENTCARDDICT, "r", encoding="utf-8")
+            f.close()
+        except FileNotFoundError:
+            with open(PATH_CURRENTCARDDICT, "w", encoding="utf-8") as f:
+                json.dump({}, f, indent=4, ensure_ascii=False)
+            d = {}
+        else:
+            with open(PATH_CURRENTCARDDICT, 'r', encoding='utf-8') as f:
+                d = json.load(f)
+        d1 = {}
+        for keys in d:
+            d1[int(keys)] = self.groups[d[keys][0]].cards[d[keys][1]]
+        self.current = d1
+
+    def readhandlers(self) -> List[str]:
+        """读取全部handlers。
+
+        使用时，先写再读，正常情况下不会有找不到文件的可能"""
+        with open(PATH_HANDLERS, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        return d
+
+    def construct(self) -> None:
+        """创建变量引用"""
+        pass
+    @overload
+    def writeplayer(self, plid: int):
+        pass
+    @overload
+    def writeplayer(self, pl: Player):
+        pass
+    @overload
+    def writegroup(self, gpid: int):
+        pass
+
+    @overload
+    def writegroup(self, gp: Group):
+        return self.writegroup(gp.id)
+
+    """
+    def writekpinfo(self) -> None:
+        with open(PATH_GROUP_KP, "w", encoding="utf-8") as f:
+            json.dump(self.kpinfo, f, indent=4, ensure_ascii=False)
+    """
+    """
+    def writecards(self) -> None:
+        listofdict: Dict[str, Dict[str, dict]] = {}
+        for gpid in listofgamecard:
+            if len(listofgamecard[gpid]) == 0:
+                listofgamecard.pop(gpid)
+                continue
+            listofdict[str(gpid)] = {}
+            for cdids in listofgamecard[gpid]:
+                listofdict[str(gpid)][str(cdids)
+                                    ] = listofgamecard[gpid][cdids].__dict__
+        with open(PATH_CARDSLIST, "w", encoding="utf-8") as f:
+            json.dump(listofdict, f, indent=4, ensure_ascii=False)
 
 
-def writecards(listofgamecard: Dict[int, Dict[int, GameCard]]) -> None:
-    """用于CARDS_DICT写入"""
-    listofdict: Dict[str, Dict[str, dict]] = {}
-    for gpid in listofgamecard:
-        if len(listofgamecard[gpid]) == 0:
-            listofgamecard.pop(gpid)
-            continue
-        listofdict[str(gpid)] = {}
-        for cdids in listofgamecard[gpid]:
-            listofdict[str(gpid)][str(cdids)
-                                  ] = listofgamecard[gpid][cdids].__dict__
-    with open(PATH_CARDSLIST, "w", encoding="utf-8") as f:
-        json.dump(listofdict, f, indent=4, ensure_ascii=False)
-
-
-def writegameinfo(listofobj: List[GroupGame]) -> None:
-    """用于ON_GAME写入"""
-    savelist: List[dict] = []
-    for i in range(len(listofobj)):
-        savelist.append(copy.deepcopy(listofobj[i].__dict__))
-        tpcards: List[GameCard] = savelist[-1]["cards"]
-        savelist[-1]["cards"] = []
-        savelist[-1].pop("kpcards")
-        for i in tpcards:
-            savelist[-1]["cards"].append(i.__dict__)
-    with open(PATH_ONGAME, "w", encoding="utf-8") as f:
-        json.dump(savelist, f, indent=4, ensure_ascii=False)
+    def writegameinfo(listofobj: List[GroupGame]) -> None:
+        
+        savelist: List[dict] = []
+        for i in range(len(listofobj)):
+            savelist.append(copy.deepcopy(listofobj[i].__dict__))
+            tpcards: List[GameCard] = savelist[-1]["cards"]
+            savelist[-1]["cards"] = []
+            savelist[-1].pop("kpcards")
+            for i in tpcards:
+                savelist[-1]["cards"].append(i.__dict__)
+        with open(PATH_ONGAME, "w", encoding="utf-8") as f:
+            json.dump(savelist, f, indent=4, ensure_ascii=False)
+    """
 
 
 def writeholdgameinfo(listofobj: List[GroupGame]) -> None:
@@ -143,24 +208,6 @@ def readjobdict() -> dict:
     return d
 
 
-def readcurrentcarddict() -> dict:
-    """读取CURRENT_CARD_DICT"""
-    try:
-        f = open(PATH_CURRENTCARDDICT, "r", encoding="utf-8")
-        f.close()
-    except FileNotFoundError:
-        with open(PATH_CURRENTCARDDICT, "w", encoding="utf-8") as f:
-            json.dump({}, f, indent=4, ensure_ascii=False)
-        d = {}
-    else:
-        with open(PATH_CURRENTCARDDICT, 'r', encoding='utf-8') as f:
-            d = json.load(f)
-    d1 = {}
-    for keys in d:
-        d1[int(keys)] = (d[keys][0], d[keys][1])
-    return d1
-
-
 def writecurrentcarddict(d: Dict[int, Tuple[int, int]]) -> None:
     """CURRENT_CARD_DICT写入"""
     with open(PATH_CURRENTCARDDICT, "w", encoding="utf-8") as f:
@@ -199,12 +246,3 @@ def writehandlers(h: List[str]) -> None:
     """写入Handlers"""
     with open(PATH_HANDLERS, 'w', encoding='utf-8') as f:
         json.dump(h, f, indent=4, ensure_ascii=False)
-
-
-def readhandlers() -> List[str]:
-    """读取全部handlers。
-
-    使用时，先写再读，正常情况下不会有找不到文件的可能"""
-    with open(PATH_HANDLERS, 'r', encoding='utf-8') as f:
-        d = json.load(f)
-    return d

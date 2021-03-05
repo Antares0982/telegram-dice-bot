@@ -29,7 +29,7 @@ def addkp(update: Update, context: CallbackContext) -> bool:
     # 判断是否已经有KP
     if gpid in utils.GROUP_KP_DICT:
         # 已有KP
-        if not utils.isingroup(update, utils.getkpid(gpid)):
+        if not utils.isingroup(gpid, utils.getkpid(gpid)):
             if not utils.changeKP(gpid, kpid):  # 更新NPC卡拥有者
                 # 不应触发
                 return utils.errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")
@@ -423,9 +423,9 @@ def discard(update: Update, context: CallbackContext):
         if len(trueDiscardTupleList) == 1:
             gpid, cdid = trueDiscardTupleList[0]
             rttext = "删除卡："+str(cdid)
-            if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info["name"] != "":
+            if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info.name != "":
                 rttext += "\nname: " + \
-                    str(utils.CARDS_DICT[gpid][cdid].info["name"])
+                    str(utils.CARDS_DICT[gpid][cdid].info.name)
             rttext += "\n/details 显示删除的卡片信息。删除操作不可逆。"
             update.message.reply_text(rttext)
         else:
@@ -449,8 +449,8 @@ def discard(update: Update, context: CallbackContext):
         for gpid, cdid in discardgpcdTupleList:
             if len(rtbuttons[len(rtbuttons)-1]) == 4:
                 rtbuttons.append([])
-            if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info["name"] != 0:
-                cardname: str = utils.CARDS_DICT[gpid][cdid].info["name"]
+            if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info.name != 0:
+                cardname: str = utils.CARDS_DICT[gpid][cdid].info.name
             else:
                 cardname: str = str(cdid)
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(cardname,
@@ -464,8 +464,8 @@ def discard(update: Update, context: CallbackContext):
             utils.CURRENT_CARD_DICT.pop(plid)
             utils.writecurrentcarddict(utils.CURRENT_CARD_DICT)
         rttext = "删除卡："+str(cdid)
-        if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info["name"] != "":
-            rttext += "\nname: "+str(utils.CARDS_DICT[gpid][cdid].info["name"])
+        if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info.name != "":
+            rttext += "\nname: "+str(utils.CARDS_DICT[gpid][cdid].info.name)
         rttext += "\n/details 显示删除的卡片信息。删除操作不可逆。"
         update.message.reply_text(rttext)
         detailinfo = "删除卡片：\n"+str(utils.CARDS_DICT[gpid][cdid])+"\n"
@@ -581,14 +581,14 @@ def setstrdec(update: Update, context: CallbackContext):
         return False
     if len(context.args) == 0:
         if "STR_SIZ_M" in cardi.data:
-            rtbuttons = utils.makeIntButtons(max(0, 1 - cardi.data["SIZ"] - cardi.data["STR_SIZ_M"]), min(
-                cardi.data["STR"]-1, -cardi.data["STR_SIZ_M"]), "strdec", "", 1)
+            rtbuttons = utils.makeIntButtons(max(0, 1 - cardi.data.SIZ - cardi.data["STR_SIZ_M"]), min(
+                cardi.data.STR-1, -cardi.data["STR_SIZ_M"]), "strdec", "", 1)
         elif "STR_CON_M" in cardi.data:
-            rtbuttons = utils.makeIntButtons(max(0, 1 - cardi.data["CON"] - cardi.data["STR_CON_M"]), min(
-                cardi.data["STR"]-1, -cardi.data["STR_CON_M"]), "strdec", "", 1)
+            rtbuttons = utils.makeIntButtons(max(0, 1 - cardi.data.CON - cardi.data["STR_CON_M"]), min(
+                cardi.data.STR-1, -cardi.data["STR_CON_M"]), "strdec", "", 1)
         elif "STR_CON_DEX_M" in cardi.data:
-            rtbuttons = utils.makeIntButtons(max(0, 2 - cardi.data["CON"]-cardi.data["DEX"] - cardi.data["STR_CON_DEX_M"]), min(
-                cardi.data["STR"]-1, -cardi.data["STR_CON_DEX_M"]), "strdec", "", 1)
+            rtbuttons = utils.makeIntButtons(max(0, 2 - cardi.data.CON-cardi.data.DEX - cardi.data["STR_CON_DEX_M"]), min(
+                cardi.data.STR-1, -cardi.data["STR_CON_DEX_M"]), "strdec", "", 1)
         else:
             return utils.errorHandler(update, "无需设置力量下降值")
         rp_markup = InlineKeyboardMarkup(rtbuttons)
@@ -629,8 +629,8 @@ def setcondec(update: Update, context: CallbackContext):
         if "CON_DEX_M" not in cardi.data:
             update.message.reply_text("No need to set STR decrease.")
             return False
-        rtbuttons = utils.makeIntButtons(max(0, 1 - cardi.data["DEX"] - cardi.data["CON_DEX_M"]), min(
-            cardi.data["CON"]-1, -cardi.data["CON_DEX_M"]), "condec", "", 1)
+        rtbuttons = utils.makeIntButtons(max(0, 1 - cardi.data.DEX - cardi.data["CON_DEX_M"]), min(
+            cardi.data.CON-1, -cardi.data["CON_DEX_M"]), "condec", "", 1)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text("Set CON decrease: ", reply_markup=rp_markup)
         return True
@@ -689,19 +689,19 @@ def setjob(update: Update, context: CallbackContext) -> bool:
             "请选择职业查看详情：", reply_markup=rp_markup)
         return True
     jobname = context.args[0]
-    if not utils.IGNORE_JOB_DICT and jobname not in utils.JOB_DICT:
+    if not utils.IGNORE_JOB_DICT and jobname not in utils.BOTDATA.joblist:
         update.message.reply_text("This job is not allowed!")
         return False
-    card1.info["job"] = jobname
-    if jobname not in utils.JOB_DICT:
+    card1.info.job = jobname
+    if jobname not in utils.BOTDATA.joblist:
         update.message.reply_text(
             "这个职业不在职业表内，你可以用'/addskill 技能名 点数 (main/interest)'来选择技能！如果有interest参数，该技能将是兴趣技能并消耗兴趣技能点。")
-        card1.skill["points"] = int(card1.data["EDU"]*4)
+        card1.skill.points = int(card1.data.EDU*4)
         utils.writecards(utils.CARDS_DICT)
         return True
-    for i in range(3, len(utils.JOB_DICT[jobname])):  # Classical jobs
-        card1.suggestskill[utils.JOB_DICT[jobname][i]] = utils.getskilllevelfromdict(
-            card1, utils.JOB_DICT[jobname][i])  # int
+    for i in range(3, len(utils.BOTDATA.joblist[jobname])):  # Classical jobs
+        card1.suggestskill[utils.BOTDATA.joblist[jobname][i]] = utils.getskilllevelfromdict(
+            card1, utils.BOTDATA.joblist[jobname][i])  # int
     update.message.reply_text(
         "用 /addskill 来添加技能。")
     # This trap should not be hit
@@ -714,7 +714,7 @@ def setjob(update: Update, context: CallbackContext) -> bool:
 def showjoblist(update: Update, context: CallbackContext) -> None:
     """显示职业列表"""
     rttext = "职业列表："
-    for job in utils.JOB_DICT:
+    for job in utils.BOTDATA.joblist:
         rttext += job+"\n"
 
 
@@ -729,9 +729,9 @@ def addskill(update: Update, context: CallbackContext) -> bool:
     card1 = utils.findcard(plid)
     if not card1:
         return utils.errorHandler(update, "找不到卡。")
-    if card1.skill["points"] == -1:
+    if card1.skill.points == -1:
         return utils.errorHandler(update, "信息不完整，无法添加技能")
-    if card1.skill["points"] == 0 and card1.interest["points"] == 0:
+    if card1.skill.points == 0 and card1.interest.points == 0:
         if len(context.args) == 0 or (context.args[0] not in card1.skill and context.args[0] not in card1.interest):
             return utils.errorHandler(update, "你已经没有技能点了，请添加参数来修改具体的技能！")
     if "job" not in card1.info:
@@ -838,7 +838,7 @@ def setname(update: Update, context: CallbackContext) -> bool:
         update.message.reply_text("请输入姓名：")
         return True
     utils.nameset(card1, ' '.join(context.args))
-    update.message.reply_text("角色的名字已经设置为"+card1.info["name"]+"。")
+    update.message.reply_text("角色的名字已经设置为"+card1.info.name+"。")
     return True
 
 
@@ -997,8 +997,8 @@ def switch(update: Update, context: CallbackContext):
                 return False
             rttext = "切换成功，现在操作的卡：\n"
             cardi = utils.CARDS_DICT[gpid][temptuple[1]]
-            if "name" in cardi.info and cardi.info["name"] != "":
-                rttext += cardi.info["name"]+": "+str(cardi.id)
+            if "name" in cardi.info and cardi.info.name != "":
+                rttext += cardi.info.name+": "+str(cardi.id)
             else:
                 rttext += "(No name): "+str(cardi.id)
             utils.CURRENT_CARD_DICT[plid] = temptuple
@@ -1011,8 +1011,8 @@ def switch(update: Update, context: CallbackContext):
                 if cdid in utils.CARDS_DICT[gpid]:
                     rttext = "切换成功，现在操作的卡：\n"
                     cardi = utils.CARDS_DICT[gpid][cdid]
-                    if "name" in cardi.info and cardi.info["name"] != "":
-                        rttext += cardi.info["name"]+": "+str(cardi.id)
+                    if "name" in cardi.info and cardi.info.name != "":
+                        rttext += cardi.info.name+": "+str(cardi.id)
                     else:
                         rttext += "(No name): "+str(cardi.id)
                     utils.CURRENT_CARD_DICT[plid] = (gpid, cdid)
@@ -1029,8 +1029,8 @@ def switch(update: Update, context: CallbackContext):
         gpid, cdid = mycardslist[0]
         rttext = "你只有一张卡，自动切换。现在操作的卡：\n"
         cardi = utils.CARDS_DICT[gpid][cdid]
-        if "name" in cardi.info and cardi.info["name"] != "":
-            rttext += cardi.info["name"]+": "+str(cardi.id)
+        if "name" in cardi.info and cardi.info.name != "":
+            rttext += cardi.info.name+": "+str(cardi.id)
         else:
             rttext += "(No name): "+str(cardi.id)
         update.message.reply_text(rttext)
@@ -1042,10 +1042,10 @@ def switch(update: Update, context: CallbackContext):
     for gpid, cdid in mycardslist:
         cardi = utils.CARDS_DICT[gpid][cdid]
         cardiname: str
-        if "name" not in cardi.info or cardi.info["name"] == "":
+        if "name" not in cardi.info or cardi.info.name == "":
             cardiname = str(cdid)
         else:
-            cardiname = cardi.info["name"]
+            cardiname = cardi.info.name
         if len(rtbuttons[len(rtbuttons)-1]) == 4:
             rtbuttons.append([])
         rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(
@@ -1089,7 +1089,7 @@ def switchkp(update: Update, context: CallbackContext):
         return utils.errorHandler(update, "无效id", True)
     game.kpctrl = cdid
     update.message.reply_text(
-        "切换到卡" + str(num)+"，角色名称：" + cardi.info["name"])
+        "切换到卡" + str(num)+"，角色名称：" + cardi.info.name)
     utils.writegameinfo(utils.ON_GAME)
     return True
 
@@ -1209,9 +1209,9 @@ def roll(update: Update, context: CallbackContext):
         elif dicename in gamecard.interest:
             test = gamecard.interest[dicename]
         elif dicename == "母语":
-            test = gamecard.data["EDU"]
+            test = gamecard.data.EDU
         elif dicename == "闪避":
-            test = gamecard.data["DEX"]//2
+            test = gamecard.data.DEX//2
         elif dicename in gamecard.data:
             test = gamecard.data[dicename]
         elif dicename == "力量":
@@ -1251,7 +1251,7 @@ def roll(update: Update, context: CallbackContext):
         else:  # HIT BAD TRAP
             return utils.errorHandler(update, "无效输入")
         if "global" in gamecard.tempstatus:
-            test += gamecard.tempstatus["global"]
+            test += gamecard.tempstatus.global
         if dicename in gamecard.tempstatus:
             test += gamecard.tempstatus[dicename]
         test += tpcheck
@@ -1484,10 +1484,10 @@ def showids(update: Update, context: CallbackContext) -> bool:
                 if cardi.playerid == utils.getkpid(gpid) or cardi.type != "PL":
                     continue
                 rttext += str(cardi.id)+": "
-                if "name" not in cardi.info or cardi.info["name"] == "":
+                if "name" not in cardi.info or cardi.info.name == "":
                     rttext += "No name\n"
                 else:
-                    rttext += cardi.info["name"]+"\n"
+                    rttext += cardi.info.name+"\n"
             if rttext == "":
                 return utils.errorHandler(update, "本群没有卡")
             update.message.reply_text(rttext)
@@ -1502,10 +1502,10 @@ def showids(update: Update, context: CallbackContext) -> bool:
             if cardi in game.kpcards or cardi.type != "PL":
                 continue
             rttext += str(cardi.id)+": "
-            if "name" not in cardi.info or cardi.info["name"] == "":
+            if "name" not in cardi.info or cardi.info.name == "":
                 rttext += "No name\n"
             else:
-                rttext += cardi.info["name"]+"\n"
+                rttext += cardi.info.name+"\n"
         if rttext == "":
             return utils.errorHandler(update, "游戏中没有卡")
         update.message.reply_text(rttext)
@@ -1530,8 +1530,8 @@ def showids(update: Update, context: CallbackContext) -> bool:
         if len(cards) == 0:
             return utils.errorHandler(update, "游戏中KP没有卡")
         for cardi in cards:
-            if "name" in cardi.info and cardi.info["name"] != "":
-                rttext += str(cardi.id)+": "+cardi.info["name"]+"\n"
+            if "name" in cardi.info and cardi.info.name != "":
+                rttext += str(cardi.id)+": "+cardi.info.name+"\n"
             else:
                 rttext += str(cardi.id) + ": No name\n"
         update.message.reply_text(rttext)
@@ -1547,9 +1547,9 @@ def showids(update: Update, context: CallbackContext) -> bool:
         for cdid in utils.CARDS_DICT[gpid]:
             if utils.CARDS_DICT[gpid][cdid].playerid == kpid:
                 rttext += "(KP) "
-            if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info["name"].strip() != "":
+            if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info.name.strip() != "":
                 rttext += str(utils.CARDS_DICT[gpid][cdid].id) + \
-                    ": "+utils.CARDS_DICT[gpid][cdid].info["name"]+"\n"
+                    ": "+utils.CARDS_DICT[gpid][cdid].info.name+"\n"
             else:
                 rttext += str(utils.CARDS_DICT[gpid][cdid].id) + ": No name\n"
     if rttext == "":
@@ -1679,8 +1679,8 @@ def changeid(update: Update, context: CallbackContext) -> bool:
     utils.CARDS_DICT[gpid][newid] = utils.CARDS_DICT[gpid].pop(oldid)
     utils.CARDS_DICT[gpid][newid].id = newid
     utils.writecards(utils.CARDS_DICT)
-    if "name" in cardi.info and cardi.info["name"] != "":
-        rtmsg = "修改了卡片："+cardi.info["name"]+"的id至"+str(newid)
+    if "name" in cardi.info and cardi.info.name != "":
+        rtmsg = "修改了卡片："+cardi.info.name+"的id至"+str(newid)
     else:
         rtmsg = "修改了卡片：No name 的id至"+str(newid)
     # 判断游戏是否也在进行，进行的话也要修改游戏内的卡
@@ -1747,8 +1747,8 @@ def changegroup(update: Update, context: CallbackContext) -> bool:
     utils.CARDS_DICT[newgpid][cdid].groupid = newgpid
     utils.writecards(utils.CARDS_DICT)
     cardname = "No name"
-    if "name" in cardi.info and cardi.info["name"] != "":
-        cardname = cardi.info["name"]
+    if "name" in cardi.info and cardi.info.name != "":
+        cardname = cardi.info.name
     update.message.reply_text(
         "操作成功，已经将卡片"+cardname+"从群："+str(oldgpid)+"移动到群："+str(newgpid))
     return True
@@ -1868,22 +1868,22 @@ def randombackground(update: Update, context: CallbackContext) -> bool:
         "好名头",
         "雄心壮志"
     ]
-    card1.background["faith"] = rdfaithlist[utils.dicemdn(1, len(rdfaithlist))[
+    card1.background.faith = rdfaithlist[utils.dicemdn(1, len(rdfaithlist))[
         0]-1]
-    card1.background["vip"] = rdviplist[utils.dicemdn(1, len(rdviplist))[
+    card1.background.vip = rdviplist[utils.dicemdn(1, len(rdviplist))[
         0]-1]
-    card1.background["exsigplace"] = rdsigplacelist[utils.dicemdn(
+    card1.background.exsigplace = rdsigplacelist[utils.dicemdn(
         1, len(rdsigplacelist))[0]-1]
-    card1.background["precious"] = rdpreciouslist[utils.dicemdn(
+    card1.background.precious = rdpreciouslist[utils.dicemdn(
         1, len(rdpreciouslist))[0]-1]
-    card1.background["speciality"] = rdspecialitylist[utils.dicemdn(
+    card1.background.speciality = rdspecialitylist[utils.dicemdn(
         1, len(rdspecialitylist))[0]-1]
     utils.writecards(utils.CARDS_DICT)
-    rttext = "faith: "+card1.background["faith"]
-    rttext += "\nvip: "+card1.background["vip"]
-    rttext += "\nexsigplace: "+card1.background["exsigplace"]
-    rttext += "\nprecious: "+card1.background["precious"]
-    rttext += "\nspeciality: "+card1.background["speciality"]
+    rttext = "faith: "+card1.background.faith
+    rttext += "\nvip: "+card1.background.vip
+    rttext += "\nexsigplace: "+card1.background.exsigplace
+    rttext += "\nprecious: "+card1.background.precious
+    rttext += "\nspeciality: "+card1.background.speciality
     update.message.reply_text(rttext)
     return True
 
@@ -1981,7 +1981,7 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
         if not card1:
             return utils.errorHandler(update, "找不到卡。")
     rttext = "检定：理智 "
-    sanity = card1.attr["SAN"]
+    sanity = card1.attr.SAN
     check = utils.dicemdn(1, 100)[0]
     rttext += str(check)+"/"+str(sanity)+" "
     utils.initrules(gpid)
@@ -2017,13 +2017,13 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
             m, n = checkpass.split("d", maxsplit=1)
             m, n = int(m), int(n)
             sanloss = int(sum(utils.dicemdn(m, n)))
-    card1.attr["SAN"] -= sanloss
+    card1.attr.SAN -= sanloss
     rttext += str(sanloss)+"\n"
-    if card1.attr["SAN"] <= 0:
-        card1.attr["SAN"] = 0
+    if card1.attr.SAN <= 0:
+        card1.attr.SAN = 0
         card1.status = "mad"
         rttext += "陷入永久疯狂，快乐撕卡~\n"
-    elif sanloss > (card1.attr["SAN"]+sanloss)//5:
+    elif sanloss > (card1.attr.SAN+sanloss)//5:
         rttext += "一次损失五分之一以上理智，进入不定性疯狂状态。\n"
     elif sanloss >= 5:
         rttext += "一次损失5点或以上理智，可能需要进行智力（灵感）检定。\n"
@@ -2066,14 +2066,14 @@ def lp(update: Update, context: CallbackContext) -> bool:
             return utils.errorHandler(update, "参数无效", True)
     elif not utils.isint(clp):
         return utils.errorHandler(update, "参数无效", True)
-    originlp = cardi.attr["LP"]
+    originlp = cardi.attr.LP
     if clp[0] == "+":
-        cardi.attr["LP"] += int(clp[1:])
+        cardi.attr.LP += int(clp[1:])
     elif clp[0] == "-":
-        cardi.attr["LP"] -= int(clp[1:])
+        cardi.attr.LP -= int(clp[1:])
     else:
-        cardi.attr["LP"] = int(clp)
-    update.message.reply_text("生命值从"+str(originlp)+"修改为"+str(cardi.attr["LP"]))
+        cardi.attr.LP = int(clp)
+    update.message.reply_text("生命值从"+str(originlp)+"修改为"+str(cardi.attr.LP))
     return True
 
 
