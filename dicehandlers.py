@@ -689,19 +689,19 @@ def setjob(update: Update, context: CallbackContext) -> bool:
             "请选择职业查看详情：", reply_markup=rp_markup)
         return True
     jobname = context.args[0]
-    if not utils.IGNORE_JOB_DICT and jobname not in utils.BOTDATA.joblist:
+    if not utils.IGNORE_JOB_DICT and jobname not in utils.dicebot.joblist:
         update.message.reply_text("This job is not allowed!")
         return False
     card1.info.job = jobname
-    if jobname not in utils.BOTDATA.joblist:
+    if jobname not in utils.dicebot.joblist:
         update.message.reply_text(
             "这个职业不在职业表内，你可以用'/addskill 技能名 点数 (main/interest)'来选择技能！如果有interest参数，该技能将是兴趣技能并消耗兴趣技能点。")
         card1.skill.points = int(card1.data.EDU*4)
         utils.writecards(utils.CARDS_DICT)
         return True
-    for i in range(3, len(utils.BOTDATA.joblist[jobname])):  # Classical jobs
-        card1.suggestskill[utils.BOTDATA.joblist[jobname][i]] = utils.getskilllevelfromdict(
-            card1, utils.BOTDATA.joblist[jobname][i])  # int
+    for i in range(3, len(utils.dicebot.joblist[jobname])):  # Classical jobs
+        card1.suggestskill[utils.dicebot.joblist[jobname][i]] = utils.getskilllevelfromdict(
+            card1, utils.dicebot.joblist[jobname][i])  # int
     update.message.reply_text(
         "用 /addskill 来添加技能。")
     # This trap should not be hit
@@ -714,7 +714,7 @@ def setjob(update: Update, context: CallbackContext) -> bool:
 def showjoblist(update: Update, context: CallbackContext) -> None:
     """显示职业列表"""
     rttext = "职业列表："
-    for job in utils.BOTDATA.joblist:
+    for job in utils.dicebot.joblist:
         rttext += job+"\n"
 
 

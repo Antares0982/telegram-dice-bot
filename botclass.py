@@ -1,15 +1,23 @@
 # -*- coding:utf-8 -*-
-
 import copy
 import json
 import os
 import time
 from typing import overload
-from cfg import *
+
+from telegram.ext import Updater
+
+from cfg import ADMIN_ID, DATA_PATH, PROXY, PROXY_URL, TOKEN
 from gameclass import *
 
+if PROXY:
+    updater = Updater(token=TOKEN, request_kwargs={
+        'proxy_url': PROXY_URL}, use_context=True)
+else:
+    updater = Updater(token=TOKEN, use_context=True)
 
-class DATA:
+
+class DiceBot:
     def __init__(self):
         self.IDENTIFIER = str(time.time())
         self.groups: Dict[int, Group] = {}
@@ -17,11 +25,13 @@ class DATA:
         self.joblist: dict
         self.skilllist: dict
         self.allids: List[int] = []
+        self.updater: Updater = updater
         self.readall()  # 先执行
         self.readcurrent()  # 后执行
         self.construct()
         self.operation: Dict[int, str] = {}
         # self.readhandlers()
+        # 代理设置
 
     def readall(self) -> None:
         for filename in os.listdir(DATA_PATH):
@@ -30,23 +40,6 @@ class DATA:
             with open(filename, "r", encoding='utf-8') as f:
                 d = json.load(f)
             self.groups[int(filename[:len(filename)-5])] = Group(d=d)
-
-    def readcurrent(self) -> None:
-        """读取CURRENT_CARD_DICT"""
-        try:
-            f = open(PATH_CURRENTCARDDICT, "r", encoding="utf-8")
-            f.close()
-        except FileNotFoundError:
-            with open(PATH_CURRENTCARDDICT, "w", encoding="utf-8") as f:
-                json.dump({}, f, indent=4, ensure_ascii=False)
-            d = {}
-        else:
-            with open(PATH_CURRENTCARDDICT, 'r', encoding='utf-8') as f:
-                d = json.load(f)
-        d1 = {}
-        for keys in d:
-            d1[int(keys)] = self.groups[d[keys][0]].cards[d[keys][1]]
-        self.current = d1
 
     def readhandlers(self) -> List[str]:
         """读取全部handlers。
@@ -59,12 +52,15 @@ class DATA:
     def construct(self) -> None:
         """创建变量引用"""
         pass
+
     @overload
     def writeplayer(self, plid: int):
         pass
+
     @overload
     def writeplayer(self, pl: Player):
         pass
+
     @overload
     def writegroup(self, gpid: int):
         pass
@@ -246,3 +242,10 @@ def writehandlers(h: List[str]) -> None:
     """写入Handlers"""
     with open(PATH_HANDLERS, 'w', encoding='utf-8') as f:
         json.dump(h, f, indent=4, ensure_ascii=False)
+
+
+try:
+    dicebot = DiceBot()
+except:
+    updater.bot.send_message(chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
+    exit()

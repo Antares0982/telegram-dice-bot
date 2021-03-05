@@ -2,6 +2,7 @@
 import copy
 from io import TextIOWrapper
 from typing import Dict, List, Optional, Tuple
+
 from dicefunc import *
 
 # 卡信息存储于群中
