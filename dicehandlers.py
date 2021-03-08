@@ -1251,7 +1251,7 @@ def roll(update: Update, context: CallbackContext):
         else:  # HIT BAD TRAP
             return utils.errorHandler(update, "无效输入")
         if "global" in gamecard.tempstatus:
-            test += gamecard.tempstatus.global
+            test += gamecard.tempstatus.GLOBAL
         if dicename in gamecard.tempstatus:
             test += gamecard.tempstatus[dicename]
         test += tpcheck

@@ -3,11 +3,11 @@ import copy
 import json
 import os
 import time
-from typing import overload
+from typing import Any, overload
 
 from telegram.ext import Updater
 
-from cfg import ADMIN_ID, DATA_PATH, PROXY, PROXY_URL, TOKEN
+from cfg import *
 from gameclass import *
 
 if PROXY:
@@ -15,6 +15,50 @@ if PROXY:
         'proxy_url': PROXY_URL}, use_context=True)
 else:
     updater = Updater(token=TOKEN, use_context=True)
+
+
+def isconsttype(val) -> bool:
+    if isinstance(val, int) or isinstance(val, str) or isinstance(val, bool):
+        return True
+    if isinstance(val, list):
+        for e in val:
+            if not isconsttype(e):
+                return False
+        return True
+    return False
+
+
+def to_json(dct: Dict[str, Any], jumpkeys: List[str] = []) -> dict:
+    d = {}
+    for key in dct:
+        if key in jumpkeys:
+            continue
+        val = dct[key]
+        if isinstance(val, dict):
+            d[key] = to_json(val, jumpkeys)
+        elif isconsttype(val):
+            if isinstance(val, list):
+                d[key] = copy.deepcopy(val)
+            else:
+                d[key] = val
+        elif isinstance(val, object):
+            try:
+                dd = to_json(val.__dict__, jumpkeys)
+                d[key] = dd
+            except:
+                pass
+        elif isinstance(val, list):
+            t = []
+            for e in val:
+                if isinstance(e, object):
+                    t.append(to_json(e.__dict__), jumpkeys)
+                elif isconsttype(e):
+                    if isinstance(e, list):
+                        t.append(copy.deepcopy(e))
+                    else:
+                        t.append(e)
+            d[key] = t
+    return d
 
 
 class DiceBot:
@@ -31,7 +75,6 @@ class DiceBot:
         self.construct()
         self.operation: Dict[int, str] = {}
         # self.readhandlers()
-        # 代理设置
 
     def readall(self) -> None:
         for filename in os.listdir(DATA_PATH):
@@ -43,11 +86,13 @@ class DiceBot:
 
     def readhandlers(self) -> List[str]:
         """读取全部handlers。
-
         使用时，先写再读，正常情况下不会有找不到文件的可能"""
         with open(PATH_HANDLERS, 'r', encoding='utf-8') as f:
             d = json.load(f)
         return d
+
+    def checkconsistency():
+        pass
 
     def construct(self) -> None:
         """创建变量引用"""
@@ -55,15 +100,28 @@ class DiceBot:
 
     @overload
     def writeplayer(self, plid: int):
-        pass
+        try:
+            pl = self.players[plid]
+        except KeyError:
+            self.players[plid] = Player(plid=plid)
+            pl = self.players[plid]
+        with open(PATH_PLAYERS+str(plid)+".json", 'w', encoding='utf-8') as f:
+            json.dump(to_json(pl.__dict__), f, indent=4, ensure_ascii=False)
 
     @overload
     def writeplayer(self, pl: Player):
-        pass
+        return self.writeplayer(pl.id)
 
     @overload
     def writegroup(self, gpid: int):
-        pass
+        try:
+            gp = self.groups[gpid]
+        except KeyError:
+            self.groups[gpid] = Group(gpid=gpid)
+            gp = self.groups[gpid]
+        with open(PATH_GROUPS+str(gpid)+".json", "w", encoding="utf-8") as f:
+            json.dump(to_json(gp.__dict__, ["chat"]),
+                      f, indent=4, ensure_ascii=False)
 
     @overload
     def writegroup(self, gp: Group):
@@ -104,8 +162,8 @@ class DiceBot:
     """
 
 
+"""
 def writeholdgameinfo(listofobj: List[GroupGame]) -> None:
-    """用于HOLD_GAME写入"""
     savelist: List[dict] = []
     for i in range(len(listofobj)):
         savelist.append(copy.deepcopy(listofobj[i].__dict__))
@@ -119,7 +177,6 @@ def writeholdgameinfo(listofobj: List[GroupGame]) -> None:
 
 
 def readinfo() -> Tuple[Dict[int, int], Dict[int, Dict[int, GameCard]], List[GroupGame], List[GroupGame]]:
-    """读取四个文件的数据：GROUP_KP_DICT, CARDS_DICT, ON_GAME, HOLD_GAME"""
     # 如果文件不存在，则创建新文件
     # group-kp
     try:
@@ -188,6 +245,7 @@ def readinfo() -> Tuple[Dict[int, int], Dict[int, Dict[int, GameCard]], List[Gro
     for i in range(len(holdgamelistdict)):
         holdgamelist.append(GroupGame(holdgamelistdict[i]))
     return gpkpdict, gamecardlist, ongamelist, holdgamelist
+"""
 
 
 def readskilldict() -> dict:
@@ -202,12 +260,6 @@ def readjobdict() -> dict:
     with open(PATH_JOBDICT, 'r', encoding='utf-8') as f:
         d = json.load(f)
     return d
-
-
-def writecurrentcarddict(d: Dict[int, Tuple[int, int]]) -> None:
-    """CURRENT_CARD_DICT写入"""
-    with open(PATH_CURRENTCARDDICT, "w", encoding="utf-8") as f:
-        json.dump(d, f, indent=4, ensure_ascii=False)
 
 
 def readrules() -> Dict[int, GroupRule]:
@@ -227,15 +279,6 @@ def readrules() -> Dict[int, GroupRule]:
     for key in d:
         d1[int(key)] = GroupRule(d[key])
     return d1
-
-
-def writerules(d: Dict[int, GroupRule]) -> None:
-    """GROUP_RULES写入"""
-    d1: Dict[int, dict] = {}
-    for key in d:
-        d1[key] = d[key].__dict__
-    with open(PATH_RULES, "w", encoding="utf-8") as f:
-        json.dump(d1, f, indent=4, ensure_ascii=False)
 
 
 def writehandlers(h: List[str]) -> None:

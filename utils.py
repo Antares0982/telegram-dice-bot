@@ -179,7 +179,7 @@ def cardadd(card: GameCard, gpid: int) -> bool:
     # 增加群索引
     gp = getgp(gpid)
     if not gp:
-        dicebot.groups[gpid] = Group(gpid)
+        dicebot.groups[gpid] = Group(gpid=gpid)
     card.group = gp
     gp.cards[card.id] = card
     dicebot.writegroup(gpid)
@@ -1715,7 +1715,7 @@ def plainNewCard() -> dict:
             "thirdencounter": ""
         },
         "tempstatus": {
-            "global": 0
+            "GLOBAL": 0
         },
         "item": "",
         "assets": "",
@@ -1790,7 +1790,7 @@ def templateNewCard() -> dict:
             "thirdencounter": ""
         },
         "tempstatus": {
-            "global": 0
+            "GLOBAL": 0
         },
         "item": "",
         "assets": "",

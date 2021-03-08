@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 from configparser import ConfigParser
-
+from sys import platform
 cfgparser = ConfigParser()
 cfgparser.read('config.ini')
 
@@ -18,15 +18,22 @@ BOT_ID = int(TOKEN.split(":")[0])
 
 DATA_PATH = cfgparser.get("PATH", "DATA_PATH")
 GLOBAL_DATA_PATH = cfgparser.get("PATH", "GLOBAL_DATA_PATH")
-PATH_GROUP_KP = DATA_PATH+r'groupkpdict.json'
-PATH_CARDSLIST = DATA_PATH+r'cards.json'
-PATH_ONGAME = DATA_PATH+r'ongame.json'
-PATH_SKILLDICT = DATA_PATH+r'skilldict.json'
-PATH_JOBDICT = DATA_PATH+r'jobdict.json'
-PATH_CURRENTCARDDICT = DATA_PATH+r'currentcarddict.json'
-PATH_RULES = DATA_PATH+r'grouprules.json'
-PATH_HANDLERS = DATA_PATH+r'handlers.json'
-PATH_HOLDGAME = DATA_PATH+r'holdgame.json'
+if platform == "win32":
+    if DATA_PATH[-1]!='\\':
+        DATA_PATH+='\\'
+    if GLOBAL_DATA_PATH[-1]!='\\':
+        GLOBAL_DATA_PATH+='\\'
+    PATH_PLAYERS = DATA_PATH+"players\\"
+    PATH_GROUPS = DATA_PATH+"groups\\"
+else:
+    if DATA_PATH[-1]!='/':
+        DATA_PATH+='/'
+    PATH_PLAYERS = DATA_PATH+"players/"
+    PATH_GROUPS = DATA_PATH+"groups/"
+
+PATH_SKILLDICT = GLOBAL_DATA_PATH+r'skilldict.json'
+PATH_JOBDICT = GLOBAL_DATA_PATH+r'jobdict.json'
+PATH_HANDLERS = GLOBAL_DATA_PATH+r'handlers.json'
 
 ADMIN_ID = cfgparser.getint("ID", "ADMIN_ID")  # BOT控制者的userid
 

@@ -2,7 +2,7 @@
 import copy
 from io import TextIOWrapper
 from typing import Dict, List, Optional, Tuple
-
+from telegram import Chat
 from dicefunc import *
 
 # 卡信息存储于群中
@@ -96,13 +96,16 @@ class GameCard:
 
 
 class Player:
-    def __init__(self, plid: Optional[int] = None):
+    def __init__(self, plid: Optional[int] = None, d: dict = {}):
         self.cards: Dict[int, GameCard] = {}  # 需要在载入时赋值
         self.gamecards: Dict[int, GameCard] = {}  # 需要在载入时赋值
         self.controlling: Optional[GameCard] = None  # 需要在载入时赋值
         self.id = plid
         self.kpgroups: Dict[int, Group] = {}
         self.kpgames: Dict[int, GroupGame] = {}
+        for key in d:
+            if key == "cards" or key == "gamecards":
+                continue
 
     def iskp(self, gpid: int) -> bool:
         if gpid in self.kpgroups:
@@ -116,20 +119,20 @@ class Player:
 
 
 class Group:
-    def __init__(self, gpid: int, d: dict = {}):
-        self.id: int = gpid
+    def __init__(self, gpid: Optional[int] = None, d: dict = {}):
+        self.id: Optional[int] = gpid
         self.cards: Dict[int, GameCard] = {}
         self.game: Optional[GroupGame] = None
         self.rule: GroupRule = GroupRule()
-        self.holdinggame: Optional[GroupGame] = None
+        self.pausedgame: Optional[GroupGame] = None
         self.kp: Optional[Player] = None  # 需要在载入时赋值
-        self.players: Dict[int, Player] = {}
+        self.chat: Optional[Chat] = None
         for key in d:
             if key == "game":
                 self.game = GroupGame(d[key])
             elif key == "rule":
-                self.rule = GroupRule(d[key])
-            elif key == "holdinggame":
+                self.rule.changeRules(d[key])
+            elif key == "pausedgame":
                 self.holdinggame = GroupGame(d[key])
             elif key == "cards":
                 for key2 in d[key]:
@@ -237,7 +240,7 @@ class CardStatus:
         self.INT: int = 0
         self.EDU: int = 0
         self.LUCK: int = 0
-        self.global: int = 0
+        self.GLOBAL: int = 0
 
     def modify(self, attr: str, val) -> bool:
         pass
