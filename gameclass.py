@@ -1,14 +1,59 @@
 # -*- coding:utf-8 -*-
 import copy
 from io import TextIOWrapper
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from telegram import Chat
 from dicefunc import *
 
 # 卡信息存储于群中
 
 
-class GameCard:
+def isconsttype(val) -> bool:
+    if val is int or val is str or val is bool:
+        return True
+    if isinstance(val, list):
+        for e in val:
+            if not isconsttype(e):
+                return False
+        return True
+    return False
+
+# 基类
+
+
+class datatype:
+    def to_json(self, jumpkey: List[str] = []) -> dict:
+        d: Dict[str, Any] = {}
+        for key in self.__dict__:
+            if self.__dict__[key] is None or key in jumpkey or self.__dict__[key] is function:
+                continue
+            if isconsttype(self.__dict__[key]):
+                d[key] = self.__dict__[key]
+            elif isinstance(self.__dict__[key], datatype):
+                try:
+                    d[key] = self.__dict__[key].to_json()
+                except AttributeError:
+                    pass
+        return d
+
+    def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
+        if attr in self.__dict__ and isconsttype(val) and type(val) == type(self.__dict__[attr]):
+            rttext = str(self.__dict__[attr])
+            self.__dict__[attr] = val
+            return rttext, True
+        for key in self.__dict__:
+            if key in jumpkey:
+                continue
+            if isinstance(self.__dict__[key], datatype):
+                try:
+                    rttext, ok = self.__dict__[key].modify(attr, val)
+                    if ok:
+                        return rttext, True
+                except AttributeError:
+                    pass
+
+
+class GameCard(datatype):
     def __init__(self, carddict: dict = {}):
         self.id: int = 0
         self.playerid: int = 0
@@ -90,22 +135,22 @@ class GameCard:
     def additem(self, item: str) -> None:
         self.item.append(item)
 
-    def modify(self, attr: str, val) -> bool:
-        pass
-        return True
+    def modify(self, attr: str, val) -> Tuple[str, bool]:
+        if attr == "GLOBAL":
+            self.tempstatus.modify(attr, val)
+        return super().modify(attr, val, jumpkey="tempstatus")
 
 
-class Player:
+class Player(datatype):
     def __init__(self, plid: Optional[int] = None, d: dict = {}):
         self.cards: Dict[int, GameCard] = {}  # 需要在载入时赋值
         self.gamecards: Dict[int, GameCard] = {}  # 需要在载入时赋值
-        self.controlling: Optional[GameCard] = None  # 需要在载入时赋值
+        self.controlling: Optional[Union[GameCard, int]] = None  # 需要在载入时赋值
         self.id = plid
         self.kpgroups: Dict[int, Group] = {}
         self.kpgames: Dict[int, GroupGame] = {}
         for key in d:
-            if key == "cards" or key == "gamecards":
-                continue
+            pass
 
     def iskp(self, gpid: int) -> bool:
         if gpid in self.kpgroups:
@@ -117,16 +162,36 @@ class Player:
             return
         pass
 
+    def to_json(self) -> dict:
+        d = {}
+        for key in self.__dict__:
+            if isconsttype(self.__dict__[key]):
+                d[key] = self.__dict__[key]
+        # cards
+        idlist: List[int] = []
+        for key in self.cards:
+            idlist.append(key)
+        d["cards"] = idlist
+        # gamecards
+        idlist: List[int] = []
+        for key in self.gamecards:
+            idlist.append(key)
+        d["gamecards"] = idlist
+        # controlling
+        if self.controlling is not None and self.controlling is not int:
+            d["controlling"] = self.controlling.id
+        return d
 
-class Group:
+
+class Group(datatype):
     def __init__(self, gpid: Optional[int] = None, d: dict = {}):
         self.id: Optional[int] = gpid
         self.cards: Dict[int, GameCard] = {}
         self.game: Optional[GroupGame] = None
         self.rule: GroupRule = GroupRule()
         self.pausedgame: Optional[GroupGame] = None
-        self.kp: Optional[Player] = None  # 需要在载入时赋值
-        self.chat: Optional[Chat] = None
+        self.kp: Optional[Union[Player, int]] = None  # 需要在载入时赋值
+        self.chat: Union[Chat, int] = None  # 需要在载入时赋值
         for key in d:
             if key == "game":
                 self.game = GroupGame(d[key])
@@ -159,8 +224,15 @@ class Group:
             return self.cards[cardid]
         return None
 
+    def to_json(self) -> dict:
+        d = super().to_json(["kp", "chat"])
+        if self.kp is not None:
+            d['kp'] = self.kp.id
+        d['chat'] = self.chat.id
+        return d
 
-class CardData:
+
+class CardData(datatype):
     def __init__(self, d: dict = {}):
         self.STR: int = 0
         self.SIZ: int = 0
@@ -172,9 +244,11 @@ class CardData:
         self.EDU: int = 0
         self.LUCK: int = 0
         self.TOTAL: int = 0
-        self.datainfo: Optional[str]
-        self.datanames: List[str] = ["STR", "SIZ", "CON",
-                                     "DEX", "POW", "APP", "INT", "EDU"]
+        self.datainfo: str = ""
+        self.__datanames: List[str] = ["STR", "SIZ", "CON",
+                                       "DEX", "POW", "APP", "INT", "EDU"]
+        self.__alldatanames: List[str] = copy.copy(
+            self.__datanames).append("LUCK")
         if not d:
             self.randdata()
         else:
@@ -183,7 +257,7 @@ class CardData:
 
     def total(self) -> int:
         self.TOTAL = 0
-        for key in self.datanames:
+        for key in self.__datanames:
             self.TOTAL += self.__dict__[key]
         self.TOTAL += self.LUCK
         return self.TOTAL
@@ -218,7 +292,7 @@ class CardData:
 
     def countless50discard(self) -> bool:
         countless50 = 0
-        for key in self.datanames:
+        for key in self.__datanames:
             if self.__dict__[key] < 50:
                 countless50 += 1
         if countless50 >= 3:
@@ -230,7 +304,7 @@ class CardData:
         return True
 
 
-class CardStatus:
+class CardStatus(datatype):
     def __init__(self):
         self.STR: int = 0
         self.SIZ: int = 0
@@ -247,7 +321,7 @@ class CardStatus:
         return True
 
 
-class CardInfo:
+class CardInfo(datatype):
     def __init__(self):
         self.name: str = ""
         self.age: int = ""
@@ -259,7 +333,7 @@ class CardInfo:
         return True
 
 
-class Skill:
+class Skill(datatype):
     def __init__(self):
         self.points: int = -1
         self.skills: Dict[str, int] = {}
@@ -278,12 +352,12 @@ class Skill:
         self.skills[skillname] = val
 
 
-class SgSkill:
+class SgSkill(datatype):
     def __init__(self):
         self.skills: Dict[str, int] = {}
 
 
-class CardAttr:
+class CardAttr(datatype):
     def __init__(self, card: GameCard):
         self.DB: str
         self.MOV: str
@@ -299,7 +373,7 @@ class CardAttr:
         return True
 
 
-class CardBackground:
+class CardBackground(datatype):
     def __init__(self):
         self.description: str = ""
         self.vip: str = ""
@@ -319,7 +393,7 @@ class CardBackground:
 # 保存在群中
 
 
-class GroupGame:  # If defined, game is started.
+class GroupGame(datatype):  # If defined, game is started.
     def __init__(self, groupid, cards: Dict[int, dict] = {}, kpid: int = None):
         self.group: Group = None  # 需要在载入时赋值
         if isinstance(groupid, dict):
@@ -357,7 +431,7 @@ class GroupGame:  # If defined, game is started.
         return rttext
 
 
-class GroupRule:
+class GroupRule(datatype):
     """一场游戏的规则。
 
     KP在群里用`/setrule`设置规则。群中如果没有规则，会自动生成默认规则。"""

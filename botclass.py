@@ -1,9 +1,8 @@
 # -*- coding:utf-8 -*-
-import copy
 import json
 import os
 import time
-from typing import Any, overload
+from typing import overload
 
 from telegram.ext import Updater
 
@@ -17,72 +16,66 @@ else:
     updater = Updater(token=TOKEN, use_context=True)
 
 
-def isconsttype(val) -> bool:
-    if isinstance(val, int) or isinstance(val, str) or isinstance(val, bool):
-        return True
-    if isinstance(val, list):
-        for e in val:
-            if not isconsttype(e):
-                return False
-        return True
-    return False
-
-
-def to_json(dct: Dict[str, Any], jumpkeys: List[str] = []) -> dict:
-    d = {}
-    for key in dct:
-        if key in jumpkeys:
-            continue
-        val = dct[key]
-        if isinstance(val, dict):
-            d[key] = to_json(val, jumpkeys)
-        elif isconsttype(val):
-            if isinstance(val, list):
-                d[key] = copy.deepcopy(val)
-            else:
-                d[key] = val
-        elif isinstance(val, object):
-            try:
-                dd = to_json(val.__dict__, jumpkeys)
-                d[key] = dd
-            except:
-                pass
-        elif isinstance(val, list):
-            t = []
-            for e in val:
-                if isinstance(e, object):
-                    t.append(to_json(e.__dict__), jumpkeys)
-                elif isconsttype(e):
-                    if isinstance(e, list):
-                        t.append(copy.deepcopy(e))
-                    else:
-                        t.append(e)
-            d[key] = t
-    return d
-
-
 class DiceBot:
     def __init__(self):
         self.IDENTIFIER = str(time.time())
-        self.groups: Dict[int, Group] = {}
-        self.players: Dict[int, Player] = {}
+        self.groups: Dict[int, Group] = {}  # readall()赋值
+        self.players: Dict[int, Player] = {}  # readall()赋值
+        self.cards: Dict[int, GameCard] = {}  # 需要construct()来赋值
+        self.gamecards: Dict[int, GameCard] = {}
         self.joblist: dict
         self.skilllist: dict
         self.allids: List[int] = []
         self.updater: Updater = updater
         self.readall()  # 先执行
-        self.readcurrent()  # 后执行
-        self.construct()
+        self.construct()  # 后执行
         self.operation: Dict[int, str] = {}
-        # self.readhandlers()
+        self.readhandlers()
 
     def readall(self) -> None:
-        for filename in os.listdir(DATA_PATH):
+        # groups
+        for filename in os.listdir(PATH_GROUPS):
             if filename.find(".json") != len(filename)-5:
                 continue
             with open(filename, "r", encoding='utf-8') as f:
                 d = json.load(f)
             self.groups[int(filename[:len(filename)-5])] = Group(d=d)
+        for filename in os.listdir(PATH_PLAYERS):
+            if filename.find(".json") != len(filename)-5:
+                continue
+            with open(filename, "r", encoding='utf-8') as f:
+                d = json.load(f)
+            self.players[int(filename[:len(filename)-5])] = Player(d=d)
+
+    def construct(self) -> None:
+        """创建变量引用"""
+        for gp in self.groups.values():
+            for card in gp.cards.values():
+                self.cards[card.id] = card  # 添加self.cards
+                card.player = self.players[card.playerid]  # 添加card.player
+                card.player.cards[card.id] = card  # 添加player.cards
+                card.group = gp  # 添加card.group
+            if gp.kp is int:
+                gp.kp = self.players[gp.kp]
+            if gp.chat is int:
+                gp.chat = self.updater.bot.get_chat(chat_id=gp.chat)
+            if gp.game is not None:
+                for card in gp.game.cards.values():
+                    self.gamecards[card.id] = card  # 添加self.gamecards
+                    # 添加gamecard.player
+                    card.player = self.players[card.playerid]
+                    card.player.gamecards[card.id] = card  # 添加player.gamecards
+                    card.group = gp  # 添加card.group
+            if gp.pausedgame is not None:
+                for card in gp.pausedgame.cards.values():
+                    self.gamecards[card.id] = card  # 添加self.gamecards
+                    # 添加gamecard.player
+                    card.player = self.players[card.playerid]
+                    card.player.gamecards[card.id] = card  # 添加player.gamecards
+                    card.group = gp  # 添加card.group
+        for pl in self.players.values():
+            if pl.controlling is int:
+                pl.controlling = self.cards[pl.controlling]
 
     def readhandlers(self) -> List[str]:
         """读取全部handlers。
@@ -94,9 +87,20 @@ class DiceBot:
     def checkconsistency():
         pass
 
-    def construct(self) -> None:
-        """创建变量引用"""
-        pass
+    @overload
+    def writegroup(self, gpid: int):
+        try:
+            gp = self.groups[gpid]
+        except KeyError:
+            self.groups[gpid] = Group(gpid=gpid)
+            gp = self.groups[gpid]
+        with open(PATH_GROUPS+str(gpid)+".json", "w", encoding="utf-8") as f:
+            json.dump(gp.to_json(),
+                      f, indent=4, ensure_ascii=False)
+
+    @overload
+    def writegroup(self, gp: Group):
+        return self.writegroup(gp.id)
 
     @overload
     def writeplayer(self, plid: int):
@@ -106,26 +110,11 @@ class DiceBot:
             self.players[plid] = Player(plid=plid)
             pl = self.players[plid]
         with open(PATH_PLAYERS+str(plid)+".json", 'w', encoding='utf-8') as f:
-            json.dump(to_json(pl.__dict__), f, indent=4, ensure_ascii=False)
+            json.dump(pl.to_json(), f, indent=4, ensure_ascii=False)
 
     @overload
     def writeplayer(self, pl: Player):
         return self.writeplayer(pl.id)
-
-    @overload
-    def writegroup(self, gpid: int):
-        try:
-            gp = self.groups[gpid]
-        except KeyError:
-            self.groups[gpid] = Group(gpid=gpid)
-            gp = self.groups[gpid]
-        with open(PATH_GROUPS+str(gpid)+".json", "w", encoding="utf-8") as f:
-            json.dump(to_json(gp.__dict__, ["chat"]),
-                      f, indent=4, ensure_ascii=False)
-
-    @overload
-    def writegroup(self, gp: Group):
-        return self.writegroup(gp.id)
 
     """
     def writekpinfo(self) -> None:

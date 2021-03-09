@@ -19,15 +19,15 @@ BOT_ID = int(TOKEN.split(":")[0])
 DATA_PATH = cfgparser.get("PATH", "DATA_PATH")
 GLOBAL_DATA_PATH = cfgparser.get("PATH", "GLOBAL_DATA_PATH")
 if platform == "win32":
-    if DATA_PATH[-1]!='\\':
-        DATA_PATH+='\\'
-    if GLOBAL_DATA_PATH[-1]!='\\':
-        GLOBAL_DATA_PATH+='\\'
+    if DATA_PATH[-1] != '\\':
+        DATA_PATH += '\\'
+    if GLOBAL_DATA_PATH[-1] != '\\':
+        GLOBAL_DATA_PATH += '\\'
     PATH_PLAYERS = DATA_PATH+"players\\"
     PATH_GROUPS = DATA_PATH+"groups\\"
 else:
-    if DATA_PATH[-1]!='/':
-        DATA_PATH+='/'
+    if DATA_PATH[-1] != '/':
+        DATA_PATH += '/'
     PATH_PLAYERS = DATA_PATH+"players/"
     PATH_GROUPS = DATA_PATH+"groups/"
 

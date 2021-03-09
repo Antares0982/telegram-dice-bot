@@ -186,7 +186,7 @@ def cardadd(card: GameCard, gpid: int) -> bool:
     # 增加pl索引
     pl = getplayer(card.playerid)
     if not pl:
-        dicebot.players[card.playerid] = Player(card.playerid)
+        dicebot.players[card.playerid] = Player(plid=card.playerid)
         pl = dicebot.players[card.playerid]
     pl.cards[card.id] = card
     if pl.controlling:
