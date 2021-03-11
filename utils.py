@@ -1661,6 +1661,10 @@ def botchat(update: Update) -> None:
     if isgroupmsg(update):
         return
     text = update.message.text
+    try:
+        rttext = text+" = "+str(calculator(text))
+    except:
+        pass
     if text[:1] == "我":
         update.message.reply_text("你"+text[1:])
         return

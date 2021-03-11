@@ -95,3 +95,48 @@ def isadicename(dicename: str) -> bool:
     if int(dicename) >= 0:
         return True
     return False
+
+
+def multdiv(s: str) -> int:
+    mu = s.rfind("*")
+    di = s.rfind("/")
+    if mu == -1 and di == -1:
+        return int(s)
+    if mu == -1:
+        return multdiv(s[:di])//int(s[di+1:])
+    if di == -1:
+        return multdiv(s[:mu])*int(s[mu+1:])
+    if mu > di:
+        return multdiv(s[:mu])*int(s[mu+1:])
+    return multdiv(s[:di])//int(s[di+1:])
+
+
+def pre(s: str) -> str:
+    i = len(s)-1
+    while i > 0:
+        if s[i] == '-':
+            if s[i-1] == '-':
+                s = s[:i-1]+'+'+s[i+1:]
+                i -= 1
+            elif s[i-1] != '+':
+                s = s[:i]+"+"+s[i:]
+        i -= 1
+    return s
+
+
+def calstr(s: str) -> str:
+    if s.find("(") == -1:
+        return str(calculator(s, False))
+    i = s.rfind("(")
+    j = s[i:].find(")")+i
+    return s[:i]+calstr(s[i+1:j])+s[j+1:]
+
+
+def calculator(s: str, haveSpace: bool = True) -> int:
+    """计算器。除法视为整除"""
+    if haveSpace:
+        s = "".join(s.split())
+    while s.find("(") != -1:
+        s = calstr(s)
+    s = pre(s)
+    return sum(map(multdiv, s.split('+')))

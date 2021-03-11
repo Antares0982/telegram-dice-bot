@@ -42,7 +42,7 @@ class datatype:
             self.__dict__[attr] = val
             return rttext, True
         for key in self.__dict__:
-            if key in jumpkey:
+            if key in jumpkey or self.__dict__[key] is function:
                 continue
             if isinstance(self.__dict__[key], datatype):
                 try:
@@ -51,6 +51,12 @@ class datatype:
                         return rttext, True
                 except AttributeError:
                     pass
+
+    def read_json(self, d: dict, jumpkeys: List[str] = []) -> None:
+        for key in self.__dict__:
+            if key in d and key not in jumpkeys:
+                self.__dict__[key] = d[key]
+        return
 
 
 class GameCard(datatype):
@@ -73,25 +79,29 @@ class GameCard(datatype):
         self.type: str = ""
         self.discard: bool = False
         self.status: str = ""
-        for key in carddict:
+        if len(carddict) > 0:
+            self.read_json(carddict)
+
+    def read_json(self, d: dict, jumpkeys: List[str] = []) -> None:
+        super().read_json(d, jumpkeys=[
+            "data", "info", "skill", "interest", "suggestskill", "attr", "background", "tempstatus"])
+        for key in d:
             if key == "data":
-                self.data = CardData(carddict[key])
+                self.data = CardData(d[key])
             elif key == "info":
-                self.info = CardInfo(carddict[key])
+                self.info = CardInfo(d[key])
             elif key == "skill":
-                self.skill = Skill(carddict[key])
+                self.skill = Skill(d[key])
             elif key == "interest":
-                self.interest = Skill(carddict[key])
+                self.interest = Skill(d[key])
             elif key == "suggestskill":
-                self.suggestskill = SgSkill(carddict[key])
+                self.suggestskill = SgSkill(d[key])
             elif key == "attr":
-                self.attr = CardAttr(carddict[key])
+                self.attr = CardAttr(d[key])
             elif key == "background":
-                self.background = CardBackground(carddict[key])
+                self.background = CardBackground(d[key])
             elif key == "tempstatus":
-                self.tempstatus = CardStatus(carddict[key])
-            else:
-                self.__dict__[key] = carddict[key]
+                self.tempstatus = CardStatus(d[key])
 
     def __str__(self):
         rttext: str = ""
@@ -143,9 +153,10 @@ class GameCard(datatype):
 
 class Player(datatype):
     def __init__(self, plid: Optional[int] = None, d: dict = {}):
-        self.cards: Dict[int, GameCard] = {}  # 需要在载入时赋值
-        self.gamecards: Dict[int, GameCard] = {}  # 需要在载入时赋值
-        self.controlling: Optional[Union[GameCard, int]] = None  # 需要在载入时赋值
+        self.cards: Dict[int, GameCard] = {}  # 需要在载入时赋值。存储时：存储群-卡id对
+        self.gamecards: Dict[int, GameCard] = {}  # 需要在载入时赋值。存储时：存储群-卡id对
+        # 需要在载入时赋值。存储时：卡id
+        self.controlling: Optional[Union[GameCard, int]] = None
         self.id = plid
         self.kpgroups: Dict[int, Group] = {}
         self.kpgames: Dict[int, GroupGame] = {}
