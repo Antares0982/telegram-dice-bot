@@ -88,6 +88,7 @@ def main() -> None:
     dispatcher.add_handler(MessageHandler(Filters.text & (
         ~Filters.command), dicehandlers.textHandler))
     dicehandlers.utils.updater.start_polling(clean=True)
+    dicehandlers.utils.updater.idle()
 
 
 if __name__ == "__main__":

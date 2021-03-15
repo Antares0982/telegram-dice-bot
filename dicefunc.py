@@ -22,11 +22,13 @@ def dicemdn(m: int, n: int) -> List[int]:
 
 
 def get3d6str(dtname: str, a: int, b: int, c: int) -> str:
+    """返回`dtname = 5*(3d6) = 5*(a+b+c) = ans`"""
     return dtname+" = 5*(3d6) = 5*(" + str(a) + "+" + str(b) + \
         "+" + str(c) + ") = " + str(5*(a+b+c)) + "\n"
 
 
 def get2d6_6str(dtname: str, a: int, b: int) -> str:
+    """返回`dtname = 5*(2d6+6) = 5*(a+b+6) = ans`"""
     return dtname+" = 5*(2d6+6) = 5*(" + str(a) + "+" + \
         str(b) + "+6) = " + str(5*(a+b+6)) + "\n"
 
@@ -97,21 +99,32 @@ def isadicename(dicename: str) -> bool:
     return False
 
 
-def multdiv(s: str) -> int:
+def realdiv(a: int, b: int) -> int:
+    """解决python负数与正数的整除结果是实际除法结果向下取整的问题"""
+    if b == 0:
+        raise ValueError
+    if b < 0:
+        return realdiv(-a, -b)
+    if a < 0:
+        return -((-a)//b)
+    return a//b
+
+
+def __multdiv(s: str) -> int:
     mu = s.rfind("*")
     di = s.rfind("/")
     if mu == -1 and di == -1:
         return int(s)
     if mu == -1:
-        return multdiv(s[:di])//int(s[di+1:])
+        return realdiv(__multdiv(s[:di]), int(s[di+1:]))
     if di == -1:
-        return multdiv(s[:mu])*int(s[mu+1:])
+        return __multdiv(s[:mu])*int(s[mu+1:])
     if mu > di:
-        return multdiv(s[:mu])*int(s[mu+1:])
-    return multdiv(s[:di])//int(s[di+1:])
+        return __multdiv(s[:mu])*int(s[mu+1:])
+    return realdiv(__multdiv(s[:di]), int(s[di+1:]))
 
 
-def pre(s: str) -> str:
+def __pre(s: str) -> str:
     i = len(s)-1
     while i > 0:
         if s[i] == '-':
@@ -124,12 +137,12 @@ def pre(s: str) -> str:
     return s
 
 
-def calstr(s: str) -> str:
+def __calstr(s: str) -> str:
     if s.find("(") == -1:
         return str(calculator(s, False))
     i = s.rfind("(")
     j = s[i:].find(")")+i
-    return s[:i]+calstr(s[i+1:j])+s[j+1:]
+    return s[:i]+__calstr(s[i+1:j])+s[j+1:]
 
 
 def calculator(s: str, haveSpace: bool = True) -> int:
@@ -137,6 +150,6 @@ def calculator(s: str, haveSpace: bool = True) -> int:
     if haveSpace:
         s = "".join(s.split())
     while s.find("(") != -1:
-        s = calstr(s)
-    s = pre(s)
-    return sum(map(multdiv, s.split('+')))
+        s = __calstr(s)
+    s = __pre(s)
+    return sum(map(__multdiv, s.split('+')))

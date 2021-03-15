@@ -934,9 +934,6 @@ def showskillpages(page: int, card1: GameCard) -> Tuple[str, List[List[InlineKey
 
 
 def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
-    if not card1:
-        query.edit_message_text(text="找不到卡。")
-        return False
     jobname = args[1]
     if len(args) == 2:
         # 切换至显示职业详情
@@ -970,6 +967,9 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         query.edit_message_reply_markup(rp_markup)
         return True
+    if not card1:
+        query.edit_message_text(text="找不到卡。")
+        return False
     confirm = args[2]  # 只能是True，或False
     if confirm == "False":
         rtbuttons = makejobbutton()
@@ -978,7 +978,6 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
         query.edit_message_reply_markup(rp_markup)
         return True
     # 确认完成
-
     card1.info.job = jobname
     query.edit_message_text(
         "职业设置为："+jobname+"\n现在你可以用指令 /addskill 添加技能，首先需要设置信用点。")
@@ -988,8 +987,8 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
         sendtoAdmin("生成技能出错，位置：buttonjob")
         return False
     for i in range(3, len(dicebot.joblist[jobname])):  # Classical jobs
-        card1.suggestskill.skills[dicebot.joblist[jobname][i]
-                                  ] = getskilllevelfromdict(card1, dicebot.joblist[jobname][i])  # int
+        card1.suggestskill.set(dicebot.joblist[jobname][i], getskilllevelfromdict(
+            card1, dicebot.joblist[jobname][i]))   # int
     dicebot.writegroup(card1.groupid)
     return True
 

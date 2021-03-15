@@ -14,7 +14,7 @@ if PROXY:
         'proxy_url': PROXY_URL}, use_context=True)
 else:
     updater = Updater(token=TOKEN, use_context=True)
-
+updater.idle()
 
 class DiceBot:
     def __init__(self):
@@ -250,9 +250,8 @@ def readjobdict() -> dict:
         d = json.load(f)
     return d
 
-
+"""
 def readrules() -> Dict[int, GroupRule]:
-    """读取GROUP_RULES"""
     d: Dict[str, dict]
     try:
         f = open(PATH_RULES, "r", encoding='utf-8')
@@ -268,7 +267,7 @@ def readrules() -> Dict[int, GroupRule]:
     for key in d:
         d1[int(key)] = GroupRule(d[key])
     return d1
-
+"""
 
 def writehandlers(h: List[str]) -> None:
     """写入Handlers"""
