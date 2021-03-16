@@ -9,6 +9,7 @@ from telegram.ext import Updater
 from cfg import *
 from gameclass import *
 
+
 if PROXY:
     updater = Updater(token=TOKEN, request_kwargs={
         'proxy_url': PROXY_URL}, use_context=True)

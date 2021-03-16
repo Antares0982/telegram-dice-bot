@@ -1,42 +1,88 @@
 # -*- coding:utf-8 -*-
 from configparser import ConfigParser, NoOptionError, NoSectionError
 from sys import platform
-cfgparser = ConfigParser()
-cfgparser.read('config.ini')
+from os import getcwd
+
+__all__ = [
+    "PROXY", "PROXY_URL", "BOTUSERNAME", "TOKEN", "DATA_PATH", "ADMIN_ID", "IGNORE_JOB_DICT", "VERSION", "BOT_ID",
+    "PATH_PLAYERS", "PATH_GROUPS", "GLOBAL_DATA_PATH", "PATH_SKILLDICT", "PATH_JOBDICT", "PATH_HANDLERS",
+    "CREATE_CARD_HELP", "HELP_TEXT"
+]
+
+
+def __cfgparse():
+    global PROXY, PROXY_URL, BOTUSERNAME, TOKEN, DATA_PATH, ADMIN_ID, IGNORE_JOB_DICT
+    cfgparser = ConfigParser()
+    cfgparser.read('config.ini')
+
+    PROXY = cfgparser.getboolean("PROXY", "proxy")  # 大陆登录telegram需要设置代理，否则关闭
+    PROXY_URL = cfgparser.get("PROXY", "proxy_url22")  # 代理
+
+    BOTUSERNAME = cfgparser.get("BOT", "username")
+    TOKEN = cfgparser.get("BOT", "token")  # BOT TOKEN
+
+    DATA_PATH = cfgparser.get("PATH", "data_path")
+
+    ADMIN_ID = cfgparser.getint("ID", "admin_id")  # BOT控制者的userid
+
+    IGNORE_JOB_DICT = cfgparser.getboolean("SETTINGS", "ignore_job_dict")
+
+
+def __defaultcfg():
+    cfgparser = ConfigParser()
+
+    cfgparser["PROXY"] = {}
+    cfgparser["PROXY"]["proxy"] = 'true'
+    cfgparser["PROXY"]["proxy_url"] = "http://127.0.0.1:1080/"
+
+    cfgparser["BOT"] = {}
+    cfgparser["BOT"]["username"] = "your_bot_user_name"
+    cfgparser["BOT"]["token"] = "123456789:AABBCC-eeffgghh"
+
+    cfgparser["PATH"] = {}
+    if platform == 'win32':
+        cfgparser["PATH"]["data_path"] = getcwd()+"\\data\\"
+    else:
+        cfgparser["PATH"]["data_path"] = getcwd()+"/data/"
+
+    cfgparser["ID"] = {}
+    cfgparser["ID"]["admin_id"] = '12345'
+
+    cfgparser["SETTINGS"] = {}
+    cfgparser["SETTINGS"]["ignore_job_dict"] = 'true'
+
+    with open("sample_config.ini", 'w') as f:
+        cfgparser.write(f)
+
+
+try:
+    __cfgparse()
+except (NoSectionError, NoOptionError):
+    __defaultcfg()
+    raise Exception("配置文件不完整，请检查配置文件")
 
 VERSION = "1.1.1"
-PROXY = cfgparser.getboolean("PROXY", "PROXY")  # 大陆登录telegram需要设置代理，否则关闭
 
-PROXY_URL = cfgparser.get("PROXY", "PROXY_URL")  # 代理
-
-TOKEN = cfgparser.get("BOT", "TOKEN")  # BOT TOKEN
-BOTUSERNAME = cfgparser.get("BOT", "USERNAME")
 BOT_ID = int(TOKEN.split(":")[0])
 
-# DATA_PATH = r'/home/tgbot/'  # 数据文件存在哪个目录
 
-DATA_PATH = cfgparser.get("PATH", "DATA_PATH")
-GLOBAL_DATA_PATH = cfgparser.get("PATH", "GLOBAL_DATA_PATH")
 if platform == "win32":
     if DATA_PATH[-1] != '\\':
         DATA_PATH += '\\'
-    if GLOBAL_DATA_PATH[-1] != '\\':
-        GLOBAL_DATA_PATH += '\\'
     PATH_PLAYERS = DATA_PATH+"players\\"
     PATH_GROUPS = DATA_PATH+"groups\\"
+    GLOBAL_DATA_PATH = DATA_PATH+"global\\"
 else:
     if DATA_PATH[-1] != '/':
         DATA_PATH += '/'
     PATH_PLAYERS = DATA_PATH+"players/"
     PATH_GROUPS = DATA_PATH+"groups/"
+    GLOBAL_DATA_PATH = DATA_PATH+"global/"
 
 PATH_SKILLDICT = GLOBAL_DATA_PATH+r'skilldict.json'
 PATH_JOBDICT = GLOBAL_DATA_PATH+r'jobdict.json'
 PATH_HANDLERS = GLOBAL_DATA_PATH+r'handlers.json'
 
-ADMIN_ID = cfgparser.getint("ID", "ADMIN_ID")  # BOT控制者的userid
-
-IGNORE_JOB_DICT = cfgparser.getboolean("SETTINGS", "IGNORE_JOB_DICT")
 
 CREATE_CARD_HELP = """建卡流程如下：
 1 创建新卡，生成除幸运外的基本属性
@@ -52,5 +98,3 @@ HELP_TEXT = "欢迎使用COC dice bot，目前版本：v"+VERSION+"""
 作者：@AntaresChr
 使用 /help 查看指令的帮助。
 （私聊时偶尔触发嘴臭模式）"""
-
-del cfgparser
