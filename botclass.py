@@ -16,6 +16,7 @@ else:
     updater = Updater(token=TOKEN, use_context=True)
 updater.idle()
 
+
 class DiceBot:
     def __init__(self):
         self.IDENTIFIER = str(time.time())
@@ -48,13 +49,14 @@ class DiceBot:
             self.players[int(filename[:len(filename)-5])] = Player(d=d)
 
     def construct(self) -> None:
-        """创建变量引用"""
+        """创建变量之间的引用"""
         for gp in self.groups.values():
             for card in gp.cards.values():
                 self.cards[card.id] = card  # 添加self.cards
                 card.player = self.players[card.playerid]  # 添加card.player
                 card.player.cards[card.id] = card  # 添加player.cards
                 card.group = gp  # 添加card.group
+                self.allids.append(card.id)  # 添加self.allids
             if gp.kp is int:
                 gp.kp = self.players[gp.kp]
             if gp.chat is int:
@@ -73,6 +75,7 @@ class DiceBot:
                     card.player = self.players[card.playerid]
                     card.player.gamecards[card.id] = card  # 添加player.gamecards
                     card.group = gp  # 添加card.group
+        self.allids.sort()
         for pl in self.players.values():
             if pl.controlling is int:
                 pl.controlling = self.cards[pl.controlling]
@@ -85,6 +88,9 @@ class DiceBot:
         return d
 
     def checkconsistency():
+        # TODO 检查allids是否正确
+        # TODO 检查kp对是否完整
+        # 如果出现不一致，用assert抛出AssertionError
         pass
 
     @overload
@@ -92,11 +98,11 @@ class DiceBot:
         try:
             gp = self.groups[gpid]
         except KeyError:
-            self.groups[gpid] = Group(gpid=gpid)
-            gp = self.groups[gpid]
+            gp = self.creategp(gpid)
         with open(PATH_GROUPS+str(gpid)+".json", "w", encoding="utf-8") as f:
-            json.dump(gp.to_json(),
-                      f, indent=4, ensure_ascii=False)
+            gp.write(f)
+            # json.dump(gp.to_json(),
+            #           f, indent=4, ensure_ascii=False)
 
     @overload
     def writegroup(self, gp: Group):
@@ -107,14 +113,29 @@ class DiceBot:
         try:
             pl = self.players[plid]
         except KeyError:
-            self.players[plid] = Player(plid=plid)
-            pl = self.players[plid]
+            pl = self.createplayer(plid)
         with open(PATH_PLAYERS+str(plid)+".json", 'w', encoding='utf-8') as f:
-            json.dump(pl.to_json(), f, indent=4, ensure_ascii=False)
+            pl.write(f)
 
     @overload
     def writeplayer(self, pl: Player):
         return self.writeplayer(pl.id)
+
+    def getgp(self, gpid: int) -> Optional[Group]:
+        if gpid not in self.groups:
+            return None
+        return self.groups[gpid]
+
+    def creategp(self, gpid: int) -> Group:
+        self.groups[gpid] = Group(gpid=gpid)
+
+    def getplayer(self, plid) -> Optional[Player]:
+        if plid not in self.players:
+            return None
+        return self.players[plid]
+
+    def createplayer(self, plid) -> Player:
+        self.players[plid] = Player(plid=plid)
 
     """
     def writekpinfo(self) -> None:
@@ -250,6 +271,7 @@ def readjobdict() -> dict:
         d = json.load(f)
     return d
 
+
 """
 def readrules() -> Dict[int, GroupRule]:
     d: Dict[str, dict]
@@ -268,6 +290,7 @@ def readrules() -> Dict[int, GroupRule]:
         d1[int(key)] = GroupRule(d[key])
     return d1
 """
+
 
 def writehandlers(h: List[str]) -> None:
     """写入Handlers"""

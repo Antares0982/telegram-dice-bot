@@ -1,11 +1,10 @@
 # -*- coding:utf-8 -*-
-from configparser import ConfigParser
+from configparser import ConfigParser, NoOptionError, NoSectionError
 from sys import platform
 cfgparser = ConfigParser()
 cfgparser.read('config.ini')
 
 VERSION = "1.1.1"
-
 PROXY = cfgparser.getboolean("PROXY", "PROXY")  # 大陆登录telegram需要设置代理，否则关闭
 
 PROXY_URL = cfgparser.get("PROXY", "PROXY_URL")  # 代理

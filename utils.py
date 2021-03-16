@@ -75,18 +75,15 @@ def isgroupmsg(update: Update) -> bool:
 
 
 def getgp(gpid: int) -> Optional[Group]:
-    if gpid not in dicebot.groups:
-        return None
-    return dicebot.groups[gpid]
+    return dicebot.getgp(gpid)
 
 
 def initgroup(gpid: int) -> Optional[Group]:
-    """若聊天环境是新群，创建群对象并返回True，否则False"""
+    """若gpid未存储过，创建Group对象并返回，否则返回None"""
     gp = getgp(gpid)
     if gp:
         return None
-    dicebot.groups[gpid] = Group(gpid=gpid)
-    return dicebot.groups[gpid]
+    return dicebot.creategp(gpid)
 
 
 def forcegetgroup(gpid: int) -> Group:
@@ -110,11 +107,11 @@ def getplayer(plid: int) -> Optional[Player]:
 
 
 def initplayer(plid: int) -> Optional[Player]:
+    """若plid未存储过，创建Player对象并返回，否则返回None"""
     pl = getplayer(plid)
     if pl:
         return None
-    dicebot.players[plid] = Player(plid=plid)
-    return dicebot.players[plid]
+    return dicebot.createplayer(plid)
 
 
 def forcegetplayer(plid: int) -> Player:
@@ -144,7 +141,17 @@ def autoswitchhint(plid: int) -> None:
     dicebot.updater.bot.send_message(chat_id=plid, text="创建新卡时，控制自动切换到新卡")
 
 
-# 卡片相关：查增删
+def executilsfunc(com: str) -> str:
+    """使用utils的函数执行一句指令。这个函数应禁止非管理者调用"""
+    try:
+        exec("t="+com, {})
+        return str(locals()['t'])
+    except:
+        return "执行失败"
+
+# 卡片相关：查 增 删
+
+
 def cardpop(gpid: int, cdid: int) -> Optional[GameCard]:
     """删除一张卡并返回其数据。返回None则删除失败"""
     # 删除group索引
