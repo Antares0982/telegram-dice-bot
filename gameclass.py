@@ -7,12 +7,17 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 from telegram import Chat
 
 from dicefunc import *
-
+from cfg import PATH_GROUPS, PATH_PLAYERS
 # 卡信息存储于群中
 
 
+def istrueconsttype(val) -> bool:
+    """如果val是int, str, bool才返回True"""
+    return val is int or val is str or val is bool
+
+
 def isconsttype(val) -> bool:
-    if val is int or val is str or val is bool:
+    if istrueconsttype(val):
         return True
     if val is list:
         for e in val:
@@ -69,25 +74,28 @@ class datatype:
     def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
         """向下查找成员attr并修改其值为val，忽略jumpkey中的成员。如果val类型和原本类型（不是None）不相同，则抛出TypeError"""
         if hasattr(self, attr):
-            if val is not list and isconsttype(val) and (type(val) == type(self.__dict__[attr]) or self.__dict__[attr] is None):
+            if val is not list and istrueconsttype(val) and (type(val) == type(self.__dict__[attr]) or self.__dict__[attr] is None):
                 rttext = str(self.__dict__[attr])
                 self.__dict__[attr] = val
+                if hasattr(self, "write") and self.write is function:
+                    self.write()
                 return rttext, True
-            raise TypeError
+            raise TypeError("成员"+attr+"类型与修改目标值不符")
         # 向下查找递归调用modify()
         for key in iter(self.__dict__):
             val = self.__dict__[key]
             if key in jumpkey:
                 continue
             if isinstance(val, datatype):
-                rttext, ok = val.modify(attr, val, jumpkey)
+                if len(jumpkey) > 0:
+                    rttext, ok = val.modify(attr, val, jumpkey)
+                else:
+                    rttext, ok = val.modify(attr, val)  # 使用下一级的默认参数
                 if ok:
+                    if hasattr(self, "write") and self.write is function:
+                        self.write()
                     return rttext, True
-        return "找不到成员 "+attr, False
-
-    def write(self, f: Optional[TextIOWrapper] = None):
-        assert(f is not None)
-        json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
+        return "找不到成员："+attr, False
 
 
 class GameCard(datatype):
@@ -191,12 +199,23 @@ class GameCard(datatype):
         rttext += "状态: "+self.status+"\n"
         return rttext
 
+    def cardConstruct(self):
+        self.data.card = self
+        self.skill.card = self
+        self.interest.card = self
+        if self.group is not None:
+            self.write()
+
     def check(self) -> bool:
         pass
         return True
 
     def additem(self, item: str) -> None:
         self.item.append(item)
+
+    def write(self):
+        if self.group is not None:
+            self.group.write()
 
 
 class Player(datatype):
@@ -248,6 +267,12 @@ class Player(datatype):
             return True
         return False
 
+    def write(self):
+        if self.id is not int:
+            raise ValueError("写入文件时，Player实例没有id")
+        with open(PATH_PLAYERS+str(self.id)+".json", 'w', encoding='utf-8') as f:
+            json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
+
 
 class Group(datatype):
     def __init__(self, gpid: Optional[int] = None, d: dict = {}):
@@ -296,6 +321,12 @@ class Group(datatype):
             return self.cards[cardid]
         return None
 
+    def write(self):
+        if self.id is not int:
+            raise ValueError("写入文件时，Group实例没有id")
+        with open(PATH_GROUPS+str(self.id)+".json", 'w', encoding='utf-8') as f:
+            json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
+
 
 class CardData(datatype):
     def __init__(self, d: dict = {}):
@@ -314,7 +345,8 @@ class CardData(datatype):
                                        "DEX", "POW", "APP", "INT", "EDU"]
         self.__alldatanames: List[str] = copy.copy(
             self.__datanames).append("LUCK")
-        if not d:
+        self.card: GameCard = None  # 用cardConstruct()赋值
+        if len(d) == 0:
             self.randdata()
         else:
             for key in d:
@@ -354,6 +386,7 @@ class CardData(datatype):
         self.EDU = 5*(a+b+6)
         text += get2d6_6str("EDU", a, b)
         self.datainfo = text
+        self.write()
 
     def countless50discard(self) -> bool:
         countless50 = 0
@@ -364,9 +397,12 @@ class CardData(datatype):
             return True
         return False
 
-    def modify(self, attr: str, val: int) -> bool:
-        pass
-        return True
+    def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
+        return super().modify(attr, val, jumpkey=jumpkey)
+
+    def write(self):
+        if self.card is not None and self.card.group is not None:
+            self.card.group.write()
 
 
 class CardStatus(datatype):
@@ -381,8 +417,15 @@ class CardStatus(datatype):
         self.LUCK: int = 0
         self.GLOBAL: int = 0
 
-    def modify(self, attr: str, val) -> bool:
-        pass
+    def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
+        if attr != "GLOBAL":
+            return "CardStatus实例不可以使用modify()修改一般成员", False
+        super().modify("GLOBAL", val)
+
+    def changestatus(self, attr: str, addval: int) -> bool:
+        if attr not in self.__dict__:
+            return False
+        self.__dict__[attr] += addval
         return True
 
 
@@ -395,10 +438,6 @@ class CardInfo(datatype):
         if len(d) > 0:
             self.read_json(d=d)
 
-    def modify(self, attr: str, val) -> bool:
-        pass
-        return True
-
 
 class skilltype(datatype):  # skill的基类，只包含一个属性skills
     def __init__(self):
@@ -407,14 +446,13 @@ class skilltype(datatype):  # skill的基类，只包含一个属性skills
     def get(self, skillname: str) -> int:
         if skillname in self.skills:
             return self.skills[skillname]
-        return -1
+        raise KeyError("get("+skillname+"):没有这个技能")
 
     def set(self, skillname: str, val: int) -> None:
         self.skills[skillname] = val
 
-    def modify(self, attr: str, val) -> bool:
-        pass
-        return True
+    def modify(self, attr: str, val, jumpkey: List[str]) -> Tuple[str, bool]:
+        return "", False  # 这里没有可修改的成员
 
     def allskills(self) -> Iterator[str]:
         return iter(self.skills)
@@ -423,7 +461,7 @@ class skilltype(datatype):  # skill的基类，只包含一个属性skills
 class Skill(skilltype):
     def __init__(self, d: dict = {}):
         super().__init__()
-        self.card: Optional[GameCard] = None  # 需要在载入时赋值 # 是否必要存疑
+        self.card: GameCard = None  # 用cardConstruct()赋值
         self.points: int = -1
         if len(d) > 0:
             self.read_json(d=d)
@@ -437,7 +475,7 @@ class SgSkill(skilltype):
 
     def pop(self, skillname: str) -> int:
         if skillname not in self.skills:
-            raise KeyError("没有这个技能")
+            raise KeyError("pop("+skillname+"):没有这个技能")
         return self.skills.pop(skillname)
 
 
@@ -457,6 +495,7 @@ class CardAttr(datatype):
 
 class CardBackground(datatype):
     def __init__(self, d: dict = {}):
+        self.card: GameCard = None
         self.description: str = ""
         self.vip: str = ""
         self.viplace: str = ""
@@ -470,6 +509,107 @@ class CardBackground(datatype):
         if len(d) > 0:
             self.read_json(d=d)
 
+    def randbackground(self) -> str:
+        rdfaithlist = [
+            "毗沙门天",
+            "伊斯兰教",
+            "海尔·塞拉西一世",
+            "耶稣",
+            "佛教",
+            "道教",
+            "无神论",
+            "进化论",
+            "冷冻休眠",
+            "太空探索",
+            "因果轮回",
+            "共济会",
+            "女协",
+            "社会正义",
+            "占星术",
+            "保守党",
+            "共产党",
+            "民主党",
+            "金钱",
+            "女权运动",
+            "平等主义",
+            "工会"
+        ]
+        rdviplist = [
+            "父亲",
+            "母亲",
+            "继父",
+            "继母",
+            "哥哥",
+            "弟弟",
+            "姐姐",
+            "妹妹",
+            "儿子",
+            "女儿",
+            "配偶",
+            "前任",
+            "青梅竹马",
+            "明星",
+            "另一位调查员",
+            "NPC"
+        ]
+        rdsigplacelist = [
+            "学校（母校）",
+            "故乡",
+            "相识初恋之处",
+            "静思之地",
+            "社交之地",
+            "联系到信念的地方",
+            "重要之人的坟墓",
+            "家族的地方",
+            "生命中最高兴时所在地",
+            "工作地点"
+        ]
+        rdpreciouslist = [
+            "与得意技能相关的某件物品",
+            "职业必需品",
+            "童年遗留物",
+            "逝者遗物",
+            "重要之人给予之物",
+            "收藏品",
+            "发掘而不知真相的东西",
+            "体育用品",
+            "武器",
+            "宠物"
+        ]
+        rdspecialitylist = [
+            "慷慨大方",
+            "善待动物",
+            "梦想家",
+            "享乐主义者",
+            "冒险家",
+            "好厨子",
+            "万人迷",
+            "忠心",
+            "好名头",
+            "雄心壮志"
+        ]
+        self.faith = rdfaithlist[dicemdn(1, len(rdfaithlist))[
+            0]-1]
+        self.vip = rdviplist[dicemdn(1, len(rdviplist))[
+            0]-1]
+        self.exsigplace = rdsigplacelist[dicemdn(
+            1, len(rdsigplacelist))[0]-1]
+        self.precious = rdpreciouslist[dicemdn(
+            1, len(rdpreciouslist))[0]-1]
+        self.speciality = rdspecialitylist[dicemdn(
+            1, len(rdspecialitylist))[0]-1]
+        self.write()
+        rttext = "faith: "+self.faith
+        rttext += "\nvip: "+self.vip
+        rttext += "\nexsigplace: "+self.exsigplace
+        rttext += "\nprecious: "+self.precious
+        rttext += "\nspeciality: "+self.speciality
+        return rttext
+
+    def write(self):
+        if self.card is not None:
+            self.card.write()
+
 
 class GroupGame(datatype):  # If defined, game is started.
     def __init__(self, groupid: Optional[int] = None, cards: Dict[int, Union[dict, GameCard]] = {}, kpid: Optional[int] = None, d: dict = {}):
@@ -480,7 +620,6 @@ class GroupGame(datatype):  # If defined, game is started.
             self.read_json(d)
             return
         if groupid is not None:
-            assert(groupid is not None)
             self.groupid: int = groupid  # Unique, should not be edited after initializing
             self.kpid: int = kpid  # Can be edited
             self.cards: Dict[int, GameCard] = {}  # list of GameCard
@@ -514,6 +653,10 @@ class GroupGame(datatype):  # If defined, game is started.
             "张，其中kp所持卡共有"+str(len(self.kpcards))+"张"
         return rttext
 
+    def write(self):
+        if self.group is not None:
+            self.group.write()
+
 
 class GroupRule(datatype):
     """一场游戏的规则。
@@ -521,6 +664,7 @@ class GroupRule(datatype):
     KP在群里用`/setrule`设置规则。群中如果没有规则，会自动生成默认规则。"""
 
     def __init__(self, rules: Dict[str, List[int]] = {}):
+        self.card: GameCard = None  # 用cardConstruct()初始化
         # 0位参数描述一般技能上限，1位参数描述专精技能上限，2位参数描述专精技能个数。上限<=99
         self.skillmax: List[int] = [80, 90, 1]
         # 0位描述一般技能上限，1位描述专精技能上限，2位描述专精技能个数，3位描述至少到什么年龄才能使用此设置，如果没有设置的话默认100
@@ -599,6 +743,7 @@ class GroupRule(datatype):
             else:
                 rttext += "无法识别的key："+key
                 continue
+        self.write()
         return rttext, True
 
     def __str__(self):
@@ -666,3 +811,7 @@ class GroupRule(datatype):
                 rttext += "骰出" + \
                     str(self.greatfail[2])+"至"+str(self.greatfail[3])+"点\n"
         return rttext
+
+    def write(self):
+        if self.card is not None and self.card.group is not None:
+            self.card.group.write()

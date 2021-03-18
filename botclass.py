@@ -109,10 +109,9 @@ class DiceBot:
             gp = self.groups[gpid]
         except KeyError:
             gp = self.creategp(gpid)
-        with open(PATH_GROUPS+str(gpid)+".json", "w", encoding="utf-8") as f:
-            gp.write(f)
-            # json.dump(gp.to_json(),
-            #           f, indent=4, ensure_ascii=False)
+        gp.write()
+        # json.dump(gp.to_json(),
+        #           f, indent=4, ensure_ascii=False)
 
     @overload
     def writegroup(self, gp: Group):
@@ -124,8 +123,7 @@ class DiceBot:
             pl = self.players[plid]
         except KeyError:
             pl = self.createplayer(plid)
-        with open(PATH_PLAYERS+str(plid)+".json", 'w', encoding='utf-8') as f:
-            pl.write(f)
+        pl.write()
 
     @overload
     def writeplayer(self, pl: Player):

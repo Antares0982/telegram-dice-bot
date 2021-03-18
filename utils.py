@@ -1000,8 +1000,8 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
 ###########################################################
 
 
-def buttonaddmainskill(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
-    if not card1:
+def buttonaddmainskill(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
+    if card1 is None:
         query.edit_message_text(text="找不到卡。")
         return False
     if len(args) == 3:
@@ -1022,8 +1022,8 @@ def buttonaddmainskill(query: CallbackQuery, card1: Optional[GameCard], args: Li
     return True
 
 
-def buttoncgmainskill(query: CallbackQuery,  card1: Optional[GameCard], args: List[str]) -> bool:
-    if not card1:
+def buttoncgmainskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -> bool:
+    if card1 is None:
         query.edit_message_text(text="找不到卡。")
         return False
     if len(args) == 3:
