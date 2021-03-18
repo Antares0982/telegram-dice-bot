@@ -694,11 +694,11 @@ def skillcantouchmax(card1: GameCard) -> Tuple[bool, bool]:
         ans1 = False
         skillmaxrule = rules.skillmax
     countSpecialSkill = 0
-    for skill in card1.skill.skills:
-        if card1.skill.skills[skill] > skillmaxrule[0]:
+    for skill in card1.skill.allskills():
+        if card1.skill.get(skill) > skillmaxrule[0]:
             countSpecialSkill += 1
-    for skill in card1.interest.skills:
-        if card1.interest.skills[skill] > skillmaxrule[0]:
+    for skill in card1.interest.allskills():
+        if card1.interest.get(skill) > skillmaxrule[0]:
             countSpecialSkill += 1
     if countSpecialSkill >= skillmaxrule[2]:
         return ans1, False
@@ -723,12 +723,12 @@ def skillmaxval(skillname: str, card1: GameCard, ismainskill: bool) -> int:
     basicval = -1
     if ismainskill:
         pts = card1.skill.points
-        if skillname in card1.skill.skills:
-            basicval = card1.skill.skills[skillname]
+        if skillname in card1.skill.allskills():
+            basicval = card1.skill.get(skillname)
     else:
         pts = card1.interest.points
-        if skillname in card1.interest.skills:
-            basicval = card1.interest.skills[skillname]
+        if skillname in card1.interest.allskills():
+            basicval = card1.interest.get(skillname)
     costrule = gp.rule.skillcost
     if basicval == -1:
         basicval = getskilllevelfromdict(card1, skillname)
@@ -754,11 +754,11 @@ def evalskillcost(skillname: str, skillval: int, card1: GameCard, ismainskill: b
         return 10000  # HIT BAD TRAP
     basicval = -1
     if ismainskill:
-        if skillname in card1.skill.skills:
-            basicval = card1.skill.skills[skillname]
+        if skillname in card1.skill.allskills():
+            basicval = card1.skill.get(skillname)
     else:
-        if skillname in card1.interest.skills:
-            basicval = card1.interest.skills[skillname]
+        if skillname in card1.interest.allskills():
+            basicval = card1.interest.get(skillname)
     if basicval == -1:
         basicval = getskilllevelfromdict(card1, skillname)
     if skillval == basicval:
@@ -805,7 +805,7 @@ def addmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Updat
     card1.skill.points -= costval
     update.message.reply_text(
         "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
-    card1.skill.skills[skillname] = skillvalue
+    card1.skill.set(skillname, skillvalue)
     dicebot.writegroup(card1.groupid)
     return True
 
@@ -814,7 +814,7 @@ def addsgskill(skillname: str, skillvalue: int, card1: GameCard, update: Update)
     """添加一个建议的技能。直接调用`addmainskill`完成。"""
     if not addmainskill(skillname, skillvalue, card1, update):
         return False
-    card1.suggestskill.skills.pop(skillname)
+    card1.suggestskill.pop(skillname)
     dicebot.writegroup(card1.groupid)
     return True
 
@@ -830,7 +830,7 @@ def addintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update
     card1.interest.points -= costval
     update.message.reply_text(
         "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
-    card1.interest.skills[skillname] = skillvalue
+    card1.interest.set(skillname, skillvalue)
     dicebot.writegroup(card1.groupid)
     return True
 
@@ -847,7 +847,7 @@ def cgmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Update
     else:
         update.message.reply_text(
             "技能设置成功："+skillname+" "+str(skillvalue)+"，返还点数："+str(-costval))
-    card1.skill.skills[skillname] = skillvalue
+    card1.skill.set(skillname, skillvalue)
     dicebot.writegroup(card1.groupid)
     return True
 
@@ -865,7 +865,7 @@ def cgintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update)
     else:
         update.message.reply_text(
             "技能设置成功："+skillname+" "+str(skillvalue)+"，返还点数："+str(-costval))
-    card1.interest.skills[skillname] = skillvalue
+    card1.interest.set(skillname, skillvalue)
     dicebot.writegroup(card1.groupid)
     return True
 
@@ -905,7 +905,7 @@ def cgcredit(update: Update, card1: GameCard) -> bool:
     rtbutton = makeIntButtons(m, mm, "cgmainskill", "信用")
     rp_markup = InlineKeyboardMarkup(rtbutton)
     update.message.reply_text(text="修改信用，现在还剩"+str(card1.skill.points)+"点，当前信用："+str(
-        card1.skill.skills["信用"]), reply_markup=rp_markup)
+        card1.skill.get("信用")), reply_markup=rp_markup)
     return True
 
 
@@ -915,12 +915,12 @@ def showskillpages(page: int, card1: GameCard) -> Tuple[str, List[List[InlineKey
     rttext = "添加/修改兴趣技能，目前的数值/基础值如下："
     rtbuttons = [[]]
     for key in thispageskilllist:
-        if key in card1.skill.skills or key in card1.suggestskill.skills:
+        if key in card1.skill.allskills() or key in card1.suggestskill.allskills():
             continue
         if len(rtbuttons[len(rtbuttons)-1]) == 4:
             rtbuttons.append([])
-        if key in card1.interest.skills:
-            rttext += "（已有技能）"+key+"："+str(card1.interest.skills[key])+"\n"
+        if key in card1.interest.allskills():
+            rttext += "（已有技能）"+key+"："+str(card1.interest.get(key))+"\n"
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(text=key,
                                                                     callback_data=IDENTIFIER+" cgintskill "+key))
             continue
@@ -937,7 +937,6 @@ def showskillpages(page: int, card1: GameCard) -> Tuple[str, List[List[InlineKey
         rtbuttons.append([InlineKeyboardButton(text="上一页", callback_data=IDENTIFIER+" addintskill page "+str(
             page-1)), InlineKeyboardButton(text="下一页", callback_data=IDENTIFIER+" addintskill page "+str(page+1))])
     return rttext, rtbuttons
-###########################################################
 
 
 def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
@@ -998,6 +997,7 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
             card1, dicebot.joblist[jobname][i]))   # int
     dicebot.writegroup(card1.groupid)
     return True
+###########################################################
 
 
 def buttonaddmainskill(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:

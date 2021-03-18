@@ -2,7 +2,7 @@
 import copy
 import json
 from io import TextIOWrapper
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from telegram import Chat
 
@@ -416,6 +416,9 @@ class skilltype(datatype):  # skill的基类，只包含一个属性skills
         pass
         return True
 
+    def allskills(self) -> Iterator[str]:
+        return iter(self.skills)
+
 
 class Skill(skilltype):
     def __init__(self, d: dict = {}):
@@ -431,6 +434,11 @@ class SgSkill(skilltype):
         super().__init__()
         if len(d) > 0:
             self.read_json(d=d)
+
+    def pop(self, skillname: str) -> int:
+        if skillname not in self.skills:
+            raise KeyError("没有这个技能")
+        return self.skills.pop(skillname)
 
 
 class CardAttr(datatype):

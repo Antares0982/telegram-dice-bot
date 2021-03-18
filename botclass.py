@@ -5,6 +5,7 @@ import time
 from typing import overload
 
 from telegram.ext import Updater
+from telegram import Update
 
 from cfg import *
 from gameclass import *
@@ -88,10 +89,18 @@ class DiceBot:
             d = json.load(f)
         return d
 
+    @overload
     def checkconsistency():
         # TODO 检查allids是否正确
         # TODO 检查kp对是否完整
         # 如果出现不一致，用assert抛出AssertionError
+        pass
+
+    @overload
+    def checkconsistency(update: Update):
+        # TODO 检查群的升级
+        # TODO 检查是否是新群、新玩家
+        # 每隔几分钟，做一次该操作
         pass
 
     @overload
