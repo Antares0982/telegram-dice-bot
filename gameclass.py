@@ -4,10 +4,11 @@ import json
 from io import TextIOWrapper
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
-from telegram import Chat
+from telegram import Bot, Chat
 
-from dicefunc import *
 from cfg import PATH_GROUPS, PATH_PLAYERS
+from dicefunc import *
+
 # 卡信息存储于群中
 
 
@@ -169,34 +170,47 @@ class GameCard(datatype):
         rttext += "id: "+str(self.id)+"\n"
         rttext += "playerid: "+str(self.playerid)+"\n"
         rttext += "groupid: "+str(self.groupid)+"\n"
+
         rttext += "基础数值: "+"\n"
         rttext += str(self.data)+"\n"
+
         rttext += "信息: "+"\n"
         rttext += str(self.info)+"\n"
+
         rttext += "技能: "+"\n"
         rttext += str(self.skill)+"\n"
+
         rttext += "兴趣技能: "+"\n"
         rttext += str(self.interest)+"\n"
+
         rttext += "建议技能: "+"\n"
         rttext += str(self.suggestskill)+"\n"
-        # rttext += "角色卡检查: "+"\n"
-        # for keys in self.cardcheck:
-        #     rttext += keys+": "+str(self.cardcheck[keys])+"\n"
+
+        # TODO 角色卡检查
+
         rttext += "其他属性: "+"\n"
         rttext += str(self.attr)+"\n"
+
         rttext += "背景故事: "+"\n"
         rttext += str(self.background)+"\n"
+
         rttext += "临时检定加成: "+"\n"
         rttext += str(self.tempstatus)+"\n"
+
         rttext += "物品: "+'，'.join(self.item)+"\n"
+
         rttext += "资产: "+self.assets+"\n"
+
         rttext += "角色类型: "+self.type+"\n"
+
         rttext += "玩家是否可删除该卡: "
         if self.discard:
             rttext += "是\n"
         else:
             rttext += "否\n"
+
         rttext += "状态: "+self.status+"\n"
+
         return rttext
 
     def cardConstruct(self):
@@ -225,6 +239,7 @@ class Player(datatype):
         # controlling 需要在载入时赋值。存储时：卡id。正确载入后类型为 GameCard | None
         self.controlling: Optional[Union[GameCard, int]] = None
         self.id = plid
+        self.name: str = ""
         self.kpgroups: Dict[int, Group] = {}  # 需要在载入时赋值。存储时：存储int列表。读取时忽略
         self.kpgames: Dict[int, GroupGame] = {}  # 需要在载入时赋值。存储时：存储int列表。读取时忽略
         if len(d) > 0:
@@ -262,10 +277,14 @@ class Player(datatype):
         d["kpgames"] = idlist
         return d
 
+    def getname(self, bot: Bot) -> str:
+        if self.id is None:
+            raise TypeError("Player实例没有id")
+        self.name = bot.get_chat(chat_id=self.id).full_name
+        return self.name if self.name is not None else ""
+
     def iskp(self, gpid: int) -> bool:
-        if gpid in self.kpgroups:
-            return True
-        return False
+        return gpid in self.kpgroups
 
     def write(self):
         if self.id is not int:
@@ -283,13 +302,14 @@ class Group(datatype):
         self.game: Optional[GroupGame] = None
         self.rule: GroupRule = GroupRule()
         self.pausedgame: Optional[GroupGame] = None
+        self.name: str = ""
         # kp 需要在载入时赋值。读取、存储时为int。正确载入后类型为 Player | None
         self.kp: Optional[Union[Player, int]] = None
         self.chat: Union[Chat, int] = None  # 需要在载入时赋值。不存储
         if len(d) > 0:
             self.read_json(d)
 
-    def read_json(self, d: dict, jumpkeys: List[str] = ["game", "rule", "pausedgame", "cards"]) -> None:
+    def read_json(self, d: dict, jumpkeys: List[str] = ["game", "rule", "pausedgame", "cards", "name"]) -> None:
         super().read_json(d, jumpkeys=jumpkeys)
         if "game" in d:
             self.game = GroupGame(d=d["game"])

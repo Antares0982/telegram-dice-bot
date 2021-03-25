@@ -18,6 +18,8 @@ else:
     updater = Updater(token=TOKEN, use_context=True)
 updater.idle()
 
+updater.bot
+
 
 class DiceBot:
     def __init__(self):
@@ -91,6 +93,7 @@ class DiceBot:
 
     @overload
     def checkconsistency():
+        # TODO 检查群名称是否有变化
         # TODO 检查allids是否正确
         # TODO 检查kp对是否完整
         # 如果出现不一致，用assert抛出AssertionError
