@@ -906,23 +906,24 @@ def holdgame(update: Update, context: CallbackContext) -> bool:
 
 def continuegame(update: Update, context: CallbackContext) -> bool:
     """继续游戏。必须在`/holdgame`之后使用。"""
-    if utils.isprivatemsg(update):
-        return utils.errorHandler(update, "发送群消息继续游戏")
-    gpid = utils.getchatid(update)
-    if not utils.isfromkp(update):
-        return utils.errorHandler(update, "只有KP可以继续游戏", True)
-    game = utils.holdgamepop(gpid)
-    if not game:
-        return utils.errorHandler(update, "没有找到暂停的游戏", True)
-    utils.ON_GAME.append(game)
-    utils.writegameinfo(utils.ON_GAME)
-    gamecardidlist = utils.getgamecardsid(game)
-    if gpid in utils.CARDS_DICT:
-        for cdid in utils.CARDS_DICT[gpid]:
-            if cdid not in gamecardidlist:
-                utils.addcardtogame(game, utils.CARDS_DICT[gpid][cdid])
-    update.message.reply_text("游戏继续！")
-    return True
+    # 因为逻辑修改，需要重写
+    # if utils.isprivatemsg(update):
+    #     return utils.errorHandler(update, "发送群消息继续游戏")
+    # gpid = utils.getchatid(update)
+    # if not utils.isfromkp(update):
+    #     return utils.errorHandler(update, "只有KP可以继续游戏", True)
+    # game = utils.holdgamepop(gpid)
+    # if not game:
+    #     return utils.errorHandler(update, "没有找到暂停的游戏", True)
+    # utils.ON_GAME.append(game)
+    # utils.writegameinfo(utils.ON_GAME)
+    # gamecardidlist = utils.getgamecardsid(game)
+    # if gpid in utils.CARDS_DICT:
+    #     for cdid in utils.CARDS_DICT[gpid]:
+    #         if cdid not in gamecardidlist:
+    #             utils.addcardtogame(game, utils.CARDS_DICT[gpid][cdid])
+    # update.message.reply_text("游戏继续！")
+    # return True
 
 
 def abortgame(update: Update, context: CallbackContext) -> bool:

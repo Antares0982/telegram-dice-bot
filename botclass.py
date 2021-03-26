@@ -107,7 +107,7 @@ class DiceBot:
         pass
 
     @overload
-    def writegroup(self, gpid: int):
+    def writegroup(self, gpid: int) -> None:
         try:
             gp = self.groups[gpid]
         except KeyError:
@@ -117,11 +117,11 @@ class DiceBot:
         #           f, indent=4, ensure_ascii=False)
 
     @overload
-    def writegroup(self, gp: Group):
+    def writegroup(self, gp: Group) -> None:
         return self.writegroup(gp.id)
 
     @overload
-    def writeplayer(self, plid: int):
+    def writeplayer(self, plid: int) -> None:
         try:
             pl = self.players[plid]
         except KeyError:
@@ -129,7 +129,7 @@ class DiceBot:
         pl.write()
 
     @overload
-    def writeplayer(self, pl: Player):
+    def writeplayer(self, pl: Player) -> None:
         return self.writeplayer(pl.id)
 
     def getgp(self, gpid: int) -> Optional[Group]:

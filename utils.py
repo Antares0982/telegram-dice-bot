@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
 import asyncio
-from typing import List, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Iterator, KeysView, List, Optional, Tuple, TypeVar, Union
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, error
 from telegram.callbackquery import CallbackQuery
@@ -184,18 +184,15 @@ def cardadd(card: GameCard, gpid: int) -> bool:
     dicebot.allids.append(card.id)
     dicebot.allids.sort()
     # 增加群索引
-    gp = getgp(gpid)
-    if not gp:
-        dicebot.groups[gpid] = Group(gpid=gpid)
+    gp = forcegetgroup(gpid)
     card.group = gp
+    card.groupid = gpid
     gp.cards[card.id] = card
     dicebot.writegroup(gpid)
     # 增加pl索引
-    pl = getplayer(card.playerid)
-    if not pl:
-        dicebot.players[card.playerid] = Player(plid=card.playerid)
-        pl = dicebot.players[card.playerid]
+    pl = forcegetplayer(card.playerid)
     pl.cards[card.id] = card
+    card.player = pl
     if pl.controlling:
         autoswitchhint(pl.id)
     pl.controlling = card
@@ -211,6 +208,26 @@ def getcard(gpid: int, cdid: int) -> Optional[GameCard]:
     if not card:
         return None
     return card
+
+
+def gamecardadd(card: GameCard, gpid: int) -> bool:
+    """向游戏内添加一张卡，当卡id重复时返回False"""
+    gp = forcegetgroup(gpid)
+    if card.id not in gp.cards or card.id in gp.game.cards:
+        return False
+    # 增加群索引
+
+    card.group = gp
+    card.groupid = gpid
+    gp.game.cards[card.id] = card
+    gp.write()
+    # 增加pl索引
+
+    pl = forcegetplayer(card.playerid)
+    pl.gamecards[card.id] = card
+    card.player = pl
+    dicebot.writeplayer(pl.id)
+    return True
 
 
 # operation 查增删
@@ -321,18 +338,18 @@ def findcardwithid(cdid: int) -> Optional[GameCard]:
     return None
 
 
-def getskillmax(card1: GameCard) -> int:
-    aged, ok = skillcantouchmax(card1)
-    rule = card1.group.rule
-    if aged:
-        skillmaxrule = rule.skillmaxAged
-    else:
-        skillmaxrule = rule.skillmax
-    if ok:
-        mm = skillmaxrule[1]
-    else:
-        mm = skillmaxrule[0]
-    return mm
+# def getskillmax(card1: GameCard) -> int:
+#     aged, ok = skillcantouchmax(card1)
+#     rule = card1.group.rule
+#     if aged:
+#         skillmaxrule = rule.skillmaxAged
+#     else:
+#         skillmaxrule = rule.skillmax
+#     if ok:
+#         mm = skillmaxrule[1]
+#     else:
+#         mm = skillmaxrule[0]
+#     return mm
 
 
 def getskilllevelfromdict(card1: GameCard, key: str) -> int:
@@ -682,7 +699,7 @@ def makejobbutton() -> List[List[InlineKeyboardButton]]:
     return rtbuttons
 
 
-def skillcantouchmax(card1: GameCard) -> Tuple[bool, bool]:
+def skillcantouchmax(card1: GameCard, jumpskill: Optional[str] = None) -> Tuple[bool, bool]:
     """判断一张卡当前是否可以新增一个专精技能。
 
     第一个返回值描述年龄是否符合Aged标准。第二个返回值描述在当前年龄下能否触摸到专精等级"""
@@ -693,34 +710,49 @@ def skillcantouchmax(card1: GameCard) -> Tuple[bool, bool]:
     else:
         ans1 = False
         skillmaxrule = rules.skillmax
+
     countSpecialSkill = 0
+
     for skill in card1.skill.allskills():
+        if (skill == "母语" or skill == "闪避") and getskilllevelfromdict(card1, skill) == card1.skill.get(skill):
+            continue
+        if jumpskill is not None and skill == jumpskill:
+            continue
         if card1.skill.get(skill) > skillmaxrule[0]:
             countSpecialSkill += 1
+
     for skill in card1.interest.allskills():
+        if (skill == "母语" or skill == "闪避") and getskilllevelfromdict(card1, skill) == card1.interest.get(skill):
+            continue
+        if jumpskill is not None and skill == jumpskill:
+            continue
         if card1.interest.get(skill) > skillmaxrule[0]:
             countSpecialSkill += 1
-    if countSpecialSkill >= skillmaxrule[2]:
-        return ans1, False
-    return ans1, True
+
+    return ans1, True if countSpecialSkill < skillmaxrule[2] else ans1, False
 
 
 def skillmaxval(skillname: str, card1: GameCard, ismainskill: bool) -> int:
     """通过cost规则，返回技能能达到的最高值。"""
-    aged, ok = skillcantouchmax(card1)
+    aged, ok = skillcantouchmax(card1, skillname)
     gp = forcegetgroup(card1.groupid)
+
     if aged:
         skillrule = gp.rule.skillmaxAged
     else:
         skillrule = gp.rule.skillmax
+
     if ok:
         maxval = skillrule[1]
     else:
         maxval = skillrule[0]
+
     if skillname == "信用":
         if card1.info.job in dicebot.joblist:
             maxval = min(maxval, dicebot.joblist[card1.info.job][1])
+
     basicval = -1
+
     if ismainskill:
         pts = card1.skill.points
         if skillname in card1.skill.allskills():
@@ -729,15 +761,20 @@ def skillmaxval(skillname: str, card1: GameCard, ismainskill: bool) -> int:
         pts = card1.interest.points
         if skillname in card1.interest.allskills():
             basicval = card1.interest.get(skillname)
+
     costrule = gp.rule.skillcost
+
     if basicval == -1:
         basicval = getskilllevelfromdict(card1, skillname)
+
     if len(costrule) <= 2:
         skillmax = (pts+basicval*costrule[0])//costrule[0]
         return min(maxval, skillmax)
+
     # 有非默认的规则，长度不为2
     i = 1
     skillmax = basicval
+
     while i < len(costrule):
         if (costrule[i]-skillmax)*costrule[i-1] <= pts:
             pts -= (costrule[i]-skillmax)*costrule[i-1]
@@ -745,6 +782,7 @@ def skillmaxval(skillname: str, card1: GameCard, ismainskill: bool) -> int:
             i += 2
         else:
             return min(maxval, (pts+skillmax*costrule[i-1])//costrule[i-1])
+
     return min(maxval, skillmax)
 
 
@@ -877,7 +915,7 @@ def addcredit(update: Update, context: CallbackContext, card1: GameCard) -> bool
         m = dicebot.joblist[card1.info.job][0]
         mm = dicebot.joblist[card1.info.job][1]
     else:
-        aged, ok = skillcantouchmax(card1)
+        aged, ok = skillcantouchmax(card1, "信用")
         if aged:
             skillmaxrule = gp.rule.skillmaxAged
         else:
@@ -997,13 +1035,13 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
             card1, dicebot.joblist[jobname][i]))   # int
     dicebot.writegroup(card1.groupid)
     return True
-###########################################################
 
 
 def buttonaddmainskill(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
     if card1 is None:
         query.edit_message_text(text="找不到卡。")
         return False
+
     if len(args) == 3:
         skvalue = int(args[2])
         needpt = evalskillcost(args[1], skvalue, card1, True)
@@ -1013,6 +1051,7 @@ def buttonaddmainskill(query: CallbackQuery, card1: GameCard, args: List[str]) -
             text="主要技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.skill.points))
         dicebot.writegroup(card1.groupid)
         return True
+
     m = getskilllevelfromdict(card1, args[1])
     mm = skillmaxval(args[1], card1, True)
     rtbuttons = makeIntButtons(m, mm, args[0], args[1])
@@ -1026,6 +1065,7 @@ def buttoncgmainskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -
     if card1 is None:
         query.edit_message_text(text="找不到卡。")
         return False
+
     if len(args) == 3:
         skvalue = int(args[2])
         needpt = evalskillcost(args[1], skvalue, card1, True)
@@ -1035,6 +1075,7 @@ def buttoncgmainskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -
             text="主要技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.skill.points))
         dicebot.writegroup(card1.group)
         return True
+
     m = getskilllevelfromdict(card1, args[1])
     mm = skillmaxval(args[1], card1, True)
     rtbuttons = makeIntButtons(m, mm, args[0], args[1])
@@ -1151,64 +1192,78 @@ def buttoncondec(query: CallbackQuery, card1: Optional[GameCard], args: List[str
 
 def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
     gpid, cdid = int(args[1]), int(args[2])
+
+    card = getcard(gpid, cdid)
+    if card is None:
+        query.edit_message_text("没有找到卡片。")
+        return False
+
+    if not card.discard:
+        query.edit_message_text("该卡不可删除。")
+        return False
+
     pl = forcegetplayer(plid)
     if pl.controlling is not None and pl.controlling.groupid == gpid and pl.controlling.id == cdid:
         pl.controlling = None
         dicebot.writeplayer(plid)
-    if gpid not in CARDS_DICT or cdid not in CARDS_DICT[gpid] or CARDS_DICT[gpid][cdid].playerid != plid or not CARDS_DICT[gpid][cdid].discard:
-        query.edit_message_text("没有找到卡片。")
-        return False
-    detailinfo = "删除了：\n"+str(CARDS_DICT[gpid][cdid])
-    DETAIL_DICT[plid] = detailinfo
-    CARDS_DICT[gpid].pop(cdid)
-    if len(CARDS_DICT[gpid]) == 0:
-        CARDS_DICT.pop(gpid)
-    query.edit_message_text("删除了一张卡片，使用 /details 查看详细信息。\n该删除操作不可逆。")
+
+    detailinfo = "删除了：\n"+str(card)
+    cardpop(gpid, cdid)
+
+    query.edit_message_text("删除了一张卡片，使用 /details 查看被删除卡片的详细信息。\n该删除操作不可逆。")
     return True
 
 
 def buttonswitch(query: CallbackQuery, plid: int, args: List[str]) -> bool:
     gpid, cdid = int(args[1]), int(args[2])
-    if gpid not in CARDS_DICT or cdid not in CARDS_DICT[gpid] or CARDS_DICT[gpid][cdid].playerid != plid:
+
+    card = getcard(gpid, cdid)
+    if card is None:
         query.edit_message_text("没有找到卡片。")
         return False
-    CURRENT_CARD_DICT[plid] = (gpid, cdid)
-    writecurrentcarddict(CURRENT_CARD_DICT)
-    cardi = CARDS_DICT[gpid][cdid]
-    if "name" not in cardi.info or cardi.info["name"] == "":
+
+    pl = forcegetplayer(plid)
+    pl.controlling = card
+    pl.write()
+
+    if getname(card) == "None":
         query.edit_message_text("修改成功，现在操作的卡id是："+str(cdid))
     else:
-        query.edit_message_text("修改成功，现在操作的卡是："+cardi.info["name"])
+        query.edit_message_text("修改成功，现在操作的卡是："+card.info.name)
     return True
 
 
-def buttonswitchkp(query: CallbackQuery, kpid: int, args: List[str]) -> bool:
-    ctrlid = int(args[1])
-    game = findgamewithkpid(kpid)
-    if not game:
-        query.edit_message_text("没有找到游戏。")
-        return False
-    cardi = findcardfromgamewithid(game, ctrlid)
-    if not cardi or cardi.playerid != kpid:
-        query.edit_message_text("没有找到这张npc卡。")
-        return False
-    game.kpctrl = ctrlid
-    writegameinfo(ON_GAME)
-    query.edit_message_text("修改操纵的npc卡成功，id为："+str(ctrlid))
-    return True
+# def buttonswitchkp(query: CallbackQuery, kpid: int, args: List[str]) -> bool:
+#     ctrlid = int(args[1])
+#     game = findgamewithkpid(kpid)
+#     if not game:
+#         query.edit_message_text("没有找到游戏。")
+#         return False
+#     cardi = findcardfromgamewithid(game, ctrlid)
+#     if not cardi or cardi.playerid != kpid:
+#         query.edit_message_text("没有找到这张npc卡。")
+#         return False
+#     game.kpctrl = ctrlid
+#     writegameinfo(ON_GAME)
+#     query.edit_message_text("修改操纵的npc卡成功，id为："+str(ctrlid))
+#     return True
 
 
 def buttonsetsex(query: CallbackQuery, plid: int,  args: List[str]) -> bool:
     cardi = findcard(plid)
-    if not cardi:
+    if cardi is None:
         query.edit_message_text("找不到卡。")
         return False
+
     sex = args[1]
     if sex == "other":
         addOP(plid, "setsex")
         query.edit_message_text("请输入具体的性别：")
         return True
-    cardi.info["sex"] = sex
+
+    cardi.info.sex = sex
+    cardi.write()
+
     rttext = "性别设定为"
     if sex == "male":
         rttext += "男性。"
@@ -1218,50 +1273,50 @@ def buttonsetsex(query: CallbackQuery, plid: int,  args: List[str]) -> bool:
     return True
 
 
-def getkpctrl(game: GroupGame) -> GameCard:
-    for cardi in game.cards:
+def getkpctrl(game: GroupGame) -> Optional[GameCard]:
+    for cardi in game.cards.values():
         if cardi.id == game.kpctrl and cardi.playerid == game.kpid:
             return cardi
     return None
 
 
 def changecardgpid(oldgpid: int, newgpid: int) -> bool:
-    """函数`changegroup`的具体实现。不会检查oldgpid是否是键"""
-    if newgpid not in CARDS_DICT:  # 直接将整个字典pop出来
-        CARDS_DICT[newgpid] = CARDS_DICT.pop(oldgpid)
-        for cdid in CARDS_DICT[newgpid]:
-            CARDS_DICT[newgpid][cdid].groupid = newgpid
-    else:  # 因为目标群有卡，不可以直接复制，遍历原群所有键
-        for cdid in CARDS_DICT[oldgpid]:
-            CARDS_DICT[newgpid][cdid] = CARDS_DICT[oldgpid].pop(cdid)
-            CARDS_DICT[newgpid][cdid].groupid = newgpid
-        CARDS_DICT.pop(oldgpid)
-    writecards(CARDS_DICT)
+    """函数`changegroup`的具体实现。"""
+    oldcdidlst = list(forcegetgroup(oldgpid).cards.keys())
+    for cdid in oldcdidlst:
+        card = cardpop(oldgpid, cdid)
+        cardadd(card, newgpid)
+    getgp(oldgpid).write()
+    getgp(newgpid).write()
 
 
 def groupcopy(oldgpid: int, newgpid: int, copyall: bool) -> bool:
+    """copyall为False则只复制NPC卡片"""
     if findgame(oldgpid) or findgame(newgpid):
         return False
-    kpid = getkpid(oldgpid)
-    if newgpid not in CARDS_DICT:
-        CARDS_DICT[newgpid] = {}
-    if oldgpid in CARDS_DICT:
-        i = 0
-        newids = getnewids(len(CARDS_DICT[oldgpid]))
-        for cdid in CARDS_DICT[oldgpid]:
-            if not copyall and CARDS_DICT[oldgpid][cdid].playerid != kpid:
-                continue
-            nid = newids[i]
-            i += 1
-            CARDS_DICT[newgpid][nid] = GameCard(
-                CARDS_DICT[oldgpid][cdid].__dict__)
-            CARDS_DICT[newgpid][nid].id = nid
-            CARDS_DICT[newgpid][nid].groupid = newgpid
-    popallempties(CARDS_DICT)
-    writecards(CARDS_DICT)
-    GROUP_RULES[newgpid] = GroupRule(
-        copy.deepcopy(GROUP_RULES[oldgpid].__dict__))
-    writerules(GROUP_RULES)
+    oldgp = forcegetgroup(oldgpid)
+    srclist: List[GameCard] = []
+    for card in oldgp.cards.values():
+        if not copyall and (card.type != "PL" or (card.group.kp is not None and card.playerid == card.group.kp.id)):
+            continue
+        srclist.append(card)
+
+    if len(srclist) == 0:
+        return False
+
+    newids = getnewids(len(srclist))
+
+    dstlist = [GameCard(card.to_json()) for card in srclist]
+
+    for i in range(len(dstlist)):
+        dstlist[i].id = newids[i]
+
+    for card in dstlist:
+        cardadd(card, newgpid)
+
+    getgp(newgpid).write()
+    oldgp.write()
+
     return True
 
 
@@ -1274,25 +1329,25 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
     # If card1.skill.points is 0, turn to interest.
     # Then it must be main skill. After all main skills are added, add interest skills.
     if card1.skill.points > 0:
-        if not card1.suggestskill:  # Increase skills already added, because sgskill is empty
+        if not card1.suggestskill.allskills():  # Increase skills already added, because sgskill is empty
             # GOOD TRAP: cgmainskill
-            for keys in card1.skill:
+            for keys in card1.skill.allskills():
                 if keys == "points":
                     continue
                 if len(rtbuttons[len(rtbuttons)-1]) == 4:
                     rtbuttons.append([])
                 rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys +
-                                                                        ": "+str(card1.skill[keys]), callback_data=IDENTIFIER+" "+"cgmainskill "+keys))
+                                                                        ": "+str(card1.skill.get(keys)), callback_data=dicebot.IDENTIFIER+" "+"cgmainskill "+keys))
             rp_markup = InlineKeyboardMarkup(rtbuttons)
             update.message.reply_text("剩余点数："+str(
                 card1.skill.points)+"\n请选择一项主要技能用于增加技能点", reply_markup=rp_markup)
             return True
         # GOOD TRAP: addsgskill
-        for keys in card1.suggestskill:
+        for keys in card1.suggestskill.allskills():
             if len(rtbuttons[len(rtbuttons)-1]) == 4:
                 rtbuttons.append([])
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys+": " +
-                                                                    str(card1.suggestskill[keys]), callback_data=IDENTIFIER+" "+"addsgskill "+keys))
+                                                                    str(card1.suggestskill.get(keys)), callback_data=dicebot.IDENTIFIER+" "+"addsgskill "+keys))
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text("剩余点数："+str(
             card1.skill.points)+"\n请选择一项主要技能", reply_markup=rp_markup)
@@ -1316,29 +1371,34 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
     # Show button for numbers
     skillname = context.args[0]
     m = getskilllevelfromdict(card1, skillname)
-    if skillname == "信用" and card1.info["job"] in dicebot.joblist:
-        m = max(m, dicebot.joblist[card1.info["job"]][0])
-    if skillname in card1.skill:  # GOOD TRAP: cgmainskill
+
+    if skillname == "信用" and card1.info.job in dicebot.joblist:
+        m = max(m, dicebot.joblist[card1.info.job][0])
+
+    if skillname in card1.skill.allskills():  # GOOD TRAP: cgmainskill
         mm = skillmaxval(skillname, card1, True)
         rtbuttons = makeIntButtons(m, mm, "cgmainskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
             "更改主要技能点数。剩余技能点："+str(card1.skill.points)+" 技能名称："+skillname+"，当前技能点："+str(card1.skill[skillname]), reply_markup=rp_markup)
         return True
-    if skillname in card1.suggestskill:  # GOOD TRAP: addsgskill
+
+    if skillname in card1.suggestskill.allskills():  # GOOD TRAP: addsgskill
         mm = skillmaxval(skillname, card1, True)
         rtbuttons = makeIntButtons(m, mm, "addsgskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
             "添加建议技能。剩余技能点："+str(card1.skill.points)+" 技能名称："+skillname, reply_markup=rp_markup)
         return True
-    if skillname in card1.interest:  # GOOD TRAP: cgintskill
+
+    if skillname in card1.interest.allskills():  # GOOD TRAP: cgintskill
         mm = skillmaxval(skillname, card1, False)
         rtbuttons = makeIntButtons(m, mm, "cgintskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
-            "更改兴趣技能点数。剩余技能点："+str(card1.interest.points)+" 技能名称："+skillname+"，当前技能点："+str(card1.interest[skillname]), reply_markup=rp_markup)
+            "更改兴趣技能点数。剩余技能点："+str(card1.interest.points)+" 技能名称："+skillname+"，当前技能点："+str(card1.interest.get(skillname)), reply_markup=rp_markup)
         return True
+
     if card1.skill.points > 0:  # GOOD TRAP: addmainskill
         mm = skillmaxval(skillname, card1, True)
         rtbuttons = makeIntButtons(m, mm, "addmainskill", skillname)
@@ -1346,6 +1406,7 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
         update.message.reply_text(
             "添加主要技能。剩余技能点："+str(card1.skill.points)+" 技能名称："+skillname, reply_markup=rp_markup)
         return True
+
     mm = skillmaxval(skillname, card1, False)
     rtbuttons = (m, mm, "addintskill", skillname)
     rp_markup = InlineKeyboardMarkup(rtbuttons)
@@ -1354,203 +1415,172 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
     return True
 
 
-def addskill2(update: Update, context: CallbackContext, card1: GameCard) -> bool:
-    """该函数在`/addskill`接收且仅接收两个参数时调用。直接修改技能值。"""
-    skillname = context.args[0]
-    skillvalue = int(context.args[1])
-    if skillname in card1.skill:  # Change skill level.
-        return cgmainskill(skillname, skillvalue, card1, update)
-    if skillname in card1.suggestskill:
-        return addsgskill(skillname, skillvalue, card1, update)
-    if skillname in card1.interest:  # Change skill level.
-        return cgintskill(skillname, skillvalue, card1, update)
-    # If cannot judge which skill is, one more arg is needed. Then turn to addskill3()
-    if card1.skill.points > 0 and card1.interest.points > 0:
-        return errorHandler(update, "请使用'/addskill skillname skillvalue main/interest'来指定技能种类！")
-    # HIT GOOD TRAP
-    if card1.skill.points > 0:
-        return addmainskill(skillname, skillvalue, card1, update)
-    return addintskill(skillname, skillvalue, card1, update)
+# def addskill2(update: Update, context: CallbackContext, card1: GameCard) -> bool:
+#     """该函数在`/addskill`接收且仅接收两个参数时调用。直接修改技能值。"""
+#     skillname = context.args[0]
+#     skillvalue = int(context.args[1])
+#     if skillname in card1.skill:  # Change skill level.
+#         return cgmainskill(skillname, skillvalue, card1, update)
+#     if skillname in card1.suggestskill:
+#         return addsgskill(skillname, skillvalue, card1, update)
+#     if skillname in card1.interest:  # Change skill level.
+#         return cgintskill(skillname, skillvalue, card1, update)
+#     # If cannot judge which skill is, one more arg is needed. Then turn to addskill3()
+#     if card1.skill.points > 0 and card1.interest.points > 0:
+#         return errorHandler(update, "请使用'/addskill skillname skillvalue main/interest'来指定技能种类！")
+#     # HIT GOOD TRAP
+#     if card1.skill.points > 0:
+#         return addmainskill(skillname, skillvalue, card1, update)
+#     return addintskill(skillname, skillvalue, card1, update)
 
 
-def addskill3(update: Update, context: CallbackContext, card1: GameCard) -> bool:
-    """该函数在`/addskill`接收三个参数时调用。直接修改技能值。"""
-    skillname = context.args[0]
-    skillvalue = int(context.args[1])
-    if context.args[2] != "interest" and context.args[2] != "main":
-        return errorHandler(update, "这是main（主要）还是interest（兴趣）技能？请在第三个参数位置指明")
-    if context.args[2] == "interest" and (skillname in card1.suggestskill or skillname in card1.skill):
-        return errorHandler(update, "这是main（主要）技能")
-    if context.args[2] == "main" and skillname in card1.interest:
-        return errorHandler(update, "这是interest（兴趣）技能")
-    # HIT GOOD TRAP
-    if skillname in card1.interest:
-        # This means arg3 is "interest". Change skill level.
-        return cgintskill(skillname, skillvalue, card1, update)
-    if skillname in card1.suggestskill:  # Add suggest skill
-        return addsgskill(skillname, skillvalue, card1, update)
-    if skillname in card1.skill:  # Change skill level.
-        return cgmainskill(skillname, skillvalue, card1, update)
-    if context.args[2] == "main":
-        return addmainskill(skillname, skillvalue, card1, update)
-    return addintskill(skillname, skillvalue, card1, update)
+# def addskill3(update: Update, context: CallbackContext, card1: GameCard) -> bool:
+#     """该函数在`/addskill`接收三个参数时调用。直接修改技能值。"""
+#     skillname = context.args[0]
+#     skillvalue = int(context.args[1])
+#     if context.args[2] != "interest" and context.args[2] != "main":
+#         return errorHandler(update, "这是main（主要）还是interest（兴趣）技能？请在第三个参数位置指明")
+#     if context.args[2] == "interest" and (skillname in card1.suggestskill or skillname in card1.skill):
+#         return errorHandler(update, "这是main（主要）技能")
+#     if context.args[2] == "main" and skillname in card1.interest:
+#         return errorHandler(update, "这是interest（兴趣）技能")
+#     # HIT GOOD TRAP
+#     if skillname in card1.interest:
+#         # This means arg3 is "interest". Change skill level.
+#         return cgintskill(skillname, skillvalue, card1, update)
+#     if skillname in card1.suggestskill:  # Add suggest skill
+#         return addsgskill(skillname, skillvalue, card1, update)
+#     if skillname in card1.skill:  # Change skill level.
+#         return cgmainskill(skillname, skillvalue, card1, update)
+#     if context.args[2] == "main":
+#         return addmainskill(skillname, skillvalue, card1, update)
+#     return addintskill(skillname, skillvalue, card1, update)
 
 
-async def timer():
-    """凌晨3点进行一次自检"""
-    istime = False
-    clockhour = 3
-    clockmin = 0
-    while True:
-        nowtime = time.localtime(time.time())
-        if not istime and nowtime.tm_hour == clockhour and nowtime.tm_min == clockmin:
-            sendtoAdmin("bot自检中！")
-            botcheckdata("bot自检中……")
-            istime = True
-            continue
-        if istime:
-            if nowtime.tm_min != clockmin:
-                istime = False
-            await asyncio.sleep(10)
-            continue
-        await asyncio.sleep(30)
+# async def timer():
+#     """凌晨3点进行一次自检"""
+#     istime = False
+#     clockhour = 3
+#     clockmin = 0
+#     while True:
+#         nowtime = time.localtime(time.time())
+#         if not istime and nowtime.tm_hour == clockhour and nowtime.tm_min == clockmin:
+#             sendtoAdmin("bot自检中！")
+#             botcheckdata("bot自检中……")
+#             istime = True
+#             continue
+#         if istime:
+#             if nowtime.tm_min != clockmin:
+#                 istime = False
+#             await asyncio.sleep(10)
+#             continue
+#         await asyncio.sleep(30)
 
 
-def gamepop(gpid: int) -> GroupGame:
+def gamepop(gpid: int) -> Optional[GroupGame]:
     """终止一场游戏。`/abortgame`的具体实现。"""
-    global ON_GAME
-    for i in range(len(ON_GAME)):
-        if ON_GAME[i].groupid == gpid:
-            t = ON_GAME[i]
-            ON_GAME = ON_GAME[:i]+ON_GAME[i+1:]
-            writegameinfo(ON_GAME)
-            return t
-    return None
+    gp = forcegetgroup(gpid)
+    ans = gp.game
+    gp.game = None
+    return ans
 
 
-def holdgamepop(gpid: int) -> GroupGame:
-    """pop一场暂停的游戏。`/continuegame`的具体实现。"""
-    global HOLD_GAME
-    for i in range(len(HOLD_GAME)):
-        if HOLD_GAME[i].groupid == gpid:
-            t = HOLD_GAME[i]
-            HOLD_GAME = HOLD_GAME[:i]+HOLD_GAME[i+1:]
-            writeholdgameinfo(HOLD_GAME)
-            return t
-    return None
+def holdinggamecontinue(gpid: int) -> GroupGame:
+    """继续一场暂停的游戏。`/continuegame`的具体实现。"""
+    gp = forcegetgroup(gpid)
+    if gp.game is not None and gp.holdinggame is not None:
+        raise Exception("群："+str(gp.id)+"存在暂停的游戏和进行中的游戏")
+    if gp.holdinggame is not None:
+        gp.game, gp.holdinggame = gp.holdinggame, None
+    return gp.game
 
 
 def isholdinggame(gpid: int) -> bool:
-    for game in HOLD_GAME:
-        if game.groupid == gpid:
-            return True
-    return False
+    return True if forcegetgroup(gpid).holdinggame is not None else False
 
 
-def getgamecardsid(game: GroupGame) -> List[int]:
-    ans: List[int] = []
-    for cardi in game.cards:
-        ans.append(cardi.id)
-    return ans
+def getgamecardsid(game: GroupGame) -> KeysView[int]:
+    return game.cards.keys()
 
 
-def addcardtogame(game: GroupGame, cardi: GameCard) -> None:
-    newgamecard = GameCard(cardi.__dict__)
-    game.cards.append(newgamecard)
-    if game.kpid == cardi.playerid:
-        game.kpcards.append(newgamecard)
-    writegameinfo(ON_GAME)
-
-
-def popallempties(d: Dict[Any, dict]) -> bool:
-    """将二层字典中一层的空值对应的键删除。如果有空值，返回True，否则返回False"""
-    ans: bool = False
-    for key in d:
-        if not d[key]:
-            ans = True
-            d.pop(key)
-    return ans
-
-
-def botcheckdata(msg: str, recall: bool = True):
-    """进行一次数据自检，检查是否有群因为升级而id变化了"""
-    gpids: List[int] = []
-    for key in CARDS_DICT:
-        gpids.append(key)
-    for key in GROUP_KP_DICT:
-        if key not in gpids:
-            gpids.append(key)
-    for gpid in gpids:
-        try:
-            sendmsg = dicebot.updater.bot.send_message(
-                chat_id=gpid, text=msg)
-        except error.ChatMigrated as err:
-            sendtoAdmin(
-                "群id发生变化，原群id："+str(gpid)+"变化为"+str(err.new_chat_id))
-            if popallempties(CARDS_DICT):
-                writecards(CARDS_DICT)
-            ok = findgame(err.new_chat_id)
-            for game in ON_GAME:
-                if game.groupid == gpid:
-                    if ok:  # 直接丢弃旧的游戏数据
-                        break
-                    game.groupid = err.new_chat_id
-                    writegameinfo(ON_GAME)
-                    break
-            if gpid in CARDS_DICT:
-                sendtoAdmin("强制转移群数据中！！")
-                changecardgpid(gpid, err.new_chat_id)
-                sendtoAdmin("转移群数据完成")
-            if gpid in GROUP_KP_DICT:
-                GROUP_KP_DICT[err.new_chat_id] = GROUP_KP_DICT.pop(
-                    gpid)
-                writekpinfo(GROUP_KP_DICT)
-        except:
-            return False
-        else:
-            if recall:
-                sendmsg.delete()
-    sendtoAdmin("自检完成！")
-    return True
+# def botcheckdata(msg: str, recall: bool = True):
+#     """进行一次数据自检，检查是否有群因为升级而id变化了"""
+#     gpids: List[int] = []
+#     for key in CARDS_DICT:
+#         gpids.append(key)
+#     for key in GROUP_KP_DICT:
+#         if key not in gpids:
+#             gpids.append(key)
+#     for gpid in gpids:
+#         try:
+#             sendmsg = dicebot.updater.bot.send_message(
+#                 chat_id=gpid, text=msg)
+#         except error.ChatMigrated as err:
+#             sendtoAdmin(
+#                 "群id发生变化，原群id："+str(gpid)+"变化为"+str(err.new_chat_id))
+#             if popallempties(CARDS_DICT):
+#                 writecards(CARDS_DICT)
+#             ok = findgame(err.new_chat_id)
+#             for game in ON_GAME:
+#                 if game.groupid == gpid:
+#                     if ok:  # 直接丢弃旧的游戏数据
+#                         break
+#                     game.groupid = err.new_chat_id
+#                     writegameinfo(ON_GAME)
+#                     break
+#             if gpid in CARDS_DICT:
+#                 sendtoAdmin("强制转移群数据中！！")
+#                 changecardgpid(gpid, err.new_chat_id)
+#                 sendtoAdmin("转移群数据完成")
+#             if gpid in GROUP_KP_DICT:
+#                 GROUP_KP_DICT[err.new_chat_id] = GROUP_KP_DICT.pop(
+#                     gpid)
+#                 writekpinfo(GROUP_KP_DICT)
+#         except:
+#             return False
+#         else:
+#             if recall:
+#                 sendmsg.delete()
+#     sendtoAdmin("自检完成！")
+#     return True
 
 
 def getname(cardi: GameCard) -> str:
     """获取角色卡名字信息。
     角色卡没有名字时，返回字符串`None`"""
-    if "name" not in cardi.info or cardi.info["name"] == "":
+    if cardi.info.name == "":
         return "None"
     return cardi.info["name"]
 
 
 def cardsetage(update: Update, cardi: GameCard, age: int) -> bool:
-    if "AGE" in cardi.info and cardi.info["AGE"] > 0:
+    if cardi.info.age > 0:
         popOP(getchatid(update))
         return errorHandler(update, "已经设置过年龄了。")
     if age < 17 or age > 99:
         return errorHandler(update, "年龄应当在17-99岁。")
-    cardi.info["AGE"] = age
-    cardi.cardcheck["check1"] = True
+    cardi.info.age = age
+    # cardi.cardcheck.check1 = True
     cardi, detailmsg = generateAgeAttributes(cardi)
     update.message.reply_text(
         "年龄设置完成！详细信息如下：\n"+detailmsg+"\n如果年龄不小于40，或小于20，需要使用指令'/setstrdec number'设置STR减值。如果需要帮助，使用 /createcardhelp 来获取帮助。")
-    if cardi.cardcheck["check2"]:
-        generateOtherAttributes(cardi)
-    writecards(CARDS_DICT)
+
+    generateOtherAttributes(cardi)
+    cardi.write()
     return True
 
 
 def cardsetsex(update: Update, cardi: GameCard, sex: str) -> bool:
     if sex in ["男", "男性", "M", "m", "male", "雄", "雄性", "公", "man"]:
-        cardi.info["sex"] = "male"
+        cardi.info.sex = "male"
         update.message.reply_text("性别设定为男性。")
     elif sex in ["女", "女性", "F", "f", "female", "雌", "雌性", "母", "woman"]:
-        cardi.info["sex"] = "female"
+        cardi.info.sex = "female"
         update.message.reply_text("性别设定为女性。")
     else:
-        cardi.info["sex"] = sex
+        cardi.info.sex = sex
         update.message.reply_text(
             "性别设定为："+sex+"。")
-    writecards(CARDS_DICT)
     return True
 
 
@@ -1560,7 +1590,7 @@ def textnewcard(update: Update) -> bool:
     if not isint(text) or int(text) >= 0:
         return errorHandler(update, "无效群id。如果你不知道群id，在群里发送 /getid 获取群id。")
     gpid = int(text)
-    if hascard(plid, gpid) and getkpid(gpid) != plid:
+    if hascard(plid, gpid) and (forcegetgroup(gpid).kp is None or forcegetgroup(gpid).kp.id != plid):
         popOP(plid)
         return errorHandler(update, "你在这个群已经有一张卡了！")
     popOP(plid)
@@ -1576,16 +1606,16 @@ def textsetage(update: Update) -> bool:
     if not cardi:
         popOP(plid)
         return errorHandler(update, "找不到卡")
-    if cardsetage(update, cardi, int(text)):
-        popOP(plid)
-        return True
-    return False
+
+    return (bool(popOP(plid)) or True) if cardsetage(update, cardi, int(text)) else False
 
 
 def nameset(cardi: GameCard, name: str) -> None:
-    cardi.info["name"] = name
-    cardi.cardcheck["check5"] = True
-    writecards(CARDS_DICT)
+    cardi.info.name = name
+    # cardi.cardcheck["check5"] = True
+    cardi.write()
+
+###########################################################
 
 
 def textsetname(update: Update, plid: int) -> bool:

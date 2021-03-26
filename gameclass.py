@@ -5,6 +5,9 @@ from io import TextIOWrapper
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from telegram import Bot, Chat
+from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
+from telegram.inline.inlinekeyboardmarkup import InlineKeyboardMarkup
+from telegram.replymarkup import ReplyMarkup
 
 from cfg import PATH_GROUPS, PATH_PLAYERS
 from dicefunc import *
@@ -835,3 +838,17 @@ class GroupRule(datatype):
     def write(self):
         if self.card is not None and self.card.group is not None:
             self.card.group.write()
+
+
+class buttonpage:
+    def __init__(self, rtbuttons: List[List[InlineKeyboardButton]], page: int) -> None:
+        self.pagenum = page
+        self.nextpage: Optional[buttonpage] = None
+        if len(rtbuttons) > 4:
+            self.rtbuttons = rtbuttons[:4]
+            self.newnextpage(page+1, rtbuttons[4:])
+        else:
+            self.rtbuttons = rtbuttons
+
+    def newnextpage(self, rtbuttons: List[List[InlineKeyboardButton]], page: int):
+        self.nextpage = buttonpage(page, rtbuttons)
