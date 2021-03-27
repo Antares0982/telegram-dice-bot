@@ -1,7 +1,8 @@
 # -*- coding:utf-8 -*-
 
 import asyncio
-from typing import Any, Dict, Iterator, KeysView, List, Optional, Tuple, TypeVar, Union
+from typing import (Any, Dict, Iterator, KeysView, List, Optional, Tuple,
+                    TypeVar, Union)
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, error
 from telegram.callbackquery import CallbackQuery
@@ -39,39 +40,8 @@ DETAIL_DICT: Dict[int, str] = {}  # 临时地存储详细信息
 SKILL_PAGES: List[List[str]]
 
 
-def sendtoAdmin(msg: str) -> None:
-    dicebot.updater.bot.send_message(chat_id=ADMIN_ID, text=msg)
-
-# 检测json文件能否正常读取
-
-
 # 读取完成
-dicebot.updater.bot.send_message(
-    chat_id=ADMIN_ID, text="Bot is live!")
-
-# Update相关
-
-
-def getchatid(update: Update) -> int:
-    """返回effective_chat.id"""
-    return update.effective_chat.id
-
-
-def getmsgfromid(update: Update) -> int:
-    """返回message.from_user.id"""
-    return update.message.from_user.id
-
-
-def isprivatemsg(update: Update) -> bool:
-    if update.effective_chat.type == "private":
-        return True
-    return False
-
-
-def isgroupmsg(update: Update) -> bool:
-    if update.effective_chat.type.find("group") != -1:
-        return True
-    return False
+dicebot.sendtoAdmin("Bot is live!")
 
 
 def getgp(gpid: int) -> Optional[Group]:
@@ -1028,7 +998,7 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
     if not generatePoints(card1, jobname):
         query.edit_message_text(
             "生成技能点出错！")
-        sendtoAdmin("生成技能出错，位置：buttonjob")
+        dicebot.sendtoAdmin("生成技能出错，位置：buttonjob")
         return False
     for i in range(3, len(dicebot.joblist[jobname])):  # Classical jobs
         card1.suggestskill.set(dicebot.joblist[jobname][i], getskilllevelfromdict(

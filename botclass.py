@@ -16,9 +16,6 @@ if PROXY:
         'proxy_url': PROXY_URL}, use_context=True)
 else:
     updater = Updater(token=TOKEN, use_context=True)
-updater.idle()
-
-updater.bot
 
 
 class DiceBot:
@@ -35,7 +32,7 @@ class DiceBot:
         self.readall()  # 先执行
         self.construct()  # 后执行
         self.operation: Dict[int, str] = {}
-        self.readhandlers()
+        # self.readhandlers()
 
     def readall(self) -> None:
         # groups
@@ -54,7 +51,7 @@ class DiceBot:
             self.players[int(filename[:len(filename)-5])] = Player(d=d)
         # cards
         for filename in os.listdir(PATH_CARDS):
-            if filename.find(".json") != len(filename)-5:
+            if filename == "game" or filename.find(".json") != len(filename)-5:
                 continue
             with open(PATH_CARDS+filename, "r", encoding='utf-8') as f:
                 d = json.load(f)
@@ -70,38 +67,51 @@ class DiceBot:
         # joblist
         with open(PATH_JOBDICT, 'r', encoding='utf-8') as f:
             self.joblist = json.load(f)
-        pass
+        # skilldict
+        with open(PATH_SKILLDICT, 'r', encoding='utf-8') as f:
+            self.skilllist = json.load(f)
 
     def construct(self) -> None:
         """创建变量之间的引用"""
+        for card in self.cards.values():
+            pl = self.getplayer(card.playerid)
+            card.player = pl if pl is not None else self.createplayer(
+                card.playerid)  # 添加card.player
+            card.player.cards[card.id] = card  # 添加player.cards
+            gp = self.getgp(card.groupid)
+            card.group = gp if gp is not None else self.creategp(
+                card.groupid)  # 添加card.group
+            card.group.cards[card.id] = card  # 添加group.cards
+            self.allids.append(card.id)
+        for card in self.gamecards.values():
+            assert(self.getplayer(card.id) is not None)
+            card.player = self.getplayer(card.id)  # 添加gamecard.player
+            card.player.gamecards[card.id] = card  # 添加player.gamecards
+            assert(self.getgp(card.groupid) is not None)
+            card.group = self.getgp(card.groupid)  # 添加card.group
+            assert(bool(card.group.game) != bool(card.group.pausedgame))
+            game = card.group.game if card.group.game is not None else card.group.pausedgame
+            game.cards[card.id] = card  # 添加game.cards
         for gp in self.groups.values():
-            for card in gp.cards.values():
-                self.cards[card.id] = card  # 添加self.cards
-                card.player = self.players[card.playerid]  # 添加card.player
-                card.player.cards[card.id] = card  # 添加player.cards
-                card.group = gp  # 添加card.group
-                self.allids.append(card.id)  # 添加self.allids
-            if gp.kp is int:
-                gp.kp = self.players[gp.kp]
-            if gp.chat is int:
-                gp.chat = self.updater.bot.get_chat(chat_id=gp.chat)
-            if gp.game is not None:
-                for card in gp.game.cards.values():
-                    self.gamecards[card.id] = card  # 添加self.gamecards
-                    # 添加gamecard.player
-                    card.player = self.players[card.playerid]
-                    card.player.gamecards[card.id] = card  # 添加player.gamecards
-                    card.group = gp  # 添加card.group
-            if gp.pausedgame is not None:
-                for card in gp.pausedgame.cards.values():
-                    self.gamecards[card.id] = card  # 添加self.gamecards
-                    # 添加gamecard.player
-                    card.player = self.players[card.playerid]
-                    card.player.gamecards[card.id] = card  # 添加player.gamecards
-                    card.group = gp  # 添加card.group
+            if isinstance(gp.kp, int):
+                kp = self.getplayer(gp.kp)
+                gp.kp = kp if kp is not None else self.createplayer(gp.kp)
+                gp.kp.kpgroups[gp.id] = gp
+            if gp.chat is None:
+                gp.chat = self.updater.bot.get_chat(chat_id=gp.id)
+            gp.name = gp.chat.title
+            if gp.game is not None or gp.pausedgame is not None:
+                game = gp.game if gp.game is not None else gp.pausedgame
+                if gp.kp is not None:
+                    gp.kp.kpgames[gp.id] = game
+                game.kpid = gp.kp.id
+        for pl in self.players.values():
+            if pl.chat is None:
+                pl.chat = self.updater.bot.get_chat(chat_id=pl.id)
+            pl.getname()
         self.allids.sort()
         for pl in self.players.values():
-            if pl.controlling is int:
+            if isinstance(pl.controlling, int):
                 pl.controlling = self.cards[pl.controlling]
 
     def readhandlers(self) -> List[str]:
@@ -110,6 +120,9 @@ class DiceBot:
         with open(PATH_HANDLERS, 'r', encoding='utf-8') as f:
             d = json.load(f)
         return d
+
+    def sendtoAdmin(self, msg: str) -> None:
+        self.updater.bot.send_message(chat_id=ADMIN_ID, text=msg)
 
     @overload
     def checkconsistency():
@@ -121,7 +134,6 @@ class DiceBot:
 
     @overload
     def checkconsistency(update: Update):
-        # TODO 检查群的升级
         # TODO 检查是否是新群、新玩家
         # 每隔几分钟，做一次该操作
         pass
@@ -158,7 +170,9 @@ class DiceBot:
         return self.groups[gpid]
 
     def creategp(self, gpid: int) -> Group:
+        assert(gpid not in self.groups)
         self.groups[gpid] = Group(gpid=gpid)
+        self.groups[gpid].write()
 
     def getplayer(self, plid) -> Optional[Player]:
         if plid not in self.players:
@@ -166,7 +180,12 @@ class DiceBot:
         return self.players[plid]
 
     def createplayer(self, plid) -> Player:
+        assert(plid not in self.players)
         self.players[plid] = Player(plid=plid)
+        self.players[plid].write()
+
+    def groupmigrate(self, oldid: int, newid: int) -> None:
+        pass
 
     """
     def writekpinfo(self) -> None:
@@ -329,8 +348,9 @@ def writehandlers(h: List[str]) -> None:
         json.dump(h, f, indent=4, ensure_ascii=False)
 
 
-try:
-    dicebot = DiceBot()
-except:
-    updater.bot.send_message(chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
-    exit()
+# try:
+#     dicebot = DiceBot()
+# except:
+#     updater.bot.send_message(chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
+#     print("出现问题")
+#     exit()

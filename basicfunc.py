@@ -1,6 +1,26 @@
 # -*- coding:utf-8 -*-
 
 from typing import Any, Dict
+from telegram import Update
+# Update相关
+
+
+def getchatid(update: Update) -> int:
+    """返回effective_chat.id"""
+    return update.effective_chat.id
+
+
+def getmsgfromid(update: Update) -> int:
+    """返回message.from_user.id"""
+    return update.message.from_user.id
+
+
+def isprivatemsg(update: Update) -> bool:
+    return update.effective_chat.type == "private"
+
+
+def isgroupmsg(update: Update) -> bool:
+    return update.effective_chat.type.find("group") != -1
 
 
 def popallempties(d: Dict[Any, dict]) -> bool:

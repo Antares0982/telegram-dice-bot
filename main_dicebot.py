@@ -14,8 +14,9 @@ from telegram.ext import (CallbackContext, CallbackQueryHandler,
                           CommandHandler, Filters, MessageHandler)
 
 import dicehandlers
+from dicehandlers import dicebot
 
-dispatcher = dicehandlers.utils.dicebot.updater.dispatcher
+dispatcher = dicebot.updater.dispatcher
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
