@@ -1158,36 +1158,36 @@ def buttoncgintskill(query: CallbackQuery, card1: Optional[GameCard], args: List
     return True
 
 
-def buttonstrdec(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
-    if not card1:
-        query.edit_message_text(text="找不到卡。")
-        return False
-    strdecval = int(args[2])
-    card1, rttext, needcon = choosedec(card1, strdecval)
-    if rttext == "输入无效":
-        query.edit_message_text(rttext)
-        return False
-    if needcon:
-        rttext += "\n使用 /setcondec 来设置CON（体质）下降值。"
-    else:
-        generateOtherAttributes(card1)
-    query.edit_message_text(rttext)
-    dicebot.writegroup(card1.group)
-    return True
+# def buttonstrdec(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
+#     if not card1:
+#         query.edit_message_text(text="找不到卡。")
+#         return False
+#     strdecval = int(args[2])
+#     card1, rttext, needcon = choosedec(card1, strdecval)
+#     if rttext == "输入无效":
+#         query.edit_message_text(rttext)
+#         return False
+#     if needcon:
+#         rttext += "\n使用 /setcondec 来设置CON（体质）下降值。"
+#     else:
+#         generateOtherAttributes(card1)
+#     query.edit_message_text(rttext)
+#     dicebot.writegroup(card1.group)
+#     return True
 
 
-def buttoncondec(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
-    if not card1:
-        query.edit_message_text(text="找不到卡。")
-        return False
-    condecval = int(args[2])
-    card1, rttext = choosedec2(card1, condecval)
-    query.edit_message_text(rttext)
-    if rttext == "输入无效":
-        return False
-    generateOtherAttributes(card1)
-    dicebot.writegroup(card1.group)
-    return True
+# def buttoncondec(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
+#     if not card1:
+#         query.edit_message_text(text="找不到卡。")
+#         return False
+#     condecval = int(args[2])
+#     card1, rttext = choosedec2(card1, condecval)
+#     query.edit_message_text(rttext)
+#     if rttext == "输入无效":
+#         return False
+#     generateOtherAttributes(card1)
+#     dicebot.writegroup(card1.group)
+#     return True
 
 
 def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
@@ -1488,15 +1488,15 @@ def gamepop(gpid: int) -> Optional[GroupGame]:
 def holdinggamecontinue(gpid: int) -> GroupGame:
     """继续一场暂停的游戏。`/continuegame`的具体实现。"""
     gp = forcegetgroup(gpid)
-    if gp.game is not None and gp.holdinggame is not None:
+    if gp.game is not None and gp.pausedgame is not None:
         raise Exception("群："+str(gp.id)+"存在暂停的游戏和进行中的游戏")
-    if gp.holdinggame is not None:
-        gp.game, gp.holdinggame = gp.holdinggame, None
+    if gp.pausedgame is not None:
+        gp.game, gp.pausedgame = gp.pausedgame, None
     return gp.game
 
 
 def isholdinggame(gpid: int) -> bool:
-    return True if forcegetgroup(gpid).holdinggame is not None else False
+    return True if forcegetgroup(gpid).pausedgame is not None else False
 
 
 def getgamecardsid(game: GroupGame) -> KeysView[int]:
@@ -1615,31 +1615,37 @@ def nameset(cardi: GameCard, name: str) -> None:
     # cardi.cardcheck["check5"] = True
     cardi.write()
 
-###########################################################
-
 
 def textsetname(update: Update, plid: int) -> bool:
     if plid == 0:  # 私聊情形
         plid = getchatid(update)
+
     if getmsgfromid(update) != plid:
         return True  # 不处理
+
     popOP(getchatid(update))
-    text = update.message.text
-    text = ' '.join(text.split())
+
+    text = ' '.join(update.message.text.split())
+
     cardi = findcard(plid)
     if not cardi:
         return errorHandler(update, "找不到卡。")
+
     nameset(cardi, text)
     update.message.reply_text("姓名设置完成："+text)
+    return True
 
 
 def textsetsex(update: Update, plid: int) -> bool:
     if plid == 0:  # 私聊情形
         plid = getchatid(update)
+
     if getmsgfromid(update) != plid:
         return True
+
     popOP(getchatid(update))
     text = update.message.text
+
     cardi = findcard(plid)
     if not cardi:
         return errorHandler(update, "找不到卡。")
@@ -1651,23 +1657,24 @@ def textdelcard(update: Update, cardid: int) -> bool:
     if not cardi:
         popOP(update.effective_chat.id)
         return errorHandler(update, "找不到卡。")
+
     kpid = getmsgfromid(update)
-    if kpid != getkpid(cardi.groupid):
+    if cardi.group.kp is None or kpid != cardi.group.kp.id:
         return True
-    text = update.message.text
-    if text != "确认":
-        popOP(update.effective_chat.id)
-        return errorHandler(update, "已经取消删除卡片操作。")
-    update.message.reply_text("卡片已删除。用 /details 查看被删卡片详情。")
-    DETAIL_DICT[update.effective_chat.id] = showcardinfo(
-        cardpop(cardi.groupid, cardid))
+
+    popOP(update.effective_chat.id)
+    if update.message.text != "确认":
+        update.message.reply_text("已经取消删除卡片操作。")
+    else:
+        update.message.reply_text("卡片已删除。")
+        # DETAIL_DICT[update.effective_chat.id] = showcardinfo(
+        #     cardpop(cardi.groupid, cardid))
     return True
 
 
 def getnewcard(msgid: int, gpid: int, plid: int, cdid: int = -1) -> bool:
     """指令`/newcard`的具体实现"""
-    if gpid not in CARDS_DICT:
-        CARDS_DICT[gpid] = {}
+    gp = forcegetgroup(gpid)
     new_card, detailmsg = generateNewCard(plid, gpid)
     allids = getallid()
     if cdid >= 0 and cdid not in allids:
@@ -1680,206 +1687,43 @@ def getnewcard(msgid: int, gpid: int, plid: int, cdid: int = -1) -> bool:
     dicebot.updater.bot.send_message(chat_id=plid, reply_to_message_id=msgid,
                                      text="角色卡已创建，您的卡id为："+str(new_card.id)+"。详细信息如下：\n"+detailmsg)
     # 如果有3个属性小于50，则discard=true
-    if countless50discard(new_card):
+    if new_card.data.countless50discard():
         new_card.discard = True
         dicebot.updater.bot.send_message(chat_id=plid, reply_to_message_id=msgid,
                                          text="因为有三项属性小于50，如果你愿意的话可以使用 /discard 来删除这张角色卡。设定年龄后则不能再删除这张卡。")
     dicebot.updater.bot.send_message(chat_id=plid, reply_to_message_id=msgid,
                                      text="长按 /setage 并输入一个数字来设定年龄。如果需要卡片制作帮助，使用 /createcardhelp 来获取帮助。")
-    if plid in CURRENT_CARD_DICT:
-        dicebot.updater.bot.send_message(chat_id=plid, reply_to_message_id=msgid,
-                                         text="创建新卡时，控制自动切换至新卡。如果需要切换你操作的另一张卡，用 /switch 切换")
     cardadd(new_card)
     return True
 
 
 def botchat(update: Update) -> None:
-    if isgroupmsg(update):
+    if isgroupmsg(update) or update.message is None or update.message.text == "":
         return
     text = update.message.text
     try:
         rttext = text+" = "+str(calculator(text))
+        update.message.reply_text(rttext)
+        return
     except:
         pass
     if text[:1] == "我":
         update.message.reply_text("你"+text[1:])
         return
     if text.find("傻逼") != -1 or text.find("sb") != -1:
-        update.message.reply_text("明白了，你是傻逼")
+        update.message.reply_text("傻逼")
         return
 
 
-def plainNewCard() -> dict:
-    t = {
-        "id": -1,
-        "playerid": 0,
-        "groupid": 0,
-        "data": {
-        },
-        "info": {
-        },
-        "skill": {
-            "points": -1
-        },
-        "interest": {
-
-        },
-        "suggestskill": {
-
-        },
-        "cardcheck": {
-            "check1": False,  # 年龄是否设定
-            "check2": False,  # str, con, dex等设定是否完成
-            "check3": False,  # job是否设定完成
-            "check4": False,  # skill是否设定完成
-            "check5": False  # 名字等是否设定完成
-        },
-        "attr": {
-            "physique": -100,
-            "DB": "-100",
-            "MOV": 0,
-            "atktimes": 1,
-            "sandown": "0/0",
-            "Armor": ""
-        },
-        "background": {
-            "description": "",
-            "faith": "",
-            "vip": "",
-            "exsigplace": "",
-            "precious": "",
-            "speciality": "",
-            "dmg": "",
-            "terror": "",
-            "myth": "",
-            "thirdencounter": ""
-        },
-        "tempstatus": {
-            "GLOBAL": 0
-        },
-        "item": "",
-        "assets": "",
-        "type": "PL",
-        "discard": False,
-        "status": "alive"
-    }
-    return t
-
-
-def templateNewCard() -> dict:
-    t = {
-        "id": -1,
-        "playerid": 0,
-        "groupid": 0,
-        "data": {
-            "STR": 0,
-            "CON": 0,
-            "SIZ": 0,
-            "DEX": 0,
-            "APP": 0,
-            "INT": 0,
-            "POW": 0,
-            "EDU": 0,
-            "LUCK": 0
-        },
-        "info": {
-            "AGE": 0,
-            "job": "",
-            "name": "",
-            "sex": ""
-        },
-        "skill": {
-            "points": 0
-        },
-        "interest": {
-            "points": 0
-        },
-        "suggestskill": {
-
-        },
-        "cardcheck": {
-            "check1": False,  # 年龄是否设定
-            "check2": False,  # str, con, dex等设定是否完成
-            "check3": False,  # job是否设定完成
-            "check4": False,  # skill是否设定完成
-            "check5": False  # 名字等是否设定完成
-        },
-        "attr": {
-            "SAN": 0,
-            "MAXSAN": 99,
-            "MAGIC": 0,
-            "MAXLP": 0,
-            "LP": 0,
-            "physique": -100,
-            "DB": "-100",
-            "MOV": 0,
-            "atktimes": 1,
-            "sandown": "1/1d6",
-            "Armor": ""
-        },
-        "background": {
-            "description": "",
-            "faith": "",
-            "vip": "",
-            "exsigplace": "",
-            "precious": "",
-            "speciality": "",
-            "dmg": "",
-            "terror": "",
-            "myth": "",
-            "thirdencounter": ""
-        },
-        "tempstatus": {
-            "GLOBAL": 0
-        },
-        "item": "",
-        "assets": "",
-        "type": "PL",
-        "discard": False,
-        "status": "alive"
-    }
-    return t
-
-
 def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
+    """新建玩家卡片"""
     newcard = plainNewCard()
     newcard["playerid"] = userid
     newcard["groupid"] = groupid
     card = GameCard(newcard)
-    text = ""
-    a, b, c = np.random.randint(1, 7, size=3)
-    STR = int(5*(a+b+c))
-    text += get3d6str("STR", a, b, c)
-    a, b, c = np.random.randint(1, 7, size=3)
-    CON = int(5*(a+b+c))
-    text += get3d6str("CON", a, b, c)
-    a, b = np.random.randint(1, 7, size=2)
-    SIZ = int(5*(a+b+6))
-    text += get2d6_6str("SIZ", a, b)
-    a, b, c = np.random.randint(1, 7, size=3)
-    DEX = int(5*(a+b+c))
-    text += get3d6str("DEX", a, b, c)
-    a, b, c = np.random.randint(1, 7, size=3)
-    APP = int(5*(a+b+c))
-    text += get3d6str("APP", a, b, c)
-    a, b = np.random.randint(1, 7, size=2)
-    INT = int(5*(a+b+6))
-    text += get2d6_6str("INT", a, b)
-    a, b, c = np.random.randint(1, 7, size=3)
-    POW = int(5*(a+b+c))
-    text += get3d6str("POW", a, b, c)
-    a, b = np.random.randint(1, 7, size=2)
-    EDU = int(5*(a+b+6))
-    text += get2d6_6str("EDU", a, b)
-    card.data["STR"] = STR
-    card.data["CON"] = CON
-    card.data["SIZ"] = SIZ
-    card.data["DEX"] = DEX
-    card.data["APP"] = APP
-    card.data["INT"] = INT
-    card.data["POW"] = POW
-    card.data["EDU"] = EDU
-    card.interest.points = INT*2
+    card.data.randdata()
+    text = card.data.datainfo
+    card.interest.points = card.data.INT*2
     return card, text
 
 
@@ -1889,225 +1733,233 @@ def EDUenhance(card: GameCard, times: int) -> str:
     rttext = ""
     timelist = ["一", "二", "三", "四"]
     for j in range(times):
-        a, b = np.random.randint(1, 7, size=2)
-        if int(5*(a+b+6)) > card.data["EDU"]:
-            rttext += "第"+timelist[j]+"次检定增强："+str(int(5*(a+b+6)))+"成功，获得"
-            a = min(99-card.data["EDU"], np.random.randint(1, 11))
+        a = dicemdn(1, 100)[0]
+        if a > card.data.EDU:
+            rttext += "第"+timelist[j]+"次检定增强："+str(a)+"成功，获得"
+            a = min(99-card.data.EDU, np.random.randint(1, 11))
             rttext += str(a)+"点提升。\n"
-            card.data["EDU"] += a
+            card.data.EDU += a
         else:
-            rttext += "第"+timelist[j]+"次检定增强："+str(int(5*(a+b+6)))+"失败。\n"
+            rttext += "第"+timelist[j]+"次检定增强："+str(a)+"失败。\n"
     return rttext
 
 
 def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
-    if "AGE" not in card.info:  # This trap should not be hit
-        return card, "Attribute: AGE is NONE, please set AGE first"
-    AGE = card.info["AGE"]
-    luck = int(5*sum(np.random.randint(1, 7, size=3)))
+    if card.info.age < 17 or card.info.age > 99:
+        return card, "年龄尚未设定"
+    AGE = card.info.age
+    luck = 5*sum(dicemdn(3, 6))
     rttext = ""
     if AGE < 20:
-        luck2 = int(5*sum(np.random.randint(1, 7, size=3)))
+        luck2 = 5*sum(dicemdn(3, 6))
         if luck < luck2:
-            card.data["LUCK"] = luck2
+            card.data.LUCK = luck2
         else:
-            card.data["LUCK"] = luck
+            card.data.LUCK = luck
         rttext += "年龄低于20，幸运得到奖励骰。结果分别为" + \
             str(luck)+", "+str(luck2)+"。教育减5，力量体型合计减5。"
-        card.data["STR_SIZ_M"] = -5
-        card.data["EDU"] -= 5
+        card.data.datadec = ("STR_SIZ_M", -5)
+        card.data.EDU -= 5
     elif AGE < 40:
-        card.cardcheck["check2"] = True  # No STR decrease, check2 passes
+        # card.cardcheck["check2"] = True  # No STR decrease, check2 passes
         rttext += "年龄20-39，得到一次教育增强。"
         rttext += EDUenhance(card, 1)
-        rttext += "现在教育：" + str(card.data["EDU"])+"。"
+        rttext += "现在教育：" + str(card.data.EDU)+"。"
     elif AGE < 50:
         rttext += "年龄40-49，得到两次教育增强。\n"
         rttext += EDUenhance(card, 2)
-        rttext += "现在教育："+str(card.data["EDU"])+"。\n"
-        card.data["STR_CON_M"] = -5
-        card.data["APP"] -= 5
+        rttext += "现在教育："+str(card.data.EDU)+"。\n"
+        card.data.datadec = ("STR_CON_M", -5)
+        card.data.APP -= 5
         rttext += "力量体质合计减5，外貌减5。\n"
     elif AGE < 60:
         rttext += "年龄50-59，得到三次教育增强。\n"
         rttext += EDUenhance(card, 3)
-        rttext += "现在教育："+str(card.data["EDU"])+"。\n"
-        card.data["STR_CON_DEX_M"] = -10
-        card.data["APP"] -= 10
+        rttext += "现在教育："+str(card.data.EDU)+"。\n"
+        card.data.datadec = ("STR_CON_DEX_M", -10)
+        card.data.APP -= 10
         rttext += "力量体质敏捷合计减10，外貌减10。\n"
     elif AGE < 70:
         rttext += "年龄60-69，得到四次教育增强。\n"
         rttext += EDUenhance(card, 4)
-        rttext += "现在教育："+str(card.data["EDU"])+"。\n"
-        card.data["STR_CON_DEX_M"] = -20
-        card.data["APP"] -= 15
+        rttext += "现在教育："+str(card.data.EDU)+"。\n"
+        card.data.datadec = ("STR_CON_DEX_M", -20)
+        card.data.APP -= 15
         rttext += "力量体质敏捷合计减20，外貌减15。\n"
     elif AGE < 80:
         rttext += "年龄70-79，得到四次教育增强。\n"
         rttext += EDUenhance(card, 4)
-        rttext += "现在教育："+str(card.data["EDU"])+"。\n"
-        card.data["STR_CON_DEX_M"] = -40
-        card.data["APP"] -= 20
+        rttext += "现在教育："+str(card.data.EDU)+"。\n"
+        card.data.datadec = ("STR_CON_DEX_M", -40)
+        card.data.APP -= 20
         rttext += "力量体质敏捷合计减40，外貌减20。\n"
     else:
         rttext += "年龄80以上，得到四次教育增强。\n"
         rttext += EDUenhance(card, 4)
-        rttext += "现在教育："+str(card.data["EDU"])+"。\n"
-        card.data["STR_CON_DEX_M"] = -80
-        card.data["APP"] -= 25
+        rttext += "现在教育："+str(card.data.EDU)+"。\n"
+        card.data.datadec = ("STR_CON_DEX_M", -80)
+        card.data.APP -= 25
         rttext += "力量体质敏捷合计减80，外貌减25。\n"
     if AGE >= 20:
-        card.data["LUCK"] = luck
+        card.data.LUCK = luck
         rttext += "幸运："+str(luck)+"\n"
-    for keys in card.data:
-        if len(keys) > 6:
-            rttext += "使用' /setstrdec STRDEC '来设置因为年龄设定导致的STR减少值，根据所设定的年龄可能还需要设置CON减少值。根据上面的提示减少的数值进行设置。\n"
-            break
+    if card.data.datadec is not None:
+        rttext += "使用' /setstrdec STRDEC '来设置因为年龄设定导致的STR减少值，根据所设定的年龄可能还需要设置CON减少值。根据上面的提示减少的数值进行设置。\n"
     rttext += "使用 /setjob 进行职业设定。完成职业设定之后，用'/addskill 技能名 技能点数' 来分配技能点，用空格分隔。"
     return card, rttext
 
 
 # If returns "输入无效", card should not be edited
-def choosedec(card: GameCard, strength: int) -> Tuple[GameCard, str, bool]:
-    if card.data["STR"] <= strength:
-        return card, "输入无效", False
-    card.data["STR"] -= strength  # Add it back if "HIT BAD TRAP"
-    needCON = False
-    rttext = "力量减"+str(strength)+"点，"
-    if "STR_SIZ_M" in card.data:  # AGE less than 20
-        if strength > -card.data["STR_SIZ_M"]:
-            card.data["STR"] += strength
-            return card, "输入无效", False
-        card.data["SIZ"] += card.data["STR_SIZ_M"]+strength
-        rttext += "体型减"+str(-card.data["STR_SIZ_M"]-strength)+"点。"
-        card.data.pop("STR_SIZ_M")
-        card.cardcheck["check2"] = True  # No other decrease, check2 passes
-    elif "STR_CON_M" in card.data:
-        if strength > -card.data["STR_CON_M"]:
-            card.data["STR"] += strength
-            return card, "输入无效", False
-        card.data["CON"] += card.data["STR_CON_M"]+strength
-        rttext += "体质减"+str(-card.data["STR_CON_M"]-strength)+"点。"
-        card.data.pop("STR_CON_M")
-        card.cardcheck["check2"] = True  # No other decrease, check2 passes
-    elif "STR_CON_DEX_M" in card.data:
-        if strength > -card.data["STR_CON_DEX_M"]:
-            card.data["STR"] += strength
-            return card, "输入无效", False
-        if not strength == -card.data["STR_CON_DEX_M"]:
-            needCON = True
-            card.data["CON_DEX_M"] = card.data["STR_CON_DEX_M"]+strength
-            rttext += "体质敏捷合计减"+str(-card.data["CON_DEX_M"])+"点。"
-        else:
-            rttext += "体质敏捷合计减0点。"
-        card.data.pop("STR_CON_DEX_M")
-    else:
-        return card, "输入无效", False
-    return card, rttext, needCON
+# def choosedec(card: GameCard, strength: int) -> Tuple[GameCard, str, bool]:
+#     if card.data.STR <= strength:
+#         return card, "输入无效", False
+#     card.data.STR -= strength  # Add it back if "HIT BAD TRAP"
+#     needCON = False
+#     rttext = "力量减"+str(strength)+"点，"
+#     if "STR_SIZ_M" in card.data:  # AGE less than 20
+#         if strength > -card.data["STR_SIZ_M"]:
+#             card.data.STR += strength
+#             return card, "输入无效", False
+#         card.data.SIZ += card.data["STR_SIZ_M"]+strength
+#         rttext += "体型减"+str(-card.data["STR_SIZ_M"]-strength)+"点。"
+#         card.data.pop("STR_SIZ_M")
+#         card.cardcheck["check2"] = True  # No other decrease, check2 passes
+#     elif "STR_CON_M" in card.data:
+#         if strength > -card.data["STR_CON_M"]:
+#             card.data.STR += strength
+#             return card, "输入无效", False
+#         card.data.CON += card.data["STR_CON_M"]+strength
+#         rttext += "体质减"+str(-card.data["STR_CON_M"]-strength)+"点。"
+#         card.data.pop("STR_CON_M")
+#         card.cardcheck["check2"] = True  # No other decrease, check2 passes
+#     elif "STR_CON_DEX_M" in card.data:
+#         if strength > -card.data["STR_CON_DEX_M"]:
+#             card.data.STR += strength
+#             return card, "输入无效", False
+#         if not strength == -card.data["STR_CON_DEX_M"]:
+#             needCON = True
+#             card.data["CON_DEX_M"] = card.data["STR_CON_DEX_M"]+strength
+#             rttext += "体质敏捷合计减"+str(-card.data["CON_DEX_M"])+"点。"
+#         else:
+#             rttext += "体质敏捷合计减0点。"
+#         card.data.pop("STR_CON_DEX_M")
+#     else:
+#         return card, "输入无效", False
+#     return card, rttext, needCON
 
 
-def choosedec2(card: GameCard, con: int) -> Tuple[GameCard, str]:
-    if card.data["CON"] <= con or "CON_DEX_M" not in card.data:
-        return card, "输入无效"
-    card.data["CON"] -= con
-    rttext = "体质减"+str(con)+"点，"
-    if con > -card.data["CON_DEX_M"]:
-        card.data["CON"] += con
-        return card, "输入无效"
-    card.data["DEX"] += card.data["CON_DEX_M"]+con
-    rttext += "敏捷减"+str(-card.data["CON_DEX_M"]-con)+"点。"
-    card.data.pop("CON_DEX_M")
-    card.cardcheck["check2"] = True
-    return card, rttext
+# def choosedec2(card: GameCard, con: int) -> Tuple[GameCard, str]:
+#     if card.data.CON <= con or "CON_DEX_M" not in card.data:
+#         return card, "输入无效"
+#     card.data.CON -= con
+#     rttext = "体质减"+str(con)+"点，"
+#     if con > -card.data["CON_DEX_M"]:
+#         card.data.CON += con
+#         return card, "输入无效"
+#     card.data.DEX += card.data["CON_DEX_M"]+con
+#     rttext += "敏捷减"+str(-card.data["CON_DEX_M"]-con)+"点。"
+#     card.data.pop("CON_DEX_M")
+#     card.cardcheck["check2"] = True
+#     return card, rttext
 
 
 def generateOtherAttributes(card: GameCard) -> Tuple[GameCard, str]:
     """获取到年龄之后，通过年龄计算一些衍生数据。"""
-    if not card.cardcheck["check2"]:  # This trap should not be hit
-        return card, "Please set DATA decrease first"
-    if "SAN" not in card.attr or card.attr["SAN"] == 0:
-        card.attr["SAN"] = card.data["POW"]
-    card.attr["MAXSAN"] = 99
-    if "MAGIC" not in card.attr or card.attr["MAGIC"] == 0:
-        card.attr["MAGIC"] = card.data["POW"]//5
-    if "MAXLP" not in card.attr or card.attr["MAXLP"] == 0:
-        card.attr["MAXLP"] = (card.data["SIZ"]+card.data["CON"])//10
-    if "LP" not in card.attr or card.attr["LP"] == 0:
-        card.attr["LP"] = card.attr["MAXLP"]
-    rttext = "SAN: " + str(card.attr["SAN"])+"\n"
-    rttext += "MAGIC: " + str(card.attr["MAGIC"])+"\n"
-    rttext += "LP: " + str(card.attr["LP"])+"\n"
-    if "physique" not in card.attr or card.attr["physique"] == 0:
-        if card.data["STR"]+card.data["SIZ"] < 65:
-            card.attr["physique"] = -2
-        elif card.data["STR"]+card.data["SIZ"] < 85:
-            card.attr["physique"] = -1
-        elif card.data["STR"]+card.data["SIZ"] < 125:
-            card.attr["physique"] = 0
-        elif card.data["STR"]+card.data["SIZ"] < 165:
-            card.attr["physique"] = 1
-        elif card.data["STR"]+card.data["SIZ"] < 205:
-            card.attr["physique"] = 2
+    # if not card.cardcheck["check2"]:  # This trap should not be hit
+    #     return card, "Please set DATA decrease first"
+    if card.attr.SAN == 0:
+        card.attr.SAN = card.data.POW
+
+    if card.attr.MAGIC == 0:
+        card.attr.MAGIC = card.data.POW//5
+
+    if card.attr.MAXLP == 0:
+        card.attr.MAXLP = (card.data.SIZ+card.data.CON)//10
+        card.attr.LP = card.attr.MAXLP
+
+    rttext = "SAN: " + str(card.attr.SAN)+"\n"
+    rttext += "魔法值: " + str(card.attr.MAGIC)+"\n"
+    rttext += "生命值: " + str(card.attr.LP)+"\n"
+
+    if card.attr.build < -2:
+        if card.data.STR+card.data.SIZ < 65:
+            card.attr.build = -2
+        elif card.data.STR+card.data.SIZ < 85:
+            card.attr.build = -1
+        elif card.data.STR+card.data.SIZ < 125:
+            card.attr.build = 0
+        elif card.data.STR+card.data.SIZ < 165:
+            card.attr.build = 1
+        elif card.data.STR+card.data.SIZ < 205:
+            card.attr.build = 2
         else:
-            card.attr["physique"] = 2 + \
-                (card.data["STR"]+card.data["SIZ"]-125)//80
-    if "DB" not in card.attr or card.attr["DB"] == 0:
-        if card.attr["physique"] <= 0:
-            card.attr["DB"] = str(card.attr["physique"])
-        elif card.attr["physique"] == 1:
-            card.attr["DB"] = "1d4"
+            card.attr.build = 2 + \
+                (card.data.STR+card.data.SIZ-125)//80
+
+    if card.attr.DB == "":
+        if card.attr.build <= 0:
+            card.attr.DB = str(card.attr.build)
+        elif card.attr.build == 1:
+            card.attr.DB = "1d4"
         else:
-            card.attr["DB"] = str(card.attr["physique"]-1)+"d6"
-    rttext += "physique: " + str(card.attr["physique"])+"\n"
+            card.attr.DB = str(card.attr.build-1)+"d6"
+
+    rttext += "体格: " + str(card.attr.build)+"\n"
+    rttext += "伤害加深："+card.attr.DB+"\n"
     return card, rttext
 
 
-def generatePoints(card: GameCard, job: str):
+def generatePoints(card: GameCard) -> bool:
+    job = card.info.job
     if job not in dicebot.joblist:
         return False
-    ptrule = dicebot.joblist[job][2]
+
+    ptrule: Dict[str, int] = dicebot.joblist[job][2]
     pt = 0
+
     for keys in ptrule:
-        if keys in card.data:
-            pt += card.data[keys]*ptrule[keys]
+        if keys in card.data.alldatanames:
+            pt += card.data.getdata(keys)*ptrule[keys]
         elif len(keys) == 11:
-            pt += max(card.data[keys[:3]], card.data[keys[4:7]],
-                      card.data[keys[8:]])*ptrule[keys]
-        elif keys[:3] in card.data and keys[4:] in card.data:
-            pt += max(card.data[keys[:3]], card.data[keys[4:]])*ptrule[keys]
+            pt += max(card.data.getdata(keys[:3]), card.data.getdata(keys[4:7]),
+                      card.data.getdata(keys[8:]))*ptrule[keys]
+        elif keys[:3] in card.data.alldatanames and keys[4:] in card.data.alldatanames:
+            pt += max(card.data.getdata(keys[:3]),
+                      card.data.getdata(keys[4:]))*ptrule[keys]
         else:
             return False
-    card.skill.points = int(pt)
+
+    card.skill.points = pt
     return True
 
 
-def checkcard(card: GameCard) -> bool:
-    if "AGE" in card.info:
-        card.cardcheck["check1"] = True
-    if not card.cardcheck["check1"]:
-        return False
-    if "STR_SIZ_M" in card.data or "STR_CON_DEX_M" in card.data or "STR_CON_M" in card.data or "CON_DEX_M" in card.data:
-        return False
-    card.cardcheck["check2"] = True
-    if "job" not in card.info:
-        return False
-    card.cardcheck["check3"] = True
-    if card.skill.points != 0:
-        return False
-    if card.interest.points != 0:  # "points" must be in card.interest
-        return False
-    card.cardcheck["check4"] = True
-    if "name" not in card.info or card.info["name"] == "":
-        return False
-    card.cardcheck["check5"] = True
-    return True
+# def checkcard(card: GameCard) -> bool:
+#     if "AGE" in card.info:
+#         card.cardcheck["check1"] = True
+#     if not card.cardcheck["check1"]:
+#         return False
+#     if "STR_SIZ_M" in card.data or "STR_CON_DEX_M" in card.data or "STR_CON_M" in card.data or "CON_DEX_M" in card.data:
+#         return False
+#     card.cardcheck["check2"] = True
+#     if "job" not in card.info:
+#         return False
+#     card.cardcheck["check3"] = True
+#     if card.skill.points != 0:
+#         return False
+#     if card.interest.points != 0:  # "points" must be in card.interest
+#         return False
+#     card.cardcheck["check4"] = True
+#     if "name" not in card.info or card.info["name"] == "":
+#         return False
+#     card.cardcheck["check5"] = True
+#     return True
 
 
-def showchecks(card: GameCard) -> str:
-    if checkcard(card):
-        return "All pass."
-    rttext = ""
-    for keys in card.cardcheck:
-        if not card.cardcheck[keys]:
-            rttext += keys+": False\n"
-    return rttext
+# def showchecks(card: GameCard) -> str:
+#     if checkcard(card):
+#         return "All pass."
+#     rttext = ""
+#     for keys in card.cardcheck:
+#         if not card.cardcheck[keys]:
+#             rttext += keys+": False\n"
+#     return rttext

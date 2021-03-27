@@ -98,7 +98,7 @@ def main() -> None:
     dispatcher.add_handler(MessageHandler(
         Filters.command, dicehandlers.unknown))
     dispatcher.add_handler(MessageHandler(Filters.text & (
-        ~Filters.command), dicehandlers.textHandler))
+        ~Filters.command) & (~Filters.audio) & (~Filters.video) & (~Filters.photo) & (~Filters.sticker), dicehandlers.textHandler))
 
     dicehandlers.utils.updater.start_polling(clean=True)
     dicehandlers.utils.updater.idle()

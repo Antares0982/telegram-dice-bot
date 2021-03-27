@@ -6,8 +6,16 @@ from os import getcwd
 __all__ = [
     "PROXY", "PROXY_URL", "BOTUSERNAME", "TOKEN", "DATA_PATH", "ADMIN_ID", "IGNORE_JOB_DICT", "VERSION", "BOT_ID",
     "PATH_PLAYERS", "PATH_GROUPS", "GLOBAL_DATA_PATH", "PATH_SKILLDICT", "PATH_JOBDICT", "PATH_HANDLERS",
-    "CREATE_CARD_HELP", "HELP_TEXT"
+    "CREATE_CARD_HELP", "HELP_TEXT", "PATH_CARDS", "PATH_GAME_CARDS"
 ]
+
+PROXY: bool = False
+PROXY_URL: str = ""
+BOTUSERNAME: str = ""
+TOKEN: str = ""
+DATA_PATH: str = ""
+ADMIN_ID: int = 0
+IGNORE_JOB_DICT: bool = False
 
 
 def __cfgparse():
@@ -16,7 +24,7 @@ def __cfgparse():
     cfgparser.read('config.ini')
 
     PROXY = cfgparser.getboolean("PROXY", "proxy")  # 大陆登录telegram需要设置代理，否则关闭
-    PROXY_URL = cfgparser.get("PROXY", "proxy_url22")  # 代理
+    PROXY_URL = cfgparser.get("PROXY", "proxy_url")  # 代理
 
     BOTUSERNAME = cfgparser.get("BOT", "username")
     TOKEN = cfgparser.get("BOT", "token")  # BOT TOKEN
@@ -71,12 +79,16 @@ if platform == "win32":
         DATA_PATH += '\\'
     PATH_PLAYERS = DATA_PATH+"players\\"
     PATH_GROUPS = DATA_PATH+"groups\\"
+    PATH_CARDS = DATA_PATH+"cards\\"
+    PATH_GAME_CARDS = DATA_PATH+"cards\\game\\"
     GLOBAL_DATA_PATH = DATA_PATH+"global\\"
 else:
     if DATA_PATH[-1] != '/':
         DATA_PATH += '/'
     PATH_PLAYERS = DATA_PATH+"players/"
     PATH_GROUPS = DATA_PATH+"groups/"
+    PATH_CARDS = DATA_PATH+"cards/"
+    PATH_GAME_CARDS = DATA_PATH+"cards/game/"
     GLOBAL_DATA_PATH = DATA_PATH+"global/"
 
 PATH_SKILLDICT = GLOBAL_DATA_PATH+r'skilldict.json'

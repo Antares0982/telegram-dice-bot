@@ -90,8 +90,8 @@ KP进行游戏引导时，可以在指令前输入文字+空格（使该指令�
   * description：描述。即背景故事。
   * faith：信仰。
   * vip：重要之人。
-  * exsigplace：重要之地。
-  * precious：珍贵之物。
+  * viplace：重要之地。
+  * preciousthing：珍贵之物。
   * speciality：特质。
   * dmg：曾受过的伤。
   * terror：恐惧之物。

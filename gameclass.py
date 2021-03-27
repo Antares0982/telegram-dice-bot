@@ -9,7 +9,7 @@ from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
 from telegram.inline.inlinekeyboardmarkup import InlineKeyboardMarkup
 from telegram.replymarkup import ReplyMarkup
 
-from cfg import PATH_GROUPS, PATH_PLAYERS
+from cfg import PATH_CARDS, PATH_GAME_CARDS, PATH_GROUPS, PATH_PLAYERS
 from dicefunc import *
 
 # 卡信息存储于群中
@@ -104,11 +104,14 @@ class datatype:
 
 class GameCard(datatype):
     def __init__(self, carddict: dict = {}):
-        self.id: int = 0
+        self.id: int = None
+
         self.playerid: int = 0
         self.player: Optional[Player] = None  # 需要在载入时赋值
+
         self.groupid: int = 0
         self.group: Optional[Group] = None  # 需要在载入时赋值
+
         # 下面六项初始化后不能为None
         self.data: CardData = None
         self.info: CardInfo = None
@@ -116,13 +119,18 @@ class GameCard(datatype):
         self.interest: Skill = None
         self.suggestskill: SgSkill = None
         self.attr: CardAttr = None
+
         self.background: CardBackground = CardBackground()
         self.tempstatus: CardStatus = CardStatus()
+
         self.item: List[str] = []
         self.assets: str = ""
         self.type: str = ""
         self.discard: bool = False
         self.status: str = ""
+
+        self.isgamecard: bool = False
+
         if len(carddict) > 0:
             self.read_json(carddict)
         # 如果有属性没有读到，使用默认初始化
@@ -142,6 +150,7 @@ class GameCard(datatype):
     def read_json(self, d: dict, jumpkeys: List[str] = []) -> None:
         super().read_json(d, jumpkeys=[
             "data", "info", "skill", "interest", "suggestskill", "attr", "background", "tempstatus"])
+
         if "data" in d:
             self.data = CardData(d=d["data"])
         if "info" in d:
@@ -160,17 +169,15 @@ class GameCard(datatype):
             self.tempstatus = CardStatus(d=d["tempstatus"])
 
     def to_json(self, jumpkey: List[str] = ["player", "group"]) -> dict:
-        d = super().to_json(jumpkey=jumpkey)
-        return d
+        return super().to_json(jumpkey=jumpkey)
 
     def modify(self, attr: str, val) -> Tuple[str, bool]:
-        if attr == "GLOBAL":
-            return self.tempstatus.modify(attr, val)
-        return super().modify(attr, val, jumpkey="tempstatus")
+        return self.tempstatus.modify(attr, val) if attr == "GLOBAL" else super().modify(attr, val, jumpkey="tempstatus")
 
     def __str__(self):
         rttext: str = ""
-        rttext += "id: "+str(self.id)+"\n"
+
+        rttext += "角色卡id: "+str(self.id)+"\n"
         rttext += "playerid: "+str(self.playerid)+"\n"
         rttext += "groupid: "+str(self.groupid)+"\n"
 
@@ -214,6 +221,12 @@ class GameCard(datatype):
 
         rttext += "状态: "+self.status+"\n"
 
+        rttext += "是否为游戏中的角色卡: "
+        if self.isgamecard:
+            rttext += "是\n"
+        else:
+            rttext += "否\n"
+
         return rttext
 
     def cardConstruct(self):
@@ -223,26 +236,62 @@ class GameCard(datatype):
         if self.group is not None:
             self.write()
 
-    def check(self) -> bool:
-        pass
-        return True
+    def check(self) -> str:
+        rttext: str = ""
+
+        t = self.data.check()
+        if t != "":
+            rttext += t+"\n"
+
+        t = self.info.check()
+        if t != "":
+            rttext += t+"\n"
+
+        t = self.skill.check()
+        rttext += "主要"+t+"\n" if t != "" else ""
+        t = self.interest.check()
+        rttext += "兴趣"+t if t != "" else ""
+
+        t = self.attr.check()
+        if t != "":
+            rttext += t+"\n"
+
+        t = self.background.check()
+        if t != "":
+            rttext += t+"\n"
+
+        if len(self.item) == 0:
+            rttext += "没有设定随身物品\n"
+
+        if rttext != "":
+            rttext = "角色卡(id:"+str(self.id)+")信息不完整，检查到如下问题：\n"+rttext
+        return ""
 
     def additem(self, item: str) -> None:
         self.item.append(item)
 
+    def setassets(self, asset: str) -> None:
+        self.assets = asset
+
     def write(self):
-        if self.group is not None:
-            self.group.write()
+        if self.id is None:
+            raise ValueError("写入文件时，GameCard实例没有id")
+        if self.isgamecard:
+            with open(PATH_GAME_CARDS+str(self.id)+".json", 'w', encoding='utf-8') as f:
+                json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
+        else:
+            with open(PATH_CARDS+str(self.id)+".json", 'w', encoding='utf-8') as f:
+                json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
 
 
 class Player(datatype):
     def __init__(self, plid: Optional[int] = None, d: dict = {}):
-        self.cards: Dict[int, GameCard] = {}  # 需要在载入时赋值。存储时：存储群-卡id对。读取时忽略
-        self.gamecards: Dict[int, GameCard] = {}  # 需要在载入时赋值。存储时：存储群-卡id对。读取时忽略
+        self.cards: Dict[int, GameCard] = {}  # 需要在载入时赋值。存储时：存储卡id。读取时忽略
+        self.gamecards: Dict[int, GameCard] = {}  # 需要在载入时赋值。存储时：存储卡id。读取时忽略
         # controlling 需要在载入时赋值。存储时：卡id。正确载入后类型为 GameCard | None
-        self.controlling: Optional[Union[GameCard, int]] = None
+        self.controlling: Optional[GameCard] = None
         self.id = plid
-        self.name: str = ""
+        self.name: str = ""  # 读取时忽略
         self.kpgroups: Dict[int, Group] = {}  # 需要在载入时赋值。存储时：存储int列表。读取时忽略
         self.kpgames: Dict[int, GroupGame] = {}  # 需要在载入时赋值。存储时：存储int列表。读取时忽略
         if len(d) > 0:
@@ -306,8 +355,8 @@ class Group(datatype):
         self.rule: GroupRule = GroupRule()
         self.pausedgame: Optional[GroupGame] = None
         self.name: str = ""
-        # kp 需要在载入时赋值。读取、存储时为int。正确载入后类型为 Player | None
-        self.kp: Optional[Union[Player, int]] = None
+        # kp 需要在载入时赋值。读取、存储时为int。经过函数construct()正确载入后类型为 Player | None
+        self.kp: Optional[Player] = None
         self.chat: Union[Chat, int] = None  # 需要在载入时赋值。不存储
         if len(d) > 0:
             self.read_json(d)
@@ -319,7 +368,7 @@ class Group(datatype):
         elif "rule" in d:
             self.rule.changeRules(d["rule"])
         elif "pausedgame" in d:
-            self.holdinggame = GroupGame(d=d["pausedgame"])
+            self.pausedgame = GroupGame(d=d["pausedgame"])
         elif "cards" in d:
             for key2 in d["cards"]:
                 self.cards[int(key2)] = GameCard(d["cards"][key2])
@@ -366,14 +415,20 @@ class CardData(datatype):
         self.datainfo: str = ""
         self.__datanames: List[str] = ["STR", "SIZ", "CON",
                                        "DEX", "POW", "APP", "INT", "EDU"]
-        self.__alldatanames: List[str] = copy.copy(
+        self.alldatanames: List[str] = copy.copy(
             self.__datanames).append("LUCK")
+        self.datadec: Optional[Tuple[str, int]] = None
         self.card: GameCard = None  # 用cardConstruct()赋值
         if len(d) == 0:
             self.randdata()
         else:
             for key in d:
                 self.__dict__[key] = d[key]
+
+    def getdata(self, dataname: str) -> int:
+        if dataname not in self.alldatanames:
+            raise KeyError("CardData没有属性："+dataname)
+        return self.__dict__[dataname]
 
     def total(self) -> int:
         self.TOTAL = 0
@@ -416,12 +471,20 @@ class CardData(datatype):
         for key in self.__datanames:
             if self.__dict__[key] < 50:
                 countless50 += 1
-        if countless50 >= 3:
-            return True
-        return False
+        return countless50 >= 3
 
     def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
         return super().modify(attr, val, jumpkey=jumpkey)
+
+    def check(self) -> str:
+        rttext: str = ""
+
+        if any(self.__dict__[x] == 0 for x in self.__datanames):
+            rttext += "基础7项属性为默认值"
+        elif self.LUCK == 0:
+            rttext += "幸运未设置，请先设置年龄"
+
+        return rttext
 
     def write(self):
         if self.card is not None and self.card.group is not None:
@@ -455,11 +518,25 @@ class CardStatus(datatype):
 class CardInfo(datatype):
     def __init__(self, d={}):
         self.name: str = ""
-        self.age: int = ""
+        self.age: int = -1
         self.sex: str = ""
         self.job: str = ""
         if len(d) > 0:
             self.read_json(d=d)
+
+    def check(self) -> str:
+        rttext: str = ""
+
+        if self.job == "":
+            rttext += "未设置职业\n"
+        if self.name == "":
+            rttext += "未设置姓名\n"
+        if self.age == -1:
+            rttext += "未设置年龄\n"
+        if self.sex == "":
+            rttext += "未设置性别\n"
+
+        return rttext
 
 
 class skilltype(datatype):  # skill的基类，只包含一个属性skills
@@ -489,6 +566,12 @@ class Skill(skilltype):
         if len(d) > 0:
             self.read_json(d=d)
 
+    def check(self) -> str:
+        if self.points < 0:
+            return "技能未开始设置"
+        if self.points > 0:
+            return "技能点有剩余"
+
 
 class SgSkill(skilltype):
     def __init__(self, d: dict = {}):
@@ -507,13 +590,17 @@ class CardAttr(datatype):
         self.DB: str = ""
         self.MOV: str = ""
         self.atktimes: str = ""
-        self.physique: int = -10
+        self.build: int = -10
         self.SAN: int = 0
-        self.MAXSAN: int = 0
+        self.MAXSAN: int = 99
         self.LP: int = 0
         self.MAXLP: int = 0
+        self.MAGIC: int = 0
         if len(d) > 0:
             self.read_json(d=d)
+
+    def check(self) -> str:
+        return "衍生属性未计算" if any(self.__dict__[key] == "" for key in ("DB", "MOV")) or self.build == -10 or self.MAXLP == 0 else ""
 
 
 class CardBackground(datatype):
@@ -531,6 +618,24 @@ class CardBackground(datatype):
         self.thirdencounter: str = ""
         if len(d) > 0:
             self.read_json(d=d)
+
+    def check(self) -> str:
+        rttext = ""
+
+        if self.description == "":
+            rttext += "未设置背景故事"
+        if self.vip == "":
+            rttext += "未设置重要之人"
+        if self.viplace == "":
+            rttext += "未设置重要之地"
+        if self.faith == "":
+            rttext += "未设置信仰"
+        if self.preciousthing == "":
+            rttext += "未设置珍视之物"
+        if self.speciality == "":
+            rttext += "未设置性格特点"
+
+        return rttext
 
     def randbackground(self) -> str:
         rdfaithlist = [
@@ -615,18 +720,18 @@ class CardBackground(datatype):
             0]-1]
         self.vip = rdviplist[dicemdn(1, len(rdviplist))[
             0]-1]
-        self.exsigplace = rdsigplacelist[dicemdn(
+        self.viplace = rdsigplacelist[dicemdn(
             1, len(rdsigplacelist))[0]-1]
-        self.precious = rdpreciouslist[dicemdn(
+        self.preciousthing = rdpreciouslist[dicemdn(
             1, len(rdpreciouslist))[0]-1]
         self.speciality = rdspecialitylist[dicemdn(
             1, len(rdspecialitylist))[0]-1]
         self.write()
-        rttext = "faith: "+self.faith
-        rttext += "\nvip: "+self.vip
-        rttext += "\nexsigplace: "+self.exsigplace
-        rttext += "\nprecious: "+self.precious
-        rttext += "\nspeciality: "+self.speciality
+        rttext = "信仰: "+self.faith
+        rttext += "\n重要之人: "+self.vip
+        rttext += "\n重要之地: "+self.viplace
+        rttext += "\n珍视之物: "+self.preciousthing
+        rttext += "\n性格特点: "+self.speciality
         return rttext
 
     def write(self):

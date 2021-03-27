@@ -8,13 +8,13 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext
 
 import utils
-
+from utils import dicebot
 
 def start(update: Update, context: CallbackContext) -> None:
     """显示bot的帮助信息"""
     update.message.reply_text(utils.HELP_TEXT)
 
-
+###########################################################
 def addkp(update: Update, context: CallbackContext) -> bool:
     """添加KP。在群里发送`/addkp`将自己设置为KP。
     如果这个群已经有一名群成员是KP，则该指令无效。
@@ -495,7 +495,7 @@ def delcard(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "没有权限")
     # 开始处理
     update.message.reply_text(
-        "请确认是否删除卡片："+utils.getname(cardi)+"\n如果确认删除，请回复：确认")
+        "请确认是否删除卡片："+utils.getname(cardi)+"\n如果确认删除，请回复：确认。否则，请回复其他任何文字。")
     utils.addOP(update.effective_chat.id, "delcard "+context.args[0])
     return True
 
@@ -1873,17 +1873,17 @@ def randombackground(update: Update, context: CallbackContext) -> bool:
         0]-1]
     card1.background.vip = rdviplist[utils.dicemdn(1, len(rdviplist))[
         0]-1]
-    card1.background.exsigplace = rdsigplacelist[utils.dicemdn(
+    card1.background.viplace = rdsigplacelist[utils.dicemdn(
         1, len(rdsigplacelist))[0]-1]
-    card1.background.precious = rdpreciouslist[utils.dicemdn(
+    card1.background.preciousthing = rdpreciouslist[utils.dicemdn(
         1, len(rdpreciouslist))[0]-1]
     card1.background.speciality = rdspecialitylist[utils.dicemdn(
         1, len(rdspecialitylist))[0]-1]
     utils.writecards(utils.CARDS_DICT)
     rttext = "faith: "+card1.background.faith
     rttext += "\nvip: "+card1.background.vip
-    rttext += "\nexsigplace: "+card1.background.exsigplace
-    rttext += "\nprecious: "+card1.background.precious
+    rttext += "\nexsigplace: "+card1.background.viplace
+    rttext += "\nprecious: "+card1.background.preciousthing
     rttext += "\nspeciality: "+card1.background.speciality
     update.message.reply_text(rttext)
     return True
@@ -1926,8 +1926,8 @@ def setbkground(update: Update, context: CallbackContext) -> bool:
     `description`故事、
     `faith`信仰、
     `vip`重要之人、
-    `exsigplace`意义非凡之地、
-    `precious`珍视之物、
+    `viplace`意义非凡之地、
+    `preciousthing`珍视之物、
     `speciality`性格特质、
     `dmg`曾经受过的伤、
     `terror`恐惧之物、
@@ -2191,7 +2191,7 @@ def helper(update: Update, context: CallbackContext) -> True:
         try:
             update.message.reply_text(rttext, parse_mode="MarkdownV2")
         except:
-            update.message.reply_text("Markdown格式parse错误，请检查并改写文档")
+            update.message.reply_text("Markdown格式parse错误，请联系作者检查并改写文档")
             return False
         return True
     return utils.errorHandler(update, "找不到这个指令，或这个指令没有帮助信息。")
@@ -2200,6 +2200,8 @@ def helper(update: Update, context: CallbackContext) -> True:
 def textHandler(update: Update, context: CallbackContext) -> bool:
     """信息处理函数，用于无指令的消息处理。
     具体指令处理正常完成时再删除掉当前操作状态`OPERATION[chatid]`，处理出错时不删除。"""
+    if update.message is None:
+        return True
     if update.message.text == "cancel":
         utils.popOP(utils.getchatid(update))
         return True

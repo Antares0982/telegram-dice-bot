@@ -26,8 +26,8 @@ class DiceBot:
         self.IDENTIFIER = str(time.time())
         self.groups: Dict[int, Group] = {}  # readall()赋值
         self.players: Dict[int, Player] = {}  # readall()赋值
-        self.cards: Dict[int, GameCard] = {}  # 需要construct()来赋值
-        self.gamecards: Dict[int, GameCard] = {}
+        self.cards: Dict[int, GameCard] = {}  # readall()赋值
+        self.gamecards: Dict[int, GameCard] = {}  # readall()赋值
         self.joblist: dict
         self.skilllist: dict
         self.allids: List[int] = []
@@ -42,15 +42,35 @@ class DiceBot:
         for filename in os.listdir(PATH_GROUPS):
             if filename.find(".json") != len(filename)-5:
                 continue
-            with open(filename, "r", encoding='utf-8') as f:
+            with open(PATH_GROUPS+filename, "r", encoding='utf-8') as f:
                 d = json.load(f)
             self.groups[int(filename[:len(filename)-5])] = Group(d=d)
+        # players
         for filename in os.listdir(PATH_PLAYERS):
             if filename.find(".json") != len(filename)-5:
                 continue
-            with open(filename, "r", encoding='utf-8') as f:
+            with open(PATH_PLAYERS+filename, "r", encoding='utf-8') as f:
                 d = json.load(f)
             self.players[int(filename[:len(filename)-5])] = Player(d=d)
+        # cards
+        for filename in os.listdir(PATH_CARDS):
+            if filename.find(".json") != len(filename)-5:
+                continue
+            with open(PATH_CARDS+filename, "r", encoding='utf-8') as f:
+                d = json.load(f)
+            self.cards[int(filename[:len(filename)-5])] = GameCard(carddict=d)
+        # gamecards
+        for filename in os.listdir(PATH_GAME_CARDS):
+            if filename.find(".json") != len(filename)-5:
+                continue
+            with open(PATH_GAME_CARDS+filename, "r", encoding='utf-8') as f:
+                d = json.load(f)
+            self.gamecards[int(filename[:len(filename)-5])
+                           ] = GameCard(carddict=d)
+        # joblist
+        with open(PATH_JOBDICT, 'r', encoding='utf-8') as f:
+            self.joblist = json.load(f)
+        pass
 
     def construct(self) -> None:
         """创建变量之间的引用"""
