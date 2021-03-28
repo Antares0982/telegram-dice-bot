@@ -337,6 +337,8 @@ class Player(datatype):
     def getname(self) -> str:
         if self.id is None:
             raise TypeError("Player实例没有id")
+        if self.chat is None:
+            return self.name
         name = self.chat.full_name
         self.name = name if name is not None else ""
         return self.name

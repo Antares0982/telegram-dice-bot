@@ -2,7 +2,7 @@
 
 import asyncio
 from typing import (Any, Dict, Iterator, KeysView, List, Optional, Tuple,
-                    TypeVar, Union)
+                    TypeVar, Union, overload)
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, error
 from telegram.callbackquery import CallbackQuery
@@ -15,6 +15,22 @@ from dicefunc import *
 
 _T = TypeVar("_T")
 
+# FLAGS
+
+CANREAD = 1
+OWNCARD = 2
+CANSETINFO = 4
+CANDISCARD = 8
+CANMODIFY = 16
+
+INGROUP = 1
+GROUPKP = 2
+GROUPADMIN = 4
+BOTADMIN = 8
+
+ISPRIVATE = 1
+ISGROUP = 2
+ISCHANNEL = 4
 
 # 数据
 """
@@ -131,7 +147,7 @@ def cardpop(gpid: int, cdid: int) -> Optional[GameCard]:
     if cdid not in gp.cards:
         return None
     card = gp.cards.pop(cdid)
-    dicebot.writegroup(gpid)
+    gp.write()
     # 删除player索引
     pl = getplayer(card.playerid)
     if not pl:
@@ -139,7 +155,7 @@ def cardpop(gpid: int, cdid: int) -> Optional[GameCard]:
     pl.cards.pop(cdid)
     if pl.controlling and pl.controlling.id == cdid:
         pl.controlling = None
-    dicebot.writeplayer(card.playerid)
+    card.player.write()
     # 删除id
     i = dicebot.allids.index(card.id)
     dicebot.allids = dicebot.allids[:i]+dicebot.allids[i+1:]
@@ -158,7 +174,7 @@ def cardadd(card: GameCard, gpid: int) -> bool:
     card.group = gp
     card.groupid = gpid
     gp.cards[card.id] = card
-    dicebot.writegroup(gpid)
+    gp.write()
     # 增加pl索引
     pl = forcegetplayer(card.playerid)
     pl.cards[card.id] = card
@@ -166,7 +182,7 @@ def cardadd(card: GameCard, gpid: int) -> bool:
     if pl.controlling:
         autoswitchhint(pl.id)
     pl.controlling = card
-    dicebot.writeplayer(pl.id)
+    pl.write()
     return True
 
 
@@ -196,7 +212,7 @@ def gamecardadd(card: GameCard, gpid: int) -> bool:
     pl = forcegetplayer(card.playerid)
     pl.gamecards[card.id] = card
     card.player = pl
-    dicebot.writeplayer(pl.id)
+    pl.write()
     return True
 
 
@@ -399,7 +415,7 @@ def findDiscardCardsGroupIDTuple(plid: int) -> List[Tuple[Group, int]]:
             ans.append((card.group, card.id))
             if card.groupid == -1:
                 card.discard = True
-                dicebot.writegroup(card.groupid)
+                card.group.write()
     return ans
 
 
@@ -534,16 +550,18 @@ def findkpcards(kpid) -> List[GameCard]:
     return ans
 
 
-def isingroup(gpid: int, userid: int) -> bool:
-    """查询某个userid对应的用户是否在群里"""
+def isingroup(gp: Group, pl: Player) -> bool:
+    """查询某个pl是否在群里"""
+    if gp.chat is None:
+        return False
     try:
-        chat = dicebot.updater.bot.get_chat(chat_id=gpid)
-        chat.get_member(user_id=userid)
+        gp.chat.get_member(user_id=pl.id)
     except:
         return False
     return True
 
 
+@overload
 def isadmin(update: Update, userid: int) -> bool:
     """检测发消息的人是不是群管理员"""
     if isprivatemsg(update):
@@ -551,6 +569,16 @@ def isadmin(update: Update, userid: int) -> bool:
     admins = update.effective_chat.get_administrators()
     for admin in admins:
         if admin.user.id == userid:
+            return True
+    return False
+
+
+@overload
+def isadmin(gp: Group, pl: Player) -> bool:
+    """检测pl是不是gp的管理员"""
+    admins = gp.chat.get_administrators()
+    for admin in admins:
+        if admin.user.id == pl.id:
             return True
     return False
 
@@ -624,9 +652,9 @@ def changeplids(gpid: int, oldplid: int, newplid: int) -> None:
         card = pl.controlling
         if card.groupid == gpid:
             pl.controlling = None
-    dicebot.writegroup(gpid)
-    dicebot.writeplayer(oldplid)
-    dicebot.writeplayer(newplid)
+    gp.write()
+    pl.write()
+    newpl.write()
     return
 
 
@@ -652,9 +680,9 @@ def changeKP(gpid: int, newkpid: int = 0) -> bool:
             cardi.playerid = newkpid
         game.kpid = newkpid
     gp.kp = newkp
-    dicebot.writegroup(gpid)
-    dicebot.writeplayer(kp.id)
-    dicebot.writeplayer(newkpid)
+    gp.write()
+    kp.write()
+    newkp.write()
     return True
 
 
@@ -814,7 +842,7 @@ def addmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Updat
     update.message.reply_text(
         "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
     card1.skill.set(skillname, skillvalue)
-    dicebot.writegroup(card1.groupid)
+    card1.group.write()
     return True
 
 
@@ -823,7 +851,7 @@ def addsgskill(skillname: str, skillvalue: int, card1: GameCard, update: Update)
     if not addmainskill(skillname, skillvalue, card1, update):
         return False
     card1.suggestskill.pop(skillname)
-    dicebot.writegroup(card1.groupid)
+    card1.group.write()
     return True
 
 
@@ -839,7 +867,7 @@ def addintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update
     update.message.reply_text(
         "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
     card1.interest.set(skillname, skillvalue)
-    dicebot.writegroup(card1.groupid)
+    card1.group.write()
     return True
 
 
@@ -856,7 +884,7 @@ def cgmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Update
         update.message.reply_text(
             "技能设置成功："+skillname+" "+str(skillvalue)+"，返还点数："+str(-costval))
     card1.skill.set(skillname, skillvalue)
-    dicebot.writegroup(card1.groupid)
+    card1.group.write()
     return True
 
 
@@ -874,7 +902,7 @@ def cgintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update)
         update.message.reply_text(
             "技能设置成功："+skillname+" "+str(skillvalue)+"，返还点数："+str(-costval))
     card1.interest.set(skillname, skillvalue)
-    dicebot.writegroup(card1.groupid)
+    card1.group.write()
     return True
 
 
@@ -1003,7 +1031,7 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
     for i in range(3, len(dicebot.joblist[jobname])):  # Classical jobs
         card1.suggestskill.set(dicebot.joblist[jobname][i], getskilllevelfromdict(
             card1, dicebot.joblist[jobname][i]))   # int
-    dicebot.writegroup(card1.groupid)
+    card1.group.write()
     return True
 
 
@@ -1019,7 +1047,7 @@ def buttonaddmainskill(query: CallbackQuery, card1: GameCard, args: List[str]) -
         card1.skill.points -= needpt
         query.edit_message_text(
             text="主要技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.skill.points))
-        dicebot.writegroup(card1.groupid)
+        card1.group.write()
         return True
 
     m = getskilllevelfromdict(card1, args[1])
@@ -1043,7 +1071,7 @@ def buttoncgmainskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -
         card1.skill.points -= needpt
         query.edit_message_text(
             text="主要技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.skill.points))
-        dicebot.writegroup(card1.group)
+        card1.group.write()
         return True
 
     m = getskilllevelfromdict(card1, args[1])
@@ -1067,7 +1095,7 @@ def buttonaddsgskill(query: CallbackQuery,  card1: Optional[GameCard], args: Lis
         query.edit_message_text(
             text="主要技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.skill.points))
         card1.suggestskill.pop(args[1])
-        dicebot.writegroup(card1.group)
+        card1.group.write()
         return True
     m = getskilllevelfromdict(card1, args[1])
     mm = skillmaxval(args[1], card1, True)
@@ -1095,7 +1123,7 @@ def buttonaddintskill(query: CallbackQuery,  card1: Optional[GameCard], args: Li
         card1.interest.points -= needpt
         query.edit_message_text(
             text="兴趣技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.interest.points))
-        dicebot.writegroup(card1.group)
+        card1.group.write()
         return True
     m = getskilllevelfromdict(card1, args[1])
     mm = skillmaxval(args[1], card1, False)
@@ -1117,7 +1145,7 @@ def buttoncgintskill(query: CallbackQuery, card1: Optional[GameCard], args: List
         card1.interest.points -= needpt
         query.edit_message_text(
             text="兴趣技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.interest.points))
-        dicebot.writegroup(card1.group)
+        card1.group.write()
         return True
     m = getskilllevelfromdict(card1, args[1])
     mm = skillmaxval(args[1], card1, False)
@@ -1142,7 +1170,7 @@ def buttoncgintskill(query: CallbackQuery, card1: Optional[GameCard], args: List
 #     else:
 #         generateOtherAttributes(card1)
 #     query.edit_message_text(rttext)
-#     dicebot.writegroup(card1.group)
+#     card1.group.write()
 #     return True
 
 
@@ -1156,7 +1184,7 @@ def buttoncgintskill(query: CallbackQuery, card1: Optional[GameCard], args: List
 #     if rttext == "输入无效":
 #         return False
 #     generateOtherAttributes(card1)
-#     dicebot.writegroup(card1.group)
+#     card1.group.write()
 #     return True
 
 
@@ -1175,7 +1203,7 @@ def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
     pl = forcegetplayer(plid)
     if pl.controlling is not None and pl.controlling.groupid == gpid and pl.controlling.id == cdid:
         pl.controlling = None
-        dicebot.writeplayer(plid)
+        pl.write()
 
     detailinfo = "删除了：\n"+str(card)
     cardpop(gpid, cdid)
@@ -1933,3 +1961,59 @@ def generatePoints(card: GameCard) -> bool:
 #         if not card.cardcheck[keys]:
 #             rttext += keys+": False\n"
 #     return rttext
+@overload
+def checkaccess(pl: Player, card: GameCard) -> int:
+    """用FLAG给出玩家对角色卡的控制权限。
+    CANREAD = 1
+    OWNCARD = 2
+    CANSETINFO = 4
+    CANDISCARD = 8
+    CANMODIFY = 16
+    """
+    f = 0
+
+    if card.id in pl.cards or card.id in pl.gamecards:
+        f |= CANREAD | OWNCARD
+
+    if f & OWNCARD == 0:
+        if card.type == "PL" and checkaccess(pl, card.group) & INGROUP != 0:
+            f |= CANREAD
+
+    if f & OWNCARD != 0 and (not card.isgamecard or card.group.game is None):
+        f |= CANSETINFO
+
+    if f & OWNCARD != 0 and card.discard and not card.isgamecard:
+        f |= CANDISCARD
+
+    if card.group.kp is not None and card.group.kp == pl:
+        f |= CANMODIFY
+
+    return f
+
+
+@overload
+def checkaccess(pl: Player, gp: Group) -> int:
+    """用FLAG给出玩家与群的关系。
+    INGROUP = 1
+    GROUPKP = 2
+    GROUPADMIN = 4
+    BOTADMIN = 8
+    """
+    f = 0
+
+    if isingroup(gp, pl):
+        f |= INGROUP
+
+    if f == 0:
+        return BOTADMIN if pl.id == ADMIN_ID else 0
+
+    if gp.kp is not None and gp.kp == pl:
+        f |= GROUPKP
+
+    if isadmin(gp, pl):
+        f |= GROUPADMIN
+
+    if pl.id == ADMIN_ID:
+        f |= BOTADMIN
+
+    return f

@@ -22,12 +22,23 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 
+def botexec(s: str, needreturn: bool = False):
+    if not needreturn:
+        exec(s)
+        return
+
+    exec("t="+s)
+    return locals()["t"]
+
+
 def bot(update: Update, context: CallbackContext) -> bool:
     """直接控制控制程序的行为。可以直接调用updater。使用方法：
 
     `/bot stop`将结束程序。
 
-    `/bot restart`将调用`reload`方法重新加载所有数据。"""
+    `/bot restart`将调用`reload`方法重新加载所有数据。
+
+    `/bot exec --command`执行python代码，仅限bot控制者使用"""
     if dicehandlers.utils.getmsgfromid(update) != dicehandlers.utils.ADMIN_ID:
         return dicehandlers.utils.errorHandler(update, "没有权限", True)
 
@@ -40,17 +51,13 @@ def bot(update: Update, context: CallbackContext) -> bool:
         return True if dicehandlers.utils.botcheckdata("bot自检中……") else bool(dicehandlers.utils.sendtoAdmin("出现了未知的错误，请检查报错信息"))
 
     if inst == "stop":
-        if not dicehandlers.utils.botcheckdata("Bot程序终止！", False):
-            dicehandlers.utils.sendtoAdmin("出现了未知的错误，请检查报错信息")
 
-        dicehandlers.utils.sendtoAdmin("进程被指令终止。")
+        dicebot.sendtoAdmin("进程被指令终止。")
 
         # 结束进程，先写入所有数据
-        dicehandlers.utils.writecards(dicehandlers.utils.CARDS_DICT)
-        dicehandlers.utils.writecurrentcarddict(
-            dicehandlers.utils.CURRENT_CARD_DICT)
-        dicehandlers.utils.writekpinfo(dicehandlers.utils.GROUP_KP_DICT)
-        dicehandlers.utils.writegameinfo(dicehandlers.utils.ON_GAME)
+        dicebot.writegroup()
+        dicebot.writeplayer()
+        dicebot.writecard()
 
         pid = getpid()
         if platform == "win32":  # windows
@@ -62,6 +69,15 @@ def bot(update: Update, context: CallbackContext) -> bool:
 
     if inst == "restart":
         return dicehandlers.reload(update, context)
+
+    if inst == "exec":
+        if context.args[1] == 'r' and len(context.args) > 2:
+            return botexec(context.args[2:], True)
+        if len(context.args) > 1:
+            ans = str(botexec(context.args[1:]))
+            dicebot.sendtoAdmin(ans)
+
+        return dicehandlers.utils.errorHandler(update, "参数无效")
 
     return dicehandlers.utils.errorHandler(update, "没有这一指令", True)
 

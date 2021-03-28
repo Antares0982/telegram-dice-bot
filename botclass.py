@@ -3,6 +3,7 @@ import json
 import os
 import time
 from typing import overload
+from telegram.error import BadRequest
 
 from telegram.ext import Updater
 from telegram import Update
@@ -73,7 +74,9 @@ class DiceBot:
 
     def construct(self) -> None:
         """创建变量之间的引用"""
+        # card
         for card in self.cards.values():
+            card.isgamecard = False
             pl = self.getplayer(card.playerid)
             card.player = pl if pl is not None else self.createplayer(
                 card.playerid)  # 添加card.player
@@ -83,7 +86,9 @@ class DiceBot:
                 card.groupid)  # 添加card.group
             card.group.cards[card.id] = card  # 添加group.cards
             self.allids.append(card.id)
+        # gamecard
         for card in self.gamecards.values():
+            card.isgamecard = True
             assert(self.getplayer(card.id) is not None)
             card.player = self.getplayer(card.id)  # 添加gamecard.player
             card.player.gamecards[card.id] = card  # 添加player.gamecards
@@ -92,27 +97,37 @@ class DiceBot:
             assert(bool(card.group.game) != bool(card.group.pausedgame))
             game = card.group.game if card.group.game is not None else card.group.pausedgame
             game.cards[card.id] = card  # 添加game.cards
+        # group
         for gp in self.groups.values():
             if isinstance(gp.kp, int):
                 kp = self.getplayer(gp.kp)
                 gp.kp = kp if kp is not None else self.createplayer(gp.kp)
                 gp.kp.kpgroups[gp.id] = gp
             if gp.chat is None:
-                gp.chat = self.updater.bot.get_chat(chat_id=gp.id)
-            gp.name = gp.chat.title
+                try:
+                    gp.chat = self.updater.bot.get_chat(chat_id=gp.id)
+                    gp.name = gp.chat.title
+                except BadRequest:
+                    self.sendtoAdmin("群："+str(gp.id)+" " +
+                                     gp.name+"telegram chat无法获取")
             if gp.game is not None or gp.pausedgame is not None:
                 game = gp.game if gp.game is not None else gp.pausedgame
                 if gp.kp is not None:
                     gp.kp.kpgames[gp.id] = game
                 game.kpid = gp.kp.id
+        # player
         for pl in self.players.values():
             if pl.chat is None:
-                pl.chat = self.updater.bot.get_chat(chat_id=pl.id)
-            pl.getname()
-        self.allids.sort()
-        for pl in self.players.values():
+                try:
+                    pl.chat = self.updater.bot.get_chat(chat_id=pl.id)
+                    pl.getname()
+                except BadRequest:
+                    self.sendtoAdmin("用户："+str(pl.id)+" " +
+                                     pl.name+"telegram chat无法获取")
             if isinstance(pl.controlling, int):
                 pl.controlling = self.cards[pl.controlling]
+        # ids
+        self.allids.sort()
 
     def readhandlers(self) -> List[str]:
         """读取全部handlers。
@@ -129,7 +144,7 @@ class DiceBot:
         # TODO 检查群名称是否有变化
         # TODO 检查allids是否正确
         # TODO 检查kp对是否完整
-        # 如果出现不一致，用assert抛出AssertionError
+        # kp对如果出现不一致，用assert抛出AssertionError
         pass
 
     @overload
@@ -138,31 +153,19 @@ class DiceBot:
         # 每隔几分钟，做一次该操作
         pass
 
-    @overload
-    def writegroup(self, gpid: int) -> None:
-        try:
-            gp = self.groups[gpid]
-        except KeyError:
-            gp = self.creategp(gpid)
-        gp.write()
-        # json.dump(gp.to_json(),
-        #           f, indent=4, ensure_ascii=False)
+    def writegroup(self) -> None:
+        for gp in self.groups.values():
+            gp.write()
 
-    @overload
-    def writegroup(self, gp: Group) -> None:
-        return self.writegroup(gp.id)
+    def writeplayer(self) -> None:
+        for pl in self.players.values():
+            pl.write()
 
-    @overload
-    def writeplayer(self, plid: int) -> None:
-        try:
-            pl = self.players[plid]
-        except KeyError:
-            pl = self.createplayer(plid)
-        pl.write()
-
-    @overload
-    def writeplayer(self, pl: Player) -> None:
-        return self.writeplayer(pl.id)
+    def writecard(self) -> None:
+        for card in self.cards.values():
+            card.write()
+        for card in self.gamecards.values():
+            card.write()
 
     def getgp(self, gpid: int) -> Optional[Group]:
         if gpid not in self.groups:
@@ -185,7 +188,18 @@ class DiceBot:
         self.players[plid].write()
 
     def groupmigrate(self, oldid: int, newid: int) -> None:
-        pass
+        gp = self.getgp(oldid)
+        assert(gp is not None)
+        for card in gp.cards.values():
+            card.groupid = newid
+            card.write()
+        if gp.game is not None:
+            gp.game.groupid = newid
+            for card in gp.game.cards.values():
+                card.groupid = newid
+                card.write()
+        gp.id = newid
+        gp.write()
 
     """
     def writekpinfo(self) -> None:
@@ -347,6 +361,8 @@ def writehandlers(h: List[str]) -> None:
     with open(PATH_HANDLERS, 'w', encoding='utf-8') as f:
         json.dump(h, f, indent=4, ensure_ascii=False)
 
+
+dicebot = DiceBot()
 
 # try:
 #     dicebot = DiceBot()

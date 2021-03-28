@@ -10,11 +10,14 @@ from telegram.ext import CallbackContext
 import utils
 from utils import dicebot
 
+
 def start(update: Update, context: CallbackContext) -> None:
     """显示bot的帮助信息"""
     update.message.reply_text(utils.HELP_TEXT)
 
 ###########################################################
+
+
 def addkp(update: Update, context: CallbackContext) -> bool:
     """添加KP。在群里发送`/addkp`将自己设置为KP。
     如果这个群已经有一名群成员是KP，则该指令无效。
@@ -29,7 +32,7 @@ def addkp(update: Update, context: CallbackContext) -> bool:
     # 判断是否已经有KP
     if gpid in utils.GROUP_KP_DICT:
         # 已有KP
-        if not utils.isingroup(gpid, utils.getkpid(gpid)):
+        if not utils.isingroup(gpid, utils.getkpid(gpid)):  # 修改
             if not utils.changeKP(gpid, kpid):  # 更新NPC卡拥有者
                 # 不应触发
                 return utils.errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")
