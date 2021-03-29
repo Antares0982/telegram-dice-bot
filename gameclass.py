@@ -393,8 +393,14 @@ class Group(datatype):
             return True
         return False
 
-    def getkp(self) -> Optional[Player]:
-        return self.kp
+    def getname(self) -> str:
+        if self.id is None:
+            raise TypeError("Group实例没有id")
+        if self.chat is None:
+            return self.name
+        name = self.chat.title
+        self.name = name if name is not None else ""
+        return self.name
 
     def getcard(self, cardid: int) -> Optional[GameCard]:
         if cardid in self.cards:
@@ -762,12 +768,12 @@ class GroupGame(datatype):  # If defined, game is started.
             self.read_json(d)
             return
         if groupid is not None:
-            self.groupid: int = groupid  # Unique, should not be edited after initializing
-            self.kpid: int = kpid  # Can be edited
-            self.cards: Dict[int, GameCard] = {}  # list of GameCard
+            self.groupid: int = groupid
+            self.kpid: int = kpid
+            self.cards: Dict[int, GameCard] = {}
             for i in cards.values():
                 if isinstance(i, GameCard):
-                    self.cards[i.id] = i
+                    self.cards[i.id] = GameCard(carddict=i.to_json())  # 复制卡片
                 else:
                     self.cards[int(i["id"])] = GameCard(carddict=i)
             self.kpctrl: int = -1
@@ -784,6 +790,9 @@ class GroupGame(datatype):  # If defined, game is started.
         for i in tpcardslist:
             t = GameCard(tpcardslist[i])
             self.cards[t.id] = t
+
+    def to_json(self, jumpkey: List[str] = ["cards", "kpcards"]) -> dict:
+        return super().to_json(jumpkey=jumpkey)
 
     def __str__(self):
         rttext = ""

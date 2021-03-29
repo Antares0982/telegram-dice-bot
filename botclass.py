@@ -11,6 +11,7 @@ from telegram import Update
 from cfg import *
 from gameclass import *
 
+from basicfunc import *
 
 if PROXY:
     updater = Updater(token=TOKEN, request_kwargs={
@@ -77,23 +78,29 @@ class DiceBot:
         # card
         for card in self.cards.values():
             card.isgamecard = False
+
             pl = self.getplayer(card.playerid)
             card.player = pl if pl is not None else self.createplayer(
                 card.playerid)  # 添加card.player
             card.player.cards[card.id] = card  # 添加player.cards
+
             gp = self.getgp(card.groupid)
             card.group = gp if gp is not None else self.creategp(
                 card.groupid)  # 添加card.group
             card.group.cards[card.id] = card  # 添加group.cards
+
             self.allids.append(card.id)
         # gamecard
         for card in self.gamecards.values():
             card.isgamecard = True
+
             assert(self.getplayer(card.id) is not None)
             card.player = self.getplayer(card.id)  # 添加gamecard.player
             card.player.gamecards[card.id] = card  # 添加player.gamecards
+
             assert(self.getgp(card.groupid) is not None)
             card.group = self.getgp(card.groupid)  # 添加card.group
+
             assert(bool(card.group.game) != bool(card.group.pausedgame))
             game = card.group.game if card.group.game is not None else card.group.pausedgame
             game.cards[card.id] = card  # 添加game.cards
@@ -103,6 +110,7 @@ class DiceBot:
                 kp = self.getplayer(gp.kp)
                 gp.kp = kp if kp is not None else self.createplayer(gp.kp)
                 gp.kp.kpgroups[gp.id] = gp
+
             if gp.chat is None:
                 try:
                     gp.chat = self.updater.bot.get_chat(chat_id=gp.id)
@@ -110,11 +118,13 @@ class DiceBot:
                 except BadRequest:
                     self.sendtoAdmin("群："+str(gp.id)+" " +
                                      gp.name+"telegram chat无法获取")
+
             if gp.game is not None or gp.pausedgame is not None:
                 game = gp.game if gp.game is not None else gp.pausedgame
+                game.group = gp
                 if gp.kp is not None:
                     gp.kp.kpgames[gp.id] = game
-                game.kpid = gp.kp.id
+                    game.kpid = gp.kp.id
         # player
         for pl in self.players.values():
             if pl.chat is None:
@@ -124,6 +134,7 @@ class DiceBot:
                 except BadRequest:
                     self.sendtoAdmin("用户："+str(pl.id)+" " +
                                      pl.name+"telegram chat无法获取")
+
             if isinstance(pl.controlling, int):
                 pl.controlling = self.cards[pl.controlling]
         # ids
@@ -167,25 +178,121 @@ class DiceBot:
         for card in self.gamecards.values():
             card.write()
 
+    @overload
     def getgp(self, gpid: int) -> Optional[Group]:
-        if gpid not in self.groups:
-            return None
-        return self.groups[gpid]
+        return None if gpid not in self.groups else self.groups[gpid]
 
+    @overload
+    def getgp(self, update: Update) -> Optional[Group]:
+        assert(isgroupmsg(update))
+        return self.getgp(getchatid(update))
+
+    @overload
     def creategp(self, gpid: int) -> Group:
         assert(gpid not in self.groups)
-        self.groups[gpid] = Group(gpid=gpid)
-        self.groups[gpid].write()
 
-    def getplayer(self, plid) -> Optional[Player]:
-        if plid not in self.players:
-            return None
-        return self.players[plid]
+        gp = Group(gpid=gpid)
+        self.groups[gpid] = gp
 
-    def createplayer(self, plid) -> Player:
+        try:
+            gp.chat = self.updater.bot.get_chat(chat_id=gp.id)
+            gp.getname()
+        except:
+            self.sendtoAdmin("无法获取群"+str(gp.id)+" chat信息")
+
+        gp.write()
+
+    @overload
+    def creategp(self, update: Update) -> Group:
+        assert(isgroupmsg(update))
+        return self.creategp(getchatid(update))
+
+    @overload
+    def forcegetgroup(self, gpid: int) -> Group:
+        return self.getgp(gpid) if gpid in self.groups else self.creategp(gpid)
+
+    @overload
+    def forcegetgroup(self, update: Update) -> Group:
+        assert(isgroupmsg(update))
+        return self.forcegetgroup(getchatid(update))
+
+    @overload
+    def getplayer(self, plid: int) -> Optional[Player]:
+        return None if plid not in self.players else self.players[plid]
+
+    @overload
+    def getplayer(self, update: Update) -> Optional[Player]:
+        return self.getplayer(getmsgfromid(update))
+
+    @overload
+    def createplayer(self, plid: int) -> Player:
         assert(plid not in self.players)
-        self.players[plid] = Player(plid=plid)
-        self.players[plid].write()
+
+        pl = Player(plid=plid)
+        self.players[plid] = pl
+
+        try:
+            pl.chat = self.updater.bot.get_chat(chat_id=plid)
+            pl.getname()
+        except:
+            self.sendtoAdmin("无法获取玩家"+str(pl.id)+" chat信息")
+
+        pl.write()
+
+    @overload
+    def createplayer(self, update: Update) -> Player:
+        return self.createplayer(getmsgfromid(update))
+
+    @overload
+    def forcegetplayer(self, plid: int) -> Player:
+        return self.getplayer(plid) if plid in self.players else self.createplayer(plid)
+
+    @overload
+    def forcegetplayer(self, update: Update) -> Player:
+        return self.forcegetplayer(getmsgfromid(update))
+
+    def getcard(self, cdid: int) -> Optional[GameCard]:
+        return self.cards[cdid] if cdid in self.cards else None
+
+    def getgamecard(self, cdid: int) -> Optional[GameCard]:
+        return self.gamecards[cdid] if cdid in self.gamecards else None
+
+    def popcard(self, cdid: int) -> GameCard:
+        """删除一张游戏外的卡片"""
+        if self.getcard(cdid) is None:
+            raise KeyError("找不到id为"+str(cdid)+"的卡")
+
+        card = self.cards.pop(cdid)
+
+        # 维护groups
+        card.group.cards.pop(cdid)
+        card.group.write()
+
+        # 维护players
+        card.player.cards.pop(cdid)
+        if card.player.controlling == card:
+            card.player.controlling = None
+        card.player.write()
+
+        # 维护allids
+        self.allids.pop(self.allids.index(cdid))
+
+    def popgamecard(self, cdid: int) -> GameCard:
+        if self.getgamecard(cdid) is None:
+            raise KeyError("找不到id为"+str(cdid)+"的游戏中的卡")
+
+        card = self.gamecards.pop(cdid)
+
+        # 维护groups及games
+        assert(card.group.game is not None or card.group.pausedgame is not None)
+        assert(card.group.game is None or card.group.pausedgame is None)
+        game = card.group.game if card.group.game is not None else card.group.pausedgame
+        game.cards.pop(cdid)
+        card.group.write()
+
+        # 维护players
+        card.player.gamecards.pop(cdid)
+        card.player.write()
 
     def groupmigrate(self, oldid: int, newid: int) -> None:
         gp = self.getgp(oldid)

@@ -1,7 +1,11 @@
 # -*- coding:utf-8 -*-
 
 from typing import Any, Dict
+
 from telegram import Update
+
+from gameclass import Group, Player
+
 # Update相关
 
 
@@ -23,6 +27,10 @@ def isgroupmsg(update: Update) -> bool:
     return update.effective_chat.type.find("group") != -1
 
 
+def ischannel(update: Update) -> bool:
+    return update.effective_chat.type == "channel"
+
+
 def popallempties(d: Dict[Any, dict]) -> bool:
     """将二层字典中一层的空值对应的键删除。如果有空值，返回True，否则返回False"""
     ans: bool = False
@@ -31,6 +39,17 @@ def popallempties(d: Dict[Any, dict]) -> bool:
             ans = True
             d.pop(key)
     return ans
+
+
+def isingroup(gp: Group, pl: Player) -> bool:
+    """查询某个pl是否在群里"""
+    if gp.chat is None:
+        return False
+    try:
+        gp.chat.get_member(user_id=pl.id)
+    except:
+        return False
+    return True
 
 
 def plainNewCard() -> dict:
@@ -164,4 +183,3 @@ def templateNewCard() -> dict:
         "status": "alive"
     }
     return t
-

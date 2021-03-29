@@ -10,6 +10,18 @@ from telegram.ext import CallbackContext
 import utils
 from utils import dicebot
 
+# FLAGS
+
+CANREAD = 1
+OWNCARD = 2
+CANSETINFO = 4
+CANDISCARD = 8
+CANMODIFY = 16
+
+INGROUP = 1
+GROUPKP = 2
+GROUPADMIN = 4
+BOTADMIN = 8
 
 def start(update: Update, context: CallbackContext) -> None:
     """显示bot的帮助信息"""
@@ -18,21 +30,27 @@ def start(update: Update, context: CallbackContext) -> None:
 ###########################################################
 
 
+
 def addkp(update: Update, context: CallbackContext) -> bool:
     """添加KP。在群里发送`/addkp`将自己设置为KP。
     如果这个群已经有一名群成员是KP，则该指令无效。
     若原KP不在群里，该指令可以替换KP。
 
     如果原KP在群里，需要先发送`/delkp`来撤销自己的KP，或者管理员用`/transferkp`来强制转移KP权限。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, '发送群消息添加KP')
-    gpid = utils.getchatid(update)
-    kpid = utils.getmsgfromid(update)
-    utils.initrules(gpid)
+
+    gp = dicebot.forcegetgroup(update)
+    kp = dicebot.forcegetplayer(update)
+
     # 判断是否已经有KP
-    if gpid in utils.GROUP_KP_DICT:
+    if gp.kp is not None:
         # 已有KP
-        if not utils.isingroup(gpid, utils.getkpid(gpid)):  # 修改
+        if not utils.isingroup(gp, kp):  # 修改
             if not utils.changeKP(gpid, kpid):  # 更新NPC卡拥有者
                 # 不应触发
                 return utils.errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")

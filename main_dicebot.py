@@ -24,10 +24,17 @@ logging.basicConfig(
 
 def botexec(s: str, needreturn: bool = False):
     if not needreturn:
-        exec(s)
+        try:
+            exec(s)
+        except:
+            dicebot.sendtoAdmin("执行失败")
         return
 
-    exec("t="+s)
+    try:
+        exec("t="+s)
+    except:
+        dicebot.sendtoAdmin("执行失败")
+        return 
     return locals()["t"]
 
 

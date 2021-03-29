@@ -28,10 +28,6 @@ GROUPKP = 2
 GROUPADMIN = 4
 BOTADMIN = 8
 
-ISPRIVATE = 1
-ISGROUP = 2
-ISCHANNEL = 4
-
 # 数据
 """
 GROUP_KP_DICT: Dict[int, int]
@@ -60,23 +56,20 @@ SKILL_PAGES: List[List[str]]
 dicebot.sendtoAdmin("Bot is live!")
 
 
-def getgp(gpid: int) -> Optional[Group]:
+def __getgp(gpid: int) -> Optional[Group]:
     return dicebot.getgp(gpid)
 
 
 def initgroup(gpid: int) -> Optional[Group]:
     """若gpid未存储过，创建Group对象并返回，否则返回None"""
-    gp = getgp(gpid)
+    gp = __getgp(gpid)
     if gp:
         return None
     return dicebot.creategp(gpid)
 
 
-def forcegetgroup(gpid: int) -> Group:
-    gp = getgp(gpid)
-    if gp is None:
-        return initgroup(gpid)
-    return gp
+def __forcegetgroup(gpid: int) -> Group:
+    return dicebot.forcegetgroup(gpid)
 
 
 def updateinitgroup(update: Update) -> Optional[Group]:
@@ -86,25 +79,20 @@ def updateinitgroup(update: Update) -> Optional[Group]:
     return initgroup(gpid)
 
 
-def getplayer(plid: int) -> Optional[Player]:
-    if plid not in dicebot.players:
-        return None
-    return dicebot.players[plid]
+def __getplayer(plid: int) -> Optional[Player]:
+    return dicebot.getplayer(plid)
 
 
 def initplayer(plid: int) -> Optional[Player]:
     """若plid未存储过，创建Player对象并返回，否则返回None"""
-    pl = getplayer(plid)
+    pl = __getplayer(plid)
     if pl:
         return None
     return dicebot.createplayer(plid)
 
 
-def forcegetplayer(plid: int) -> Player:
-    pl = getplayer(plid)
-    if pl is None:
-        return initplayer(plid)
-    return pl
+def __forcegetplayer(plid: int) -> Player:
+    return dicebot.forcegetplayer(plid)
 
 
 def updateinitplayer(update: Update) -> Optional[Player]:
@@ -123,43 +111,23 @@ def chatinit(update: Update) -> Union[Player, Group, None]:
     return None
 
 
+def __getcard(cdid: int) -> Optional[GameCard]:
+    return dicebot.getcard(cdid)
+
+
 def autoswitchhint(plid: int) -> None:
     dicebot.updater.bot.send_message(chat_id=plid, text="创建新卡时，控制自动切换到新卡")
 
 
-def executilsfunc(com: str) -> str:
-    """使用utils的函数执行一句指令。这个函数应禁止非管理者调用"""
-    try:
-        exec("t="+com, {})
-        return str(locals()['t'])
-    except:
-        return "执行失败"
-
 # 卡片相关：查 增 删
 
 
-def cardpop(gpid: int, cdid: int) -> Optional[GameCard]:
+def cardpop(card: GameCard) -> Optional[GameCard]:
     """删除一张卡并返回其数据。返回None则删除失败"""
-    # 删除group索引
-    gp = getgp(gpid)
-    if not gp:
-        return None
-    if cdid not in gp.cards:
-        return None
-    card = gp.cards.pop(cdid)
-    gp.write()
-    # 删除player索引
-    pl = getplayer(card.playerid)
-    if not pl:
-        return None
-    pl.cards.pop(cdid)
-    if pl.controlling and pl.controlling.id == cdid:
-        pl.controlling = None
-    card.player.write()
-    # 删除id
-    i = dicebot.allids.index(card.id)
-    dicebot.allids = dicebot.allids[:i]+dicebot.allids[i+1:]
-    return gp.cards.pop(cdid)
+    if card.isgamecard:
+        dicebot.popgamecard(card.id)
+    else:
+        dicebot.popcard(card.id)
 
 
 def cardadd(card: GameCard, gpid: int) -> bool:
@@ -170,13 +138,13 @@ def cardadd(card: GameCard, gpid: int) -> bool:
     dicebot.allids.append(card.id)
     dicebot.allids.sort()
     # 增加群索引
-    gp = forcegetgroup(gpid)
+    gp = __forcegetgroup(gpid)
     card.group = gp
     card.groupid = gpid
     gp.cards[card.id] = card
     gp.write()
     # 增加pl索引
-    pl = forcegetplayer(card.playerid)
+    pl = __forcegetplayer(card.playerid)
     pl.cards[card.id] = card
     card.player = pl
     if pl.controlling:
@@ -187,7 +155,7 @@ def cardadd(card: GameCard, gpid: int) -> bool:
 
 
 def getcard(gpid: int, cdid: int) -> Optional[GameCard]:
-    gp = getgp(gpid)
+    gp = __getgp(gpid)
     if not gp:
         return None
     card = gp.getcard(cdid)
@@ -198,7 +166,7 @@ def getcard(gpid: int, cdid: int) -> Optional[GameCard]:
 
 def gamecardadd(card: GameCard, gpid: int) -> bool:
     """向游戏内添加一张卡，当卡id重复时返回False"""
-    gp = forcegetgroup(gpid)
+    gp = __forcegetgroup(gpid)
     if card.id not in gp.cards or card.id in gp.game.cards:
         return False
     # 增加群索引
@@ -209,7 +177,7 @@ def gamecardadd(card: GameCard, gpid: int) -> bool:
     gp.write()
     # 增加pl索引
 
-    pl = forcegetplayer(card.playerid)
+    pl = __forcegetplayer(card.playerid)
     pl.gamecards[card.id] = card
     card.player = pl
     pl.write()
@@ -274,7 +242,7 @@ def getoneid() -> int:
 # 查kp
 def searchifkp(plid: int) -> bool:
     """判断plid是否至少是一个群的kp"""
-    pl = getplayer(plid)
+    pl = __getplayer(plid)
     if not pl:
         pl = initplayer(plid)
     return bool(len(pl.kpgroups))
@@ -287,7 +255,7 @@ def isfromkp(update: Update) -> bool:
         return searchifkp(getchatid(update))
     # 如果是群消息，判断该指令是否来自本群kp
     gpid = getchatid(update)
-    gp = getgp(gpid)
+    gp = __getgp(gpid)
     if not gp:
         dicebot.groups[gpid] = Group(gpid=gpid)
         return False
@@ -298,7 +266,7 @@ def isfromkp(update: Update) -> bool:
 
 def findcard(plid: int) -> Optional[GameCard]:
     """输入一个player的id，返回该player当前选择中的卡"""
-    pl = getplayer(plid)
+    pl = __getplayer(plid)
     if not pl:
         return None
     return pl.controlling
@@ -306,7 +274,7 @@ def findcard(plid: int) -> Optional[GameCard]:
 
 def hascard(plid: int, gpid: int) -> bool:
     """判断一个群内是否已经有pl的卡"""
-    pl = getplayer(plid)
+    pl = __getplayer(plid)
     if not pl:
         pl = initplayer(plid)
         return False
@@ -382,7 +350,7 @@ def makeIntButtons(lower: int, upper: int, keystr1: str, keystr2: str, step: int
 
 def findgame(gpid: int) -> Optional[GroupGame]:
     """接收一个groupid，返回对应的GroupGame对象"""
-    gp = getgp(gpid)
+    gp = __getgp(gpid)
     if not gp:
         return None
     return gp.game
@@ -407,7 +375,7 @@ def findcardfromgamewithid(game: GroupGame, cdid: int) -> GameCard:
 def findDiscardCardsGroupIDTuple(plid: int) -> List[Tuple[Group, int]]:
     """返回`plid`对应的所有`discard`为`True`的卡的`(group, id)`对"""
     ans: List[int] = []
-    pl = getplayer(plid)
+    pl = __getplayer(plid)
     if not pl:
         return ans
     for card in pl.cards.values():
@@ -541,24 +509,13 @@ def modifycardinfo(card1: GameCard, attrname: str, val: str) -> Tuple[str, bool]
 def findkpcards(kpid) -> List[GameCard]:
     """查找`kpid`作为kp，所控制的NPC卡片，并做成列表全部返回"""
     ans = []
-    kp = getplayer(kpid)
+    kp = __getplayer(kpid)
     if not kp:
         return ans
     for card in kp.cards.values():
         if card.group.kp.id == kp.id:
             ans.append(card)
     return ans
-
-
-def isingroup(gp: Group, pl: Player) -> bool:
-    """查询某个pl是否在群里"""
-    if gp.chat is None:
-        return False
-    try:
-        gp.chat.get_member(user_id=pl.id)
-    except:
-        return False
-    return True
 
 
 @overload
@@ -626,55 +583,40 @@ def listintersect(l1: List[_T], l2: List[_T]) -> List[_T]:
     return ans
 
 
-def changeplids(gpid: int, oldplid: int, newplid: int) -> None:
+def changeplids(gp: Group, oldpl: Player, newpl: Player) -> None:
     """将某个群中所有`oldplid`持有的卡改为`newplid`持有。
     执行成功之后newplid对应的对象将会被创建"""
-    gp = getgp(gpid)
-    if not gp:
-        return
-    pl = getplayer(oldplid)
-    if not pl:
-        return
     gpcardids = list(gp.cards.keys())
-    plcardids = list(pl.cards.keys())
+    plcardids = list(oldpl.cards.keys())
     cardsids = listintersect(gpcardids, plcardids)
+
     if len(cardsids) == 0:
         return
-    newpl = getplayer(newplid)
-    if newpl is None:
-        newpl: Player = initplayer(newplid)
+
     for key in cardsids:
-        card = pl.cards[key]
-        card.playerid = newplid
+        card = oldpl.cards[key]
+        card.playerid = newpl.id
         card.player = newpl
-        newpl.cards[key] = pl.cards.pop(key)
-    if pl.controlling is not None:
-        card = pl.controlling
-        if card.groupid == gpid:
-            pl.controlling = None
-    gp.write()
-    pl.write()
+        newpl.cards[key] = oldpl.cards.pop(key)
+
+    if oldpl.controlling is not None and oldpl.controlling.group == gp:
+        oldpl.controlling = None
+
+    oldpl.write()
     newpl.write()
     return
 
 
-def changeKP(gpid: int, newkpid: int = 0) -> bool:
+def changeKP(gp: Group, newkp: Player) -> bool:
     """转移KP权限，接收参数：群id，新KP的id。
     会转移所有原KP控制的角色卡，包括正在进行的游戏。"""
-    if newkpid < 0:
-        return False
-    gp = getgp(gpid)
-    if not gp:
-        initgroup(gpid)
-        return False
-    kp = gp.getkp()
+    kp = gp.kp
     if not kp:
         return False
-    if kp.id == newkpid:
+    if kp == newkp:
         return False
-    changeplids(gpid, kp.id, newkpid)
-    newkp = forcegetplayer(newkpid)
-    game = gp.game
+    changeplids(gp, kp, newkp)
+    game = gp.game if gp.game is not None else gp.pausedgame
     if game is not None:
         for cardi in game.kpcards.values():
             cardi.playerid = newkpid
@@ -733,7 +675,7 @@ def skillcantouchmax(card1: GameCard, jumpskill: Optional[str] = None) -> Tuple[
 def skillmaxval(skillname: str, card1: GameCard, ismainskill: bool) -> int:
     """通过cost规则，返回技能能达到的最高值。"""
     aged, ok = skillcantouchmax(card1, skillname)
-    gp = forcegetgroup(card1.groupid)
+    gp = __forcegetgroup(card1.groupid)
 
     if aged:
         skillrule = gp.rule.skillmaxAged
@@ -1200,7 +1142,7 @@ def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
         query.edit_message_text("该卡不可删除。")
         return False
 
-    pl = forcegetplayer(plid)
+    pl = __forcegetplayer(plid)
     if pl.controlling is not None and pl.controlling.groupid == gpid and pl.controlling.id == cdid:
         pl.controlling = None
         pl.write()
@@ -1220,7 +1162,7 @@ def buttonswitch(query: CallbackQuery, plid: int, args: List[str]) -> bool:
         query.edit_message_text("没有找到卡片。")
         return False
 
-    pl = forcegetplayer(plid)
+    pl = __forcegetplayer(plid)
     pl.controlling = card
     pl.write()
 
@@ -1280,19 +1222,19 @@ def getkpctrl(game: GroupGame) -> Optional[GameCard]:
 
 def changecardgpid(oldgpid: int, newgpid: int) -> bool:
     """函数`changegroup`的具体实现。"""
-    oldcdidlst = list(forcegetgroup(oldgpid).cards.keys())
+    oldcdidlst = list(__forcegetgroup(oldgpid).cards.keys())
     for cdid in oldcdidlst:
         card = cardpop(oldgpid, cdid)
         cardadd(card, newgpid)
-    getgp(oldgpid).write()
-    getgp(newgpid).write()
+    __getgp(oldgpid).write()
+    __getgp(newgpid).write()
 
 
 def groupcopy(oldgpid: int, newgpid: int, copyall: bool) -> bool:
     """copyall为False则只复制NPC卡片"""
     if findgame(oldgpid) or findgame(newgpid):
         return False
-    oldgp = forcegetgroup(oldgpid)
+    oldgp = __forcegetgroup(oldgpid)
     srclist: List[GameCard] = []
     for card in oldgp.cards.values():
         if not copyall and (card.type != "PL" or (card.group.kp is not None and card.playerid == card.group.kp.id)):
@@ -1312,7 +1254,7 @@ def groupcopy(oldgpid: int, newgpid: int, copyall: bool) -> bool:
     for card in dstlist:
         cardadd(card, newgpid)
 
-    getgp(newgpid).write()
+    __getgp(newgpid).write()
     oldgp.write()
 
     return True
@@ -1477,7 +1419,7 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
 
 def gamepop(gpid: int) -> Optional[GroupGame]:
     """终止一场游戏。`/abortgame`的具体实现。"""
-    gp = forcegetgroup(gpid)
+    gp = __forcegetgroup(gpid)
     ans = gp.game
     gp.game = None
     return ans
@@ -1485,7 +1427,7 @@ def gamepop(gpid: int) -> Optional[GroupGame]:
 
 def holdinggamecontinue(gpid: int) -> GroupGame:
     """继续一场暂停的游戏。`/continuegame`的具体实现。"""
-    gp = forcegetgroup(gpid)
+    gp = __forcegetgroup(gpid)
     if gp.game is not None and gp.pausedgame is not None:
         raise Exception("群："+str(gp.id)+"存在暂停的游戏和进行中的游戏")
     if gp.pausedgame is not None:
@@ -1494,7 +1436,7 @@ def holdinggamecontinue(gpid: int) -> GroupGame:
 
 
 def isholdinggame(gpid: int) -> bool:
-    return True if forcegetgroup(gpid).pausedgame is not None else False
+    return True if __forcegetgroup(gpid).pausedgame is not None else False
 
 
 def getgamecardsid(game: GroupGame) -> KeysView[int]:
@@ -1588,7 +1530,7 @@ def textnewcard(update: Update) -> bool:
     if not isint(text) or int(text) >= 0:
         return errorHandler(update, "无效群id。如果你不知道群id，在群里发送 /getid 获取群id。")
     gpid = int(text)
-    if hascard(plid, gpid) and (forcegetgroup(gpid).kp is None or forcegetgroup(gpid).kp.id != plid):
+    if hascard(plid, gpid) and (__forcegetgroup(gpid).kp is None or __forcegetgroup(gpid).kp.id != plid):
         popOP(plid)
         return errorHandler(update, "你在这个群已经有一张卡了！")
     popOP(plid)
@@ -1672,7 +1614,7 @@ def textdelcard(update: Update, cardid: int) -> bool:
 
 def getnewcard(msgid: int, gpid: int, plid: int, cdid: int = -1) -> bool:
     """指令`/newcard`的具体实现"""
-    gp = forcegetgroup(gpid)
+    gp = __forcegetgroup(gpid)
     new_card, detailmsg = generateNewCard(plid, gpid)
     allids = getallid()
     if cdid >= 0 and cdid not in allids:
