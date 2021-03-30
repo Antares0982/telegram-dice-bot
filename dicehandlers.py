@@ -74,19 +74,34 @@ def transferkp(update: Update, context: CallbackContext) -> bool:
     """转移KP权限，只有群管理员可以使用这个指令。
     当前群没有KP时或当前群KP为管理员时，无法使用。
 
+    `/transferkp --kpid`：将当前群KP权限转移到某个群成员。
+    如果指定的`kpid`不在群内则无法设定。
+
     `/transferkp`：将当前群KP权限转移到自身。
 
-    `/transferkp --kpid`：将当前群KP权限转移到某个群成员。
-    如果指定的`kpid`不在群内则无法设定。"""
+    `/trasferkp`(reply to someone)：将kp权限转移给被回复者。"""
+
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "发送群消息强制转移KP权限")
-    if not utils.isadmin(update, utils.getmsgfromid(update)):
+
+    gp = dicebot.getgp(update)
+    pl = dicebot.getplayer(update)
+    f = utils.checkaccess(pl, gp)
+
+    if not f & GROUPADMIN:
         return utils.errorHandler(update, "没有权限", True)
-    gpid = utils.getchatid(update)
-    if utils.getkpid(gpid) == -1:
+
+    if gp.kp is None:
         return utils.errorHandler(update, "没有KP", True)
-    if utils.isadmin(update, utils.getkpid(gpid)):
+
+    if utils.checkaccess(gp.kp, gp) & GROUPADMIN:
         return utils.errorHandler(update, "KP是管理员，无法转移")
+
+    # 获取newkp
     newkpid: int
     if len(context.args) != 0:
         if not utils.isint(context.args[0]):
@@ -94,6 +109,7 @@ def transferkp(update: Update, context: CallbackContext) -> bool:
         newkpid = int(context.args[0])
     else:
         newkpid = utils.getmsgfromid(update)
+
     if newkpid == utils.getkpid(gpid):
         return utils.errorHandler(update, "原KP和新KP相同", True)
     if not utils.changeKP(gpid, newkpid):

@@ -131,7 +131,7 @@ def cardpop(card: GameCard) -> Optional[GameCard]:
 
 
 def cardadd(card: GameCard, gpid: int) -> bool:
-    """向群内添加一张卡，当卡id重复时返回False"""
+    """添加一张游戏外的卡，当卡id重复时返回False"""
     if card.id in dicebot.allids:
         return False
     # 增加id
@@ -290,6 +290,14 @@ def findcardwithid(cdid: int) -> Optional[GameCard]:
         if cdid in gp.cards:
             return gp.cards[cdid]
     return None
+
+
+def getreplyplayer(update: Update) -> Player:
+    if isprivatemsg(update):
+        return dicebot.forcegetplayer(update)
+    if isgroupmsg(update):
+        assert(update.message.reply_to_message is not None)
+        return dicebot.forcegetplayer(update.message.reply_to_message.from_user.id)
 
 
 # def getskillmax(card1: GameCard) -> int:
@@ -518,61 +526,6 @@ def findkpcards(kpid) -> List[GameCard]:
     return ans
 
 
-@overload
-def isadmin(update: Update, userid: int) -> bool:
-    """检测发消息的人是不是群管理员"""
-    if isprivatemsg(update):
-        return False
-    admins = update.effective_chat.get_administrators()
-    for admin in admins:
-        if admin.user.id == userid:
-            return True
-    return False
-
-
-@overload
-def isadmin(gp: Group, pl: Player) -> bool:
-    """检测pl是不是gp的管理员"""
-    admins = gp.chat.get_administrators()
-    for admin in admins:
-        if admin.user.id == pl.id:
-            return True
-    return False
-
-
-def recallmsg(update: Update) -> bool:
-    """撤回群消息。如果自己不是管理员，不做任何事"""
-    if isprivatemsg(update) or not isadmin(update, BOT_ID):
-        return False
-    update.message.delete()
-    return True
-
-
-def errorHandler(update: Update,  message: str, needrecall: bool = False) -> False:
-    """指令无法执行时，调用的函数。
-    固定返回`False`，并回复错误信息。
-    如果`needrecall`为`True`，在Bot是对应群管理的情况下将删除那条消息。"""
-    if not isprivatemsg(update) and not isgroupmsg(update):
-        return False
-    if needrecall and isgroupmsg(update) and isadmin(update, BOT_ID):
-        recallmsg(update)
-    else:
-        if message == "找不到卡。":
-            message += "请使用 /switch 切换当前操控的卡再试。"
-        elif message.find("参数") != -1:
-            message += "\n如果不会使用这个指令，请使用帮助： `/help --command`"
-        try:
-            msg = update.message.reply_text(message, parse_mode="MarkdownV2")
-        except:
-            msg = update.message.reply_text(message)
-        if message.find("私聊") != -1:
-            rtbutton = [[InlineKeyboardButton(
-                "跳转到私聊", callback_data="None", url="t.me/"+BOTUSERNAME)]]
-            rp_markup = InlineKeyboardMarkup(rtbutton)
-            msg.edit_reply_markup(reply_markup=rp_markup)
-    return False
-
-
 def listintersect(l1: List[_T], l2: List[_T]) -> List[_T]:
     if len(l1) > len(l2):
         l1, l2 = l2, l1
@@ -591,7 +544,7 @@ def changecardsplid(gp: Group, oldpl: Player, newpl: Player) -> None:
 
     for key in oldpl.cards.keys():
         card = oldpl.cards[key]
-        if card.group!= gp:
+        if card.group != gp:
             continue
 
         card.playerid = newpl.id
@@ -599,8 +552,8 @@ def changecardsplid(gp: Group, oldpl: Player, newpl: Player) -> None:
         newpl.cards[key] = oldpl.cards.pop(key)
 
     for key in oldpl.gamecards.keys():
-        card= oldpl.gamecards[key]
-        if card.group!=gp:
+        card = oldpl.gamecards[key]
+        if card.group != gp:
             continue
 
         card.playerid = newpl.id
