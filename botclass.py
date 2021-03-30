@@ -37,6 +37,11 @@ class DiceBot:
         # self.readhandlers()
 
     def readall(self) -> None:
+        # 初始化
+        self.groups = {}
+        self.players = {}
+        self.cards = {}
+        self.gamecards = {}
         # groups
         for filename in os.listdir(PATH_GROUPS):
             if filename.find(".json") != len(filename)-5:
@@ -295,6 +300,7 @@ class DiceBot:
 
         # 维护players
         card.player.gamecards.pop(cdid)
+        card.delete()
         card.player.write()
 
     def addkp(self, gp: Group, pl: Player) -> None:
@@ -306,7 +312,11 @@ class DiceBot:
             game.kp = pl
             pl.kpgames[gp.id] = game
 
+        gp.write()
+        pl.write()
+
     def delkp(self, gp: Group) -> Optional[Player]:
+        """仅删除kp。"""
         if gp.kp is None:
             return None
         kp = gp.kp
@@ -316,6 +326,9 @@ class DiceBot:
         if game is not None:
             game.kp = None
             kp.kpgames.pop(gp.id)
+
+        gp.write()
+        kp.write()
 
     def groupmigrate(self, oldid: int, newid: int) -> None:
         gp = self.getgp(oldid)

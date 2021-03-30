@@ -79,7 +79,7 @@ def updateinitgroup(update: Update) -> Optional[Group]:
     return initgroup(gpid)
 
 
-def __getplayer(plid: int) -> Optional[Player]:
+def __getplayer(plid: Union[int, Update]) -> Optional[Player]:
     return dicebot.getplayer(plid)
 
 
@@ -91,7 +91,7 @@ def initplayer(plid: int) -> Optional[Player]:
     return dicebot.createplayer(plid)
 
 
-def __forcegetplayer(plid: int) -> Player:
+def __forcegetplayer(plid: Union[int, Update]) -> Player:
     return dicebot.forcegetplayer(plid)
 
 
@@ -240,11 +240,8 @@ def getoneid() -> int:
 
 
 # 查kp
-def searchifkp(plid: int) -> bool:
+def searchifkp(pl: Player) -> bool:
     """判断plid是否至少是一个群的kp"""
-    pl = __getplayer(plid)
-    if not pl:
-        pl = initplayer(plid)
     return bool(len(pl.kpgroups))
 
 
@@ -252,16 +249,11 @@ def isfromkp(update: Update) -> bool:
     """判断消息发送者是否是kp。
     如果是私聊消息，只需要发送者是某群KP即返回True。如果是群聊消息，当发送者是本群KP才返回True"""
     if isprivatemsg(update):  # 私聊消息，搜索所有群判断是否是kp
-        return searchifkp(getchatid(update))
+        return searchifkp(__forcegetplayer(update))
+
     # 如果是群消息，判断该指令是否来自本群kp
-    gpid = getchatid(update)
-    gp = __getgp(gpid)
-    if not gp:
-        dicebot.groups[gpid] = Group(gpid=gpid)
-        return False
-    if gp.kp is None or gp.kp.id != getmsgfromid(update):
-        return False
-    return True
+    gp = __forcegetgroup(update)
+    return gp.kp is not None and gp.kp == __forcegetplayer(update)
 
 
 def findcard(plid: int) -> Optional[GameCard]:
@@ -278,10 +270,8 @@ def hascard(plid: int, gpid: int) -> bool:
     if not pl:
         pl = initplayer(plid)
         return False
-    for card in pl.cards.values():
-        if card.group.id == gpid:
-            return True
-    return False
+
+    return any(card.group.id == gpid for card in pl.cards.values())
 
 
 def findcardwithid(cdid: int) -> Optional[GameCard]:
@@ -292,12 +282,11 @@ def findcardwithid(cdid: int) -> Optional[GameCard]:
     return None
 
 
-def getreplyplayer(update: Update) -> Player:
+def getreplyplayer(update: Update) -> Optional[Player]:
     if isprivatemsg(update):
         return dicebot.forcegetplayer(update)
     if isgroupmsg(update):
-        assert(update.message.reply_to_message is not None)
-        return dicebot.forcegetplayer(update.message.reply_to_message.from_user.id)
+        return dicebot.forcegetplayer(update.message.reply_to_message.from_user.id) if update.message.reply_to_message is not None else None
 
 
 # def getskillmax(card1: GameCard) -> int:
@@ -366,8 +355,8 @@ def findgame(gpid: int) -> Optional[GroupGame]:
 
 def findcardfromgame(game: GroupGame, plid: int) -> GameCard:
     """从`game`中返回对应的`plid`的角色卡"""
-    for i in game.cards.values():
-        if i.playerid == plid:
+    for i in dicebot.forcegetplayer(plid).gamecards.values():
+        if i.group == game.group:
             return i
     return None
 
@@ -538,11 +527,8 @@ def listintersect(l1: List[_T], l2: List[_T]) -> List[_T]:
 
 def changecardsplid(gp: Group, oldpl: Player, newpl: Player) -> None:
     """将某个群中所有`oldplid`持有的卡改为`newplid`持有。"""
-    gpcardids = list(gp.cards.keys())
-    plcardids = list(oldpl.cards.keys())
-    cardsids = listintersect(gpcardids, plcardids)
-
     for key in oldpl.cards.keys():
+
         card = oldpl.cards[key]
         if card.group != gp:
             continue
@@ -552,6 +538,7 @@ def changecardsplid(gp: Group, oldpl: Player, newpl: Player) -> None:
         newpl.cards[key] = oldpl.cards.pop(key)
 
     for key in oldpl.gamecards.keys():
+
         card = oldpl.gamecards[key]
         if card.group != gp:
             continue
@@ -1484,17 +1471,18 @@ def cardsetsex(update: Update, cardi: GameCard, sex: str) -> bool:
     return True
 
 
-def textnewcard(update: Update) -> bool:
+def textnewcard(update: Update, cdid: int = -1) -> bool:
     text = update.message.text
     plid = getchatid(update)
     if not isint(text) or int(text) >= 0:
         return errorHandler(update, "无效群id。如果你不知道群id，在群里发送 /getid 获取群id。")
     gpid = int(text)
-    if hascard(plid, gpid) and (__forcegetgroup(gpid).kp is None or __forcegetgroup(gpid).kp.id != plid):
-        popOP(plid)
-        return errorHandler(update, "你在这个群已经有一张卡了！")
     popOP(plid)
-    return getnewcard(update.message.message_id, gpid, plid)
+    
+    if hascard(plid, gpid) and (__forcegetgroup(gpid).kp is None or __forcegetgroup(gpid).kp.id != plid):
+        return errorHandler(update, "你在这个群已经有一张卡了！")
+
+    return getnewcard(update.message.message_id, gpid, plid, cdid)
 
 
 def textsetage(update: Update) -> bool:

@@ -3,6 +3,7 @@ import copy
 import json
 from inspect import isfunction
 from io import TextIOWrapper
+import os
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from telegram import Bot, Chat
@@ -215,25 +216,17 @@ class GameCard(datatype):
         rttext += "角色类型: "+self.type+"\n"
 
         rttext += "玩家是否可删除该卡: "
-        if self.discard:
-            rttext += "是\n"
-        else:
-            rttext += "否\n"
+        rttext += "是\n" if self.discard else "否\n"
 
         rttext += "状态: "+self.status+"\n"
 
         rttext += "是否为游戏中的角色卡: "
-        if self.isgamecard:
-            rttext += "是\n"
-        else:
-            rttext += "否\n"
+        rttext += "是\n" if self.isgamecard else "否\n"
 
         return rttext
 
     def cardConstruct(self):
         self.data.card = self
-        self.skill.card = self
-        self.interest.card = self
         self.background.card = self
 
     def check(self) -> str:
@@ -276,12 +269,22 @@ class GameCard(datatype):
     def write(self):
         if self.id is None:
             raise ValueError("写入文件时，GameCard实例没有id")
+
         if self.isgamecard:
             with open(PATH_GAME_CARDS+str(self.id)+".json", 'w', encoding='utf-8') as f:
                 json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
         else:
             with open(PATH_CARDS+str(self.id)+".json", 'w', encoding='utf-8') as f:
                 json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
+
+    def delete(self):
+        if self.id is None:
+            raise ValueError("删除文件时，GameCard实例没有id")
+
+        if self.isgamecard:
+            os.remove(PATH_GAME_CARDS+str(self.id)+".json")
+        else:
+            os.remove(PATH_CARDS+str(self.id)+".json")
 
     def __eq__(self, o: object) -> bool:
         return self.id == o.id and self.isgamecard == o.isgamecard
@@ -344,6 +347,17 @@ class Player(datatype):
 
     def iskp(self, gpid: int) -> bool:
         return gpid in self.kpgroups
+
+    def __str__(self) -> str:
+        rttext = "id："+str(self.id)
+        rttext += f"昵称：{self.getname()}\n"
+        if self.controlling is not None:
+            rttext += "当前正在操作的卡片id："+str(self.controlling.id)+"\n"
+        rttext += "所有卡片id："+' '.join(self.cards.keys())+"\n"
+        rttext += "所有游戏中卡片的id："+' '.join(self.gamecards.keys())+"\n"
+        rttext += "作为kp的群id："+' '.join(self.kpgroups.keys())+"\n"
+        rttext += "正在进行游戏的群id："+' '.join(self.kpgames.keys())+"\n"
+        return rttext
 
     def write(self):
         if not isinstance(self.id, int):
@@ -423,6 +437,23 @@ class Group(datatype):
             raise ValueError("写入文件时，Group实例没有id")
         with open(PATH_GROUPS+str(self.id)+".json", 'w', encoding='utf-8') as f:
             json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
+
+    def __str__(self) -> str:
+        rttext = "群id："+str(self.id)+"\n"
+        rttext += "相关卡片id："+', '.join(map(str, self.cards.keys()))+"\n"
+        rttext += "群自定义规则："+str(self.rule)+"\n"
+
+        if self.game is not None:
+            rttext += "本群正在进行游戏。\n"
+        elif self.pausedgame is not None:
+            rttext += "本群存在一个暂停的游戏。\n"
+
+        game = self.game if self.game is not None else self.pausedgame
+        if game is None:
+            return rttext
+        rttext += str(game)
+
+        return rttext
 
     def __eq__(self, o: object) -> bool:
         return self.id == o.id
@@ -859,6 +890,10 @@ class GroupGame(datatype):  # If defined, game is started.
     def write(self):
         if self.group is not None:
             self.group.write()
+
+    def __eq__(self, o: object) -> bool:
+        assert(self.group is not None)
+        return self.group == o.group
 
 
 class GroupRule(datatype):

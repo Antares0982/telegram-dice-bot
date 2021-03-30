@@ -1,15 +1,17 @@
 # -*- coding:utf-8 -*-
 # only define handlers
 
+from _typeshed import OpenBinaryMode
+from gameclass import Group
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext
 
 import utils
 from utils import dicebot
-
+from cfg import *
 # FLAGS
 
 CANREAD = 1
@@ -106,105 +108,109 @@ def transferkp(update: Update, context: CallbackContext) -> bool:
     if len(context.args) != 0:
         if not utils.isint(context.args[0]):
             return utils.errorHandler(update, "参数需要是整数", True)
-        newkpid = int(context.args[0])
+        newkp = dicebot.forcegetplayer(int(context.args[0]))
     else:
-        newkpid = utils.getmsgfromid(update)
+        t = utils.getreplyplayer(update)
+        newkp = t if t is not None else dicebot.forcegetplayer(update)
 
-    if newkpid == utils.getkpid(gpid):
+    if newkp == gp.kp:
         return utils.errorHandler(update, "原KP和新KP相同", True)
-    if not utils.changeKP(gpid, newkpid):
+
+    if not utils.changeKP(gp, newkp):
         return utils.errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")  # 不应触发
+
     return True
 
 
 def delkp(update: Update, context: CallbackContext) -> bool:
     """撤销自己的KP权限。只有当前群内KP可以使用该指令。
     在撤销KP之后的新KP会自动获取原KP的所有NPC的卡片"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, '发群消息撤销自己的KP权限')
-    gpid = utils.getchatid(update)
-    if utils.getkpid(gpid) == -1:
+
+    gp = dicebot.forcegetgroup(update)
+    if gp.kp is None:
         return utils.errorHandler(update, '本群没有KP', True)
-    if utils.getmsgfromid(update) != utils.getkpid(gpid):
+
+    if not utils.checkaccess(dicebot.forcegetplayer(update), gp) & GROUPKP:
         return utils.errorHandler(update, '你不是KP', True)
-    if not utils.changeKP(gpid):
-        return utils.errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")  # 不应触发
+
+    utils.changecardsplid(gp, gp.kp, dicebot.forcegetplayer(0))
+    dicebot.delkp(gp)
+
     update.message.reply_text('KP已撤销')
-    if utils.getOP(gpid).find("delcard") != -1:
-        utils.popOP(gpid)
+
+    if utils.getOP(gp.id).find("delcard") != -1:
+        utils.popOP(gp.id)
+
     return True
 
 
 def reload(update: Update, context: CallbackContext) -> bool:
     """重新读取所有文件，只有bot管理者可以使用"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.getmsgfromid(update) != utils.ADMIN_ID:
         return utils.errorHandler(update, "没有权限", True)
+
     try:
-        utils.GROUP_KP_DICT, utils.CARDS_DICT, utils.ON_GAME, utils.HOLD_GAME = utils.readinfo()
-        utils.CURRENT_CARD_DICT = utils.readcurrentcarddict()
-        utils.GROUP_RULES = utils.readrules()
+        dicebot.readall()
+        dicebot.construct()
     except:
         return utils.errorHandler(update, "读取文件出现问题，请检查json文件！")
-    update.message.reply_text('成功重新读取文件。')
+
+    update.message.reply_text('重新读取文件成功。')
     return True
 
 
 def showuserlist(update: Update, context: CallbackContext) -> bool:
     """显示所有信息。非KP无法使用这一指令。
     群聊时不可以使用该指令。
-
     Bot管理者使用该指令，bot将逐条显示群-KP信息、
     全部的卡信息、游戏信息。KP使用时，只会显示与TA相关的这些消息。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isgroupmsg(update):  # Group msg: do nothing, even sender is USER or KP
         return utils.errorHandler(update, "没有这一指令", True)
-    if utils.getchatid(update) == utils.ADMIN_ID:  # 全部显示
-        rttext = "GROUP_KP_LIST:\n"
-        if not utils.GROUP_KP_DICT:
-            rttext += "None"
-        else:
-            for keys in utils.GROUP_KP_DICT:
-                rttext += str(keys) + ": "+str(utils.GROUP_KP_DICT[keys])+"\n"
-        update.message.reply_text(rttext)
-        if not utils.CARDS_DICT:
-            update.message.reply_text("CARDS: None")
-        else:
-            update.message.reply_text("CARDS:")
-            for gpids in utils.CARDS_DICT:
-                time.sleep(0.5)
-                update.message.reply_text("group:"+str(gpids))
-                for cdids in utils.CARDS_DICT[gpids]:
-                    update.message.reply_text(
-                        str(utils.CARDS_DICT[gpids][cdids]))
-                    time.sleep(0.5)
-        time.sleep(0.5)
-        rttext = "Game Info:\n"
-        if not utils.ON_GAME:
-            rttext += "None"
-        else:
-            for i in range(len(utils.ON_GAME)):
-                rttext += str(utils.ON_GAME[i].groupid) + \
-                    ": " + str(utils.ON_GAME[i].kpid)+"\n"
-        update.message.reply_text(rttext)
-        return True
-    if utils.isfromkp(update):  # private msg
-        kpid = utils.getchatid(update)
-        gpids = utils.findkpgroups(kpid)
-        if len(utils.CARDS_DICT) == 0:
-            return utils.errorHandler(update, "没有角色卡")
-        for gpid in gpids:
-            if gpid not in utils.CARDS_DICT:
-                update.message.reply_text("群: "+str(gpid)+" 没有角色卡")
-            else:
-                update.message.reply_text("群: "+str(gpid)+" 角色卡:")
-                for cdid in utils.CARDS_DICT[gpid]:
-                    update.message.reply_text(
-                        str(utils.CARDS_DICT[gpid][cdid]))
-        for i in range(len(utils.ON_GAME)):
-            if utils.ON_GAME[i].kpid == kpid:
-                update.message.reply_text(
-                    "群："+str(utils.ON_GAME[i].groupid)+"正在游戏中")
-        return True
-    return utils.errorHandler(update, "没有这一指令", True)
+
+    user = dicebot.forcegetplayer(update)
+
+    if not utils.searchifkp(user) and user.id != ADMIN_ID:
+        return utils.errorHandler(update, "没有这一指令")
+
+    # 群
+    for gp in dicebot.groups.values():
+        if utils.checkaccess(user, gp) & (GROUPKP | BOTADMIN) != 0:
+            update.message.reply_text(str(gp))
+            time.sleep(0.2)
+
+    # 玩家
+    for pl in dicebot.players.values():
+        if pl == user or user.id == ADMIN_ID:
+            update.message.reply_text(str(pl))
+            time.sleep(0.2)
+
+    # 卡片
+    for card in dicebot.cards.values():
+        if utils.checkaccess(pl, card) != 0 or user.id == ADMIN_ID:
+            update.message.reply_text(str(card))
+            time.sleep(0.2)
+
+    # 游戏中卡片
+    for card in dicebot.gamecards.values():
+        if utils.checkaccess(pl, card) != 0 or user.id == ADMIN_ID:
+            update.message.reply_text(str(card))
+            time.sleep(0.2)
+
+    return True
 
 
 def delmsg(update: Update, context: CallbackContext) -> bool:
@@ -223,21 +229,28 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
     请不要重复发送该指令，否则可能造成有用的消息丢失。
     如果感觉删除没有完成，请先随意发送一条消息来拉取删除情况，
     而不是继续用`/delmsg`删除。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     delnum = 1
     chatid = utils.getchatid(update)
+
     if utils.isgroupmsg(update) and not utils.isadmin(update, utils.BOT_ID):
         return utils.errorHandler(update, "Bot没有管理权限")
-    senderid = utils.getmsgfromid(update)
-    if utils.isgroupmsg(update) and not utils.isfromkp(update) and not utils.isadmin(update, senderid):
+
+    if utils.isgroupmsg(update) and utils.checkaccess(dicebot.forcegetplayer(update), dicebot.forcegetgroup(update)) & (GROUPKP | GROUPADMIN) != 0:
         return utils.errorHandler(update, "没有权限", True)
-    if len(context.args) >= 1 and utils.isint(context.args[0]):
-        delnum = int(context.args[0])
-        if delnum <= 0:
+
+    if len(context.args) >= 1:
+        if not utils.isint(context.args[0]) or int(context.args[0]) <= 0:
             return utils.errorHandler(update, "参数错误", True)
+        delnum = int(context.args[0])
         if delnum > 10:
             return utils.errorHandler(update, "一次最多删除10条消息")
+
     lastmsgid = update.message.message_id
-    while delnum >= 0:
+    while delnum >= 0:  # 这是因为要连同delmsg指令的消息也要删掉
         if lastmsgid < -100:
             break
         try:
@@ -247,6 +260,7 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
         else:
             delnum -= 1
             lastmsgid -= 1
+
     update.effective_chat.send_message("删除完成").delete()
     return True
 
@@ -255,23 +269,38 @@ def getid(update: Update, context: CallbackContext) -> None:
     """获取所在聊天环境的id。
     私聊使用该指令发送用户id，群聊使用该指令则发送群id。
     在创建卡片等待群id时使用该指令，会自动创建卡。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     chatid = utils.getchatid(update)
     fromuser = utils.getmsgfromid(update)
+
+    # 检测是否处于newcard状态
     opers = utils.getOP(fromuser)
+
     msg = update.message.reply_text("<code>"+str(chatid) +
                                     "</code> \n点击即可复制", parse_mode='HTML')
-    if opers != "":
+
+    if opers != "" and utils.isgroupmsg(update):
         opers = opers.split(" ")
         if utils.isgroupmsg(update) and opers[0] == "newcard":
             utils.popOP(fromuser)
-            if utils.hascard(fromuser, chatid) and utils.getkpid(chatid) != fromuser:
+
+            if utils.hascard(fromuser, chatid) and dicebot.getgp(update).kp is not None and dicebot.getgp(update).kp != fromuser:
                 context.bot.send_message(
                     chat_id=fromuser, text="你在这个群已经有一张卡了！")
                 return
-            utils.getnewcard(int(opers[1]), chatid, fromuser)
+            if len(opers) >= 3:
+                utils.getnewcard(
+                    int(opers[1]), chatid, fromuser, int(opers[2]))
+            else:
+                utils.getnewcard(int(opers[1]), chatid, fromuser)
+
             rtbutton = [[InlineKeyboardButton(
                 text="跳转到私聊", callback_data="None", url="t.me/"+utils.BOTUSERNAME)]]
             rp_markup = InlineKeyboardMarkup(rtbutton)
+
             msg.edit_reply_markup(reply_markup=rp_markup)
 
 
@@ -279,12 +308,16 @@ def showrule(update: Update, context: CallbackContext) -> bool:
     """显示当前群内的规则。
     如果想了解群规则的详情，请查阅setrule指令的帮助：
     `/help setrule`"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "请在群内查看规则")
-    gpid = utils.getchatid(update)
-    if gpid not in utils.GROUP_RULES:
-        utils.initrules(gpid)
-    rule = utils.GROUP_RULES[gpid]
+
+    gp = dicebot.forcegetgroup(update)
+    rule = gp.rule
+
     update.message.reply_text(str(rule))
     return True
 
@@ -313,24 +346,31 @@ def setrule(update: Update, context: CallbackContext) -> bool:
     skillcost：技能点数分配时的消耗。接收长度为偶数的数组，记为r。
     若i为偶数（或0），`r[i]`表示技能点小于`r[i+1]`时，
     需要分配`r[i]`点点数来获得1点技能点。r的最后一项必须是100。
-    例如：`r=[1,80,2,100]`，则从10点升至90点需要花费`1*70+2*10=90`点数。
+    例如：`r=[1, 80, 2, 100]`，则从10点升至90点需要花费`1*70+2*10=90`点数。
 
     greatsuccess：大成功范围。接收长度为4的数组，记为r。
     `r[0]-r[1]`为检定大于等于50时大成功范围，否则是`r[2]-r[3]`。
 
     greatfail：大失败范围。同上。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "请在群内用该指令设置规则")
-    gpid = utils.getchatid(update)
-    utils.initrules(gpid)
+
+    gp = dicebot.forcegetgroup(update)
+
     if not utils.isfromkp(update):
         return utils.errorHandler(update, "没有权限", True)
+
     if len(context.args) == 0:
         return utils.errorHandler(update, "需要参数", True)
-    if utils.isint(context.args[0]):
-        return utils.errorHandler(update, "参数无效", True)
-    gprule = utils.GROUP_RULES[gpid]
+
+    gprule = gp.rule
+
     ruledict: Dict[str, List[int]] = {}
+
     i = 0
     while i < len(context.args):
         j = i+1
@@ -344,15 +384,20 @@ def setrule(update: Update, context: CallbackContext) -> bool:
         ruledict[context.args[i]] = tplist
         i = j
     del i, j
+
     msg, ok = gprule.changeRules(ruledict)
-    utils.writerules(utils.GROUP_RULES)
     if not ok:
         return utils.errorHandler(update, msg)
+
     update.message.reply_text(msg)
     return True
 
 
 def createcardhelp(update: Update, context: CallbackContext) -> None:
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     update.message.reply_text(utils.CREATE_CARD_HELP, parse_mode="MarkdownV2")
 
 
@@ -361,12 +406,19 @@ def trynewcard(update: Update, context: CallbackContext) -> bool:
     测试创建的卡一定可以删除。
     创建新卡指令的帮助见`/help newcard`，
     对建卡过程有疑问，见 `/createcardhelp`。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息创建角色卡。")
-    utils.initrules(-1)
-    utils.GROUP_KP_DICT[-1] = utils.ADMIN_ID
-    utils.writekpinfo(utils.GROUP_KP_DICT)
-    return utils.getnewcard(update.message.message_id, -1, update.effective_chat.id)
+
+    gp = dicebot.getgp(-1)
+    if gp is None:
+        gp = dicebot.creategp(-1)
+        gp.kp = dicebot.forcegetplayer(ADMIN_ID)
+
+    return utils.getnewcard(update.message.message_id, -1, utils.getchatid(update))
 
 
 def newcard(update: Update, context: CallbackContext) -> bool:
@@ -398,23 +450,44 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     角色类型（PL，NPC）；
     是否可以被删除；
     状态（存活，死亡，疯狂等）。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息创建角色卡。")
-    if len(context.args) == 0:
+
+    gp: Optional[Group] = None
+    newcdid: Optional[int] = None
+
+    if len(context.args) > 0:
+        msg = context.args[0]
+
+        if not utils.isint(msg):
+            return utils.errorHandler(update, "无效群id")
+
+        if int(msg) >= 0:
+            newcdid = int(msg)
+        else:
+            gpid = int(msg)
+            gp = dicebot.forcegetgroup(gpid)
+
+    if gp is None:
         update.message.reply_text(
-            "准备创建新卡。\n如果你不知道群id，在群里发送 /getid 即可创建角色卡。\n也可以选择手动输入群id，请发送群id：")
-        utils.addOP(utils.getchatid(update), "newcard " +
-                    str(update.message.message_id))
+            "准备创建新卡。\n如果你不知道群id，在群里发送 /getid 即可创建角色卡。\n你也可以选择手动输入群id，请发送群id：")
+        if newcdid is None:
+            utils.addOP(utils.getchatid(update), "newcard " +
+                        str(update.message.message_id))
+        else:
+            utils.addOP(utils.getchatid(update), "newcard " +
+                        str(update.message.message_id)+" "+str(newcdid))
         return True
-    msg = context.args[0]
-    if not utils.isint(msg) or int(msg) >= 0:
-        return utils.errorHandler(update, "无效群id")
-    gpid = int(msg)
-    utils.initrules(gpid)
+
     # 检查(pl)是否已经有卡
     plid = utils.getchatid(update)
     if utils.hascard(plid, gpid):
         return utils.errorHandler(update, "你在这个群已经有一张卡了！")
+
     # 符合建卡条件，生成新卡
     if len(context.args) > 1:
         if not utils.isint(context.args[1]) or int(context.args[1]) < 0:
@@ -2244,7 +2317,7 @@ def textHandler(update: Update, context: CallbackContext) -> bool:
         utils.botchat(update)
         return True
     if opers[0] == "newcard":
-        return utils.textnewcard(update)
+        return utils.textnewcard(update, int(opers[2])) if len(opers) > 2 else utils.textnewcard(update)
     if oper == "setage":
         return utils.textsetage(update)
     if oper == "setname":  # 私聊情形
