@@ -583,21 +583,29 @@ def listintersect(l1: List[_T], l2: List[_T]) -> List[_T]:
     return ans
 
 
-def changeplids(gp: Group, oldpl: Player, newpl: Player) -> None:
-    """将某个群中所有`oldplid`持有的卡改为`newplid`持有。
-    执行成功之后newplid对应的对象将会被创建"""
+def changecardsplid(gp: Group, oldpl: Player, newpl: Player) -> None:
+    """将某个群中所有`oldplid`持有的卡改为`newplid`持有。"""
     gpcardids = list(gp.cards.keys())
     plcardids = list(oldpl.cards.keys())
     cardsids = listintersect(gpcardids, plcardids)
 
-    if len(cardsids) == 0:
-        return
-
-    for key in cardsids:
+    for key in oldpl.cards.keys():
         card = oldpl.cards[key]
+        if card.group!= gp:
+            continue
+
         card.playerid = newpl.id
         card.player = newpl
         newpl.cards[key] = oldpl.cards.pop(key)
+
+    for key in oldpl.gamecards.keys():
+        card= oldpl.gamecards[key]
+        if card.group!=gp:
+            continue
+
+        card.playerid = newpl.id
+        card.player = newpl
+        newpl.gamecards[key] = oldpl.gamecards.pop(key)
 
     if oldpl.controlling is not None and oldpl.controlling.group == gp:
         oldpl.controlling = None
@@ -615,13 +623,12 @@ def changeKP(gp: Group, newkp: Player) -> bool:
         return False
     if kp == newkp:
         return False
-    changeplids(gp, kp, newkp)
-    game = gp.game if gp.game is not None else gp.pausedgame
-    if game is not None:
-        for cardi in game.kpcards.values():
-            cardi.playerid = newkpid
-        game.kpid = newkpid
-    gp.kp = newkp
+
+    changecardsplid(gp, kp, newkp)
+
+    dicebot.delkp(kp)
+    dicebot.addkp(newkp)
+
     gp.write()
     kp.write()
     newkp.write()

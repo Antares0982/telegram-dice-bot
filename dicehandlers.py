@@ -23,12 +23,12 @@ GROUPKP = 2
 GROUPADMIN = 4
 BOTADMIN = 8
 
+
 def start(update: Update, context: CallbackContext) -> None:
     """显示bot的帮助信息"""
     update.message.reply_text(utils.HELP_TEXT)
 
 ###########################################################
-
 
 
 def addkp(update: Update, context: CallbackContext) -> bool:
@@ -50,27 +50,23 @@ def addkp(update: Update, context: CallbackContext) -> bool:
     # 判断是否已经有KP
     if gp.kp is not None:
         # 已有KP
-        if not utils.isingroup(gp, kp):  # 修改
-            if not utils.changeKP(gpid, kpid):  # 更新NPC卡拥有者
+        if not utils.isingroup(gp, kp):
+            if not utils.changeKP(gp, kp):  # 更新NPC卡拥有者
                 # 不应触发
                 return utils.errorHandler(update, "程序错误：不符合添加KP要求，请检查代码")
             return True
-        if utils.getkpid(gpid) == kpid:
-            return utils.errorHandler(update, "你已经是KP了", True)
-        return utils.errorHandler(update, '这个群已经有一位KP了，请先让TA发送 /delkp 撤销自己的KP。如果需要强制更换KP，请管理员用\'/transferkp kpid\'添加本群成员为KP，或者 /transferkp 将自己设为KP。')
+
+        return utils.errorHandler(update, "你已经是KP了", True) if gp.kp == kp else utils.errorHandler(update, '这个群已经有一位KP了，请先让TA发送 /delkp 撤销自己的KP。如果需要强制更换KP，请管理员用\'/transferkp kpid\'添加本群成员为KP，或者 /transferkp 将自己设为KP。')
+
     # 该群没有KP，可以直接添加KP
+    dicebot.addkp(gp, kp)
+
     # delkp指令会将KP的卡playerid全部改为0，检查如果有id为0的卡，id设为新kp的id
-    utils.changeplids(gpid, 0, kpid)
-    game = utils.findgame(gpid)
-    if game:
-        game.kpid = kpid
-        for cardi in game.kpcards:
-            cardi.playerid = kpid
-        utils.writegameinfo(utils.ON_GAME)
+    utils.changecardsplid(gp, dicebot.forcegetplayer(0), kp)
+
     update.message.reply_text(
-        "绑定群(id): " + str(gpid) + "与KP(id): " + str(kpid))
-    utils.GROUP_KP_DICT[gpid] = kpid  # 更新KP表
-    utils.writekpinfo(utils.GROUP_KP_DICT)
+        "绑定群(id): " + gp.getname() + "与KP(id): " + kp.getname())
+
     return True
 
 

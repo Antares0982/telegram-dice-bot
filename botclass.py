@@ -90,6 +90,7 @@ class DiceBot:
             card.group.cards[card.id] = card  # 添加group.cards
 
             self.allids.append(card.id)
+
         # gamecard
         for card in self.gamecards.values():
             card.isgamecard = True
@@ -104,6 +105,7 @@ class DiceBot:
             assert(bool(card.group.game) != bool(card.group.pausedgame))
             game = card.group.game if card.group.game is not None else card.group.pausedgame
             game.cards[card.id] = card  # 添加game.cards
+
         # group
         for gp in self.groups.values():
             if isinstance(gp.kp, int):
@@ -119,12 +121,11 @@ class DiceBot:
                     self.sendtoAdmin("群："+str(gp.id)+" " +
                                      gp.name+"telegram chat无法获取")
 
-            if gp.game is not None or gp.pausedgame is not None:
-                game = gp.game if gp.game is not None else gp.pausedgame
-                game.group = gp
-                if gp.kp is not None:
-                    gp.kp.kpgames[gp.id] = game
-                    game.kpid = gp.kp.id
+            game = gp.game if gp.game is not None else gp.pausedgame
+            if game is not None and gp.kp is not None:
+                game.kp = gp.kp
+                game.kp.kpgames[gp.id] = game
+
         # player
         for pl in self.players.values():
             if pl.chat is None:
@@ -136,7 +137,9 @@ class DiceBot:
                                      pl.name+"telegram chat无法获取")
 
             if isinstance(pl.controlling, int):
+                assert(self.cards[pl.controlling].player == pl)
                 pl.controlling = self.cards[pl.controlling]
+
         # ids
         self.allids.sort()
 
@@ -293,6 +296,26 @@ class DiceBot:
         # 维护players
         card.player.gamecards.pop(cdid)
         card.player.write()
+
+    def addkp(self, gp: Group, pl: Player) -> None:
+        """如果要更新kp，需要先执行delkp"""
+        gp.kp = pl
+        pl.kpgroups[gp.id] = gp
+        game = gp.game if gp.game is not None else gp.pausedgame
+        if game is not None:
+            game.kp = pl
+            pl.kpgames[gp.id] = game
+
+    def delkp(self, gp: Group) -> Optional[Player]:
+        if gp.kp is None:
+            return None
+        kp = gp.kp
+        kp.kpgroups.pop(gp.id)
+        gp.kp = None
+        game = gp.game if gp.game is not None else gp.pausedgame
+        if game is not None:
+            game.kp = None
+            kp.kpgames.pop(gp.id)
 
     def groupmigrate(self, oldid: int, newid: int) -> None:
         gp = self.getgp(oldid)
