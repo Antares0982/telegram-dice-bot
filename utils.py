@@ -1582,9 +1582,9 @@ def getnewcard(msgid: int, gpid: int, plid: int, cdid: int = -1) -> bool:
     if new_card.data.countless50discard():
         new_card.discard = True
         dicebot.updater.bot.send_message(chat_id=plid, reply_to_message_id=msgid,
-                                         text="因为有三项属性小于50，如果你愿意的话可以使用 /discard 来删除这张角色卡。设定年龄后则不能再删除这张卡。")
+                                         text="因为有三项属性小于50，如果你愿意的话可以点击 /renewcard 来重置这张角色卡。如果停止创建卡，点击 /discard 来放弃建卡。\n设定年龄后则不能再删除这张卡。")
     dicebot.updater.bot.send_message(chat_id=plid, reply_to_message_id=msgid,
-                                     text="长按 /setage 并输入一个数字来设定年龄。如果需要卡片制作帮助，使用 /createcardhelp 来获取帮助。")
+                                     text="长按 /setage 并输入一个数字来设定年龄。如果需要卡片制作帮助，点击 /createcardhelp 来获取帮助。")
     cardadd(new_card)
     return True
 

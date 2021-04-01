@@ -230,6 +230,18 @@ class GameCard(datatype):
         角色卡没有名字时，返回id的字符串形式"""
         return str(self.id) if self.info.name == "" else self.info.name
 
+    def backtonewcard(self) -> None:
+        self.data = CardData()
+        self.info = CardInfo()
+        self.skill = Skill()
+        self.interest = Skill()
+        self.suggestskill = SgSkill()
+        self.attr = CardAttr()
+        self.tempstatus = CardStatus()
+        self.item = []
+        self.assets: str = ""
+        self.write()
+
     def cardConstruct(self):
         self.data.card = self
         self.background.card = self
@@ -553,7 +565,8 @@ class CardData(datatype):
             rttext += "基础7项属性为默认值"
         elif self.LUCK == 0:
             rttext += "幸运未设置，请先设置年龄"
-
+        if self.datadec is not None:
+            rttext += "属性下降未设置完成"
         return rttext
 
     def write(self):
