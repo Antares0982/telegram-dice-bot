@@ -225,6 +225,11 @@ class GameCard(datatype):
 
         return rttext
 
+    def getname(self) -> str:
+        """获取角色卡名字信息。
+        角色卡没有名字时，返回id的字符串形式"""
+        return str(self.id) if self.info.name == "" else self.info.name
+
     def cardConstruct(self):
         self.data.card = self
         self.background.card = self

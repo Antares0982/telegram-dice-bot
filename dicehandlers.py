@@ -428,10 +428,12 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     如果发送者不是KP，那么只能在一个群内拥有最多一张角色卡。
 
     如果不知道群id，请先发送`/getid`到群里获取id。
+
     `/newcard`提交创建卡请求，bot会等待你输入`groupid`。
     `/newcard --groupid`新建一张卡片，绑定到`groupid`对应的群。
-    `/newcard --groupid --cardid`新建一张卡片，绑定到`groupid`对应的群的同时，
-    将卡片id设置为`cardid`，`cardid`必须是非负整数。
+    `/newcard --cardid`新建一张卡片，将卡片id设置为`cardid`，`cardid`必须是非负整数。
+    `/newcard --groupid --cardid`新建一张卡片，绑定到`groupid`对应的群的同时，将卡片id设置为`cardid`。
+
     当指定的卡id已经被别的卡占用的时候，将自动获取未被占用的id。
 
     当生成时有至少三项基础属性低于50时，可以使用`/discard`来放弃并删除这张角色卡。
@@ -457,6 +459,7 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息创建角色卡。")
 
+    gpid: int = None
     gp: Optional[Group] = None
     newcdid: Optional[int] = None
 
@@ -464,13 +467,17 @@ def newcard(update: Update, context: CallbackContext) -> bool:
         msg = context.args[0]
 
         if not utils.isint(msg):
-            return utils.errorHandler(update, "无效群id")
+            return utils.errorHandler(update, "输入无效")
 
         if int(msg) >= 0:
             newcdid = int(msg)
         else:
             gpid = int(msg)
             gp = dicebot.forcegetgroup(gpid)
+            if len(context.args) > 1:
+                if not utils.isint(context.args[1]) or int(context.args[1]) < 0:
+                    return utils.errorHandler(update, "输入无效")
+                newcdid = int(context.args[1])
 
     if gp is None:
         update.message.reply_text(
@@ -489,14 +496,17 @@ def newcard(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "你在这个群已经有一张卡了！")
 
     # 符合建卡条件，生成新卡
-    if len(context.args) > 1:
-        if not utils.isint(context.args[1]) or int(context.args[1]) < 0:
-            return utils.errorHandler(update, "输入的卡片id参数无效，需要是非负整数")
-        return utils.getnewcard(update.message.message_id, gpid, plid, int(context.args[1]))
-    return utils.getnewcard(update.message.message_id, gpid, plid)
+    # gp is not None
+    assert(gpid is not None)
+
+    return utils.getnewcard(update.message.message_id, gpid, plid, newcdid) if newcdid is not None else utils.getnewcard(update.message.message_id, gpid, plid)
 
 
-def discard(update: Update, context: CallbackContext):
+def renewcard(update: Update, context: CallbackContext) -> bool:
+    pass
+
+
+def discard(update: Update, context: CallbackContext) -> bool:
     """该指令用于删除角色卡。
     通过识别卡中`discard`是否为`True`来判断是否可以删除这张卡。
     如果`discard`为`False`，需要玩家向KP申请，让KP修改`discard`属性为`True`。
@@ -512,75 +522,67 @@ def discard(update: Update, context: CallbackContext):
     若其中一个参数为群id（负数），则删除该群内所有可删除的卡。
     若其中一个参数为卡id，删除对应的那张卡。
     找不到参数对应的卡时，该参数会被忽略。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息删除卡。")
-    plid = utils.getchatid(update)  # 发送者
-    # 先找到所有可删除的卡，返回一个列表
-    discardgpcdTupleList = utils.findDiscardCardsGroupIDTuple(plid)
+
+    pl = dicebot.getplayer(update)  # 发送者
+    if pl is None:
+        return utils.errorHandler(update, "找不到可删除的卡。")
+
     if len(context.args) > 0:
+        # 先处理context.args
+        if any(not utils.isint(x) for x in context.args):
+            return utils.errorHandler(update, "参数需要是整数")
+        nargs = list(map(int, context.args))
+
+        discards = utils.findDiscardCardsWithGpidCdid(pl, nargs)
+
         # 求args提供的卡id与可删除的卡id的交集
-        trueDiscardTupleList: List[Tuple[int, int]] = []
-        for gpid, cdid in discardgpcdTupleList:
-            if str(gpid) in context.args or str(cdid) in context.args:
-                trueDiscardTupleList.append((gpid, cdid))
-        if len(trueDiscardTupleList) == 0:  # 交集为空集
-            update.message.reply_text("输入的（群/卡片）ID均无效。")
-            return False
-        if len(trueDiscardTupleList) == 1:
-            gpid, cdid = trueDiscardTupleList[0]
-            rttext = "删除卡："+str(cdid)
-            if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info.name != "":
-                rttext += "\nname: " + \
-                    str(utils.CARDS_DICT[gpid][cdid].info.name)
+
+        if len(discards) == 0:  # 交集为空集
+            return utils.errorHandler(update, "输入的（群/卡片）ID均无效。")
+
+        if len(discards) == 1:
+            card = discards[0]
+            rttext = "删除卡："+str(card.getname())
             rttext += "\n/details 显示删除的卡片信息。删除操作不可逆。"
             update.message.reply_text(rttext)
         else:
             update.message.reply_text(
-                "删除了"+str(len(trueDiscardTupleList))+"张卡片。\n/details 显示删除的卡片信息。删除操作不可逆。")
-        detailinfo = ""
-        for gpid, cdid in trueDiscardTupleList:
-            detailinfo += "删除卡片：\n" + \
-                str(utils.CARDS_DICT[gpid][cdid])+"\n"  # 获取删除的卡片的详细信息
-            utils.CARDS_DICT[gpid].pop(cdid)
-            if len(utils.CARDS_DICT[gpid]) == 0:
-                utils.CARDS_DICT.pop(gpid)
-            if plid in utils.CURRENT_CARD_DICT and utils.CURRENT_CARD_DICT[plid][0] == gpid and utils.CURRENT_CARD_DICT[plid][1] == cdid:
-                utils.CURRENT_CARD_DICT.pop(plid)
-                utils.writecurrentcarddict(utils.CURRENT_CARD_DICT)
-        utils.DETAIL_DICT[plid] = detailinfo
-        utils.writecards(utils.CARDS_DICT)
+                "删除了"+str(len(discards))+"张卡片。\n删除操作不可逆。")
+
+        for card in discards:
+            utils.cardpop(card)
         return True
+
+    # 计算可以discard的卡有多少
+    discardgpcdTupleList = utils.findAllDiscardCards(pl)
     if len(discardgpcdTupleList) > 1:  # 创建按钮，接下来交给按钮完成
         rtbuttons: List[List[str]] = [[]]
-        for gpid, cdid in discardgpcdTupleList:
+        for card in discardgpcdTupleList:
             if len(rtbuttons[len(rtbuttons)-1]) == 4:
                 rtbuttons.append([])
-            if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info.name != 0:
-                cardname: str = utils.CARDS_DICT[gpid][cdid].info.name
-            else:
-                cardname: str = str(cdid)
+            cardname = card.getname()
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(cardname,
-                                                                    callback_data=utils.IDENTIFIER+" "+"discard "+str(gpid)+" "+str(cdid)))
+                                                                    callback_data=dicebot.IDENTIFIER+" "+"discard "+str(card.id)))
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text("请点击要删除的卡片：", reply_markup=rp_markup)
         return True
+
     if len(discardgpcdTupleList) == 1:
-        gpid, cdid = discardgpcdTupleList[0]
-        if plid in utils.CURRENT_CARD_DICT and utils.CURRENT_CARD_DICT[plid][0] == gpid and utils.CURRENT_CARD_DICT[plid][1] == cdid:
-            utils.CURRENT_CARD_DICT.pop(plid)
-            utils.writecurrentcarddict(utils.CURRENT_CARD_DICT)
-        rttext = "删除卡："+str(cdid)
-        if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info.name != "":
-            rttext += "\nname: "+str(utils.CARDS_DICT[gpid][cdid].info.name)
-        rttext += "\n/details 显示删除的卡片信息。删除操作不可逆。"
+        card = discardgpcdTupleList[0]
+
+        rttext = "删除卡："+card.getname()
+        rttext += "\n删除操作不可逆。"
         update.message.reply_text(rttext)
-        detailinfo = "删除卡片：\n"+str(utils.CARDS_DICT[gpid][cdid])+"\n"
-        utils.DETAIL_DICT[plid] = detailinfo
-        utils.CARDS_DICT[gpid].pop(cdid)
-        if len(utils.CARDS_DICT[gpid]) == 0:
-            utils.CARDS_DICT.pop(gpid)
-        utils.writecards(utils.CARDS_DICT)
+
+        utils.cardpop(card)
         return True
+
     # 没有可删除的卡
     return utils.errorHandler(update, "找不到可删除的卡。")
 

@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
 import asyncio
-from typing import (Any, Dict, Iterator, KeysView, List, Optional, Tuple,
+from typing import (Any, Dict, Iterable, Iterator, KeysView, List, Optional, Tuple,
                     TypeVar, Union, overload)
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, error
@@ -121,13 +121,18 @@ def autoswitchhint(plid: int) -> None:
 
 # 卡片相关：查 增 删
 
-
+@overload
 def cardpop(card: GameCard) -> Optional[GameCard]:
     """删除一张卡并返回其数据。返回None则删除失败"""
     if card.isgamecard:
         dicebot.popgamecard(card.id)
     else:
         dicebot.popcard(card.id)
+
+
+@overload
+def cardpop(id: int) -> Optional[GameCard]:
+    return dicebot.popcard(id) if dicebot.getcard(id) is not None else None
 
 
 def cardadd(card: GameCard, gpid: int) -> bool:
@@ -154,14 +159,14 @@ def cardadd(card: GameCard, gpid: int) -> bool:
     return True
 
 
-def getcard(gpid: int, cdid: int) -> Optional[GameCard]:
-    gp = __getgp(gpid)
-    if not gp:
-        return None
-    card = gp.getcard(cdid)
-    if not card:
-        return None
-    return card
+# def getcard(gpid: int, cdid: int) -> Optional[GameCard]:
+#     gp = __getgp(gpid)
+#     if not gp:
+#         return None
+#     card = gp.getcard(cdid)
+#     if not card:
+#         return None
+#     return card
 
 
 def gamecardadd(card: GameCard, gpid: int) -> bool:
@@ -369,19 +374,32 @@ def findcardfromgamewithid(game: GroupGame, cdid: int) -> GameCard:
     return None
 
 
-def findDiscardCardsGroupIDTuple(plid: int) -> List[Tuple[Group, int]]:
-    """返回`plid`对应的所有`discard`为`True`的卡的`(group, id)`对"""
+def findAllDiscardCards(pl: Player) -> List[GameCard]:
+    """返回`plid`对应的所有`discard`为`True`的卡"""
+    return [card for card in pl.cards.values() if checkaccess(pl, card) & CANDISCARD]
+
+
+def findDiscardCardsWithGpidCdid(pl: Player, cardslist: List[int]) -> List[GameCard]:
     ans: List[int] = []
-    pl = __getplayer(plid)
-    if not pl:
-        return ans
-    for card in pl.cards.values():
-        if card.discard or card.groupid == -1:
-            ans.append((card.group, card.id))
-            if card.groupid == -1:
-                card.discard = True
-                card.group.write()
-    return ans
+
+    for id in cardslist:
+        if id < 0:  # 群id
+            gp = dicebot.getgp(id)
+            if gp is None:
+                continue
+            for card in gp.cards.values():
+                if checkaccess(pl, card) & CANDISCARD:
+                    ans.append(card.id)
+        else:
+            card = gp.getcard(id)
+            if card is None:
+                continue
+            if checkaccess(pl, card) & CANDISCARD:
+                ans.append(card.id)
+
+    ans = list(set(ans))
+
+    return [dicebot.getcard(x) for x in ans]
 
 
 def showcardinfo(card1: GameCard) -> str:  # show full card
@@ -515,14 +533,16 @@ def findkpcards(kpid) -> List[GameCard]:
     return ans
 
 
-def listintersect(l1: List[_T], l2: List[_T]) -> List[_T]:
+def iterintersect(l1: Iterable[_T], l2: Iterable[_T]) -> Iterator[_T]:
     if len(l1) > len(l2):
         l1, l2 = l2, l1
+
     ans: List[_T] = []
     for i in l1:
         if i in l2:
             ans.append(i)
-    return ans
+
+    return iter(ans)
 
 
 def changecardsplid(gp: Group, oldpl: Player, newpl: Player) -> None:
@@ -1078,26 +1098,21 @@ def buttoncgintskill(query: CallbackQuery, card1: Optional[GameCard], args: List
 
 
 def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
-    gpid, cdid = int(args[1]), int(args[2])
+    cdid = int(args[1])
 
-    card = getcard(gpid, cdid)
+    card = dicebot.getcard(cdid)
     if card is None:
         query.edit_message_text("没有找到卡片。")
         return False
 
-    if not card.discard:
+    pl = __forcegetplayer(plid)
+    if not checkaccess(pl, card):
         query.edit_message_text("该卡不可删除。")
         return False
 
-    pl = __forcegetplayer(plid)
-    if pl.controlling is not None and pl.controlling.groupid == gpid and pl.controlling.id == cdid:
-        pl.controlling = None
-        pl.write()
+    cardpop(cdid)
 
-    detailinfo = "删除了：\n"+str(card)
-    cardpop(gpid, cdid)
-
-    query.edit_message_text("删除了一张卡片，使用 /details 查看被删除卡片的详细信息。\n该删除操作不可逆。")
+    query.edit_message_text(f"删除了：{card.getname()}。\n该删除操作不可逆。")
     return True
 
 
@@ -1113,10 +1128,7 @@ def buttonswitch(query: CallbackQuery, plid: int, args: List[str]) -> bool:
     pl.controlling = card
     pl.write()
 
-    if getname(card) == "None":
-        query.edit_message_text("修改成功，现在操作的卡id是："+str(cdid))
-    else:
-        query.edit_message_text("修改成功，现在操作的卡是："+card.info.name)
+    query.edit_message_text("修改成功，现在操作的卡是："+card.getname())
     return True
 
 
@@ -1432,14 +1444,6 @@ def getgamecardsid(game: GroupGame) -> KeysView[int]:
 #     return True
 
 
-def getname(cardi: GameCard) -> str:
-    """获取角色卡名字信息。
-    角色卡没有名字时，返回字符串`None`"""
-    if cardi.info.name == "":
-        return "None"
-    return cardi.info["name"]
-
-
 def cardsetage(update: Update, cardi: GameCard, age: int) -> bool:
     if cardi.info.age > 0:
         popOP(getchatid(update))
@@ -1478,7 +1482,7 @@ def textnewcard(update: Update, cdid: int = -1) -> bool:
         return errorHandler(update, "无效群id。如果你不知道群id，在群里发送 /getid 获取群id。")
     gpid = int(text)
     popOP(plid)
-    
+
     if hascard(plid, gpid) and (__forcegetgroup(gpid).kp is None or __forcegetgroup(gpid).kp.id != plid):
         return errorHandler(update, "你在这个群已经有一张卡了！")
 
@@ -1872,7 +1876,7 @@ def checkaccess(pl: Player, card: GameCard) -> int:
     if f & OWNCARD != 0 and (not card.isgamecard or card.group.game is None):
         f |= CANSETINFO
 
-    if f & OWNCARD != 0 and card.discard and not card.isgamecard:
+    if f & OWNCARD != 0 and card.groupid == -1 or (card.discard and not card.isgamecard and card.id not in dicebot.gamecards):
         f |= CANDISCARD
 
     if card.group.kp is not None and card.group.kp == pl:
