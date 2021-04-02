@@ -7,6 +7,7 @@ from typing import (Any, Dict, Iterable, Iterator, KeysView, List, Optional, Tup
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, error
 from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext
+from telegram.message import Message
 
 from basicfunc import *
 from botclass import GameCard, Group, GroupGame, Player, dicebot
@@ -330,6 +331,9 @@ def makeIntButtons(lower: int, upper: int, keystr1: str, keystr2: str, step: int
     ```
     `step`参数表示按钮会遍历大于`lower`但小于`upper`的所有按钮的间隔。
     `column`参数表示返回的二维列表每行最多有多少个按钮。"""
+    if lower > upper:
+        raise ValueError("整数按钮的最小值大于最大值，请检查代码")
+
     IDENTIFIER = dicebot.IDENTIFIER
     rtbuttons = [[]]
     if (lower//step)*step != lower:
@@ -595,6 +599,7 @@ def changeKP(gp: Group, newkp: Player) -> bool:
     return True
 
 
+
 def makejobbutton() -> List[List[InlineKeyboardButton]]:
     """生成全部职业的按钮"""
     rtbuttons = [[]]
@@ -751,7 +756,7 @@ def addmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Updat
     update.message.reply_text(
         "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
     card1.skill.set(skillname, skillvalue)
-    card1.group.write()
+    card1.write()
     return True
 
 
@@ -760,7 +765,7 @@ def addsgskill(skillname: str, skillvalue: int, card1: GameCard, update: Update)
     if not addmainskill(skillname, skillvalue, card1, update):
         return False
     card1.suggestskill.pop(skillname)
-    card1.group.write()
+    card1.write()
     return True
 
 
@@ -776,7 +781,7 @@ def addintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update
     update.message.reply_text(
         "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
     card1.interest.set(skillname, skillvalue)
-    card1.group.write()
+    card1.write()
     return True
 
 
@@ -793,7 +798,7 @@ def cgmainskill(skillname: str, skillvalue: int, card1: GameCard, update: Update
         update.message.reply_text(
             "技能设置成功："+skillname+" "+str(skillvalue)+"，返还点数："+str(-costval))
     card1.skill.set(skillname, skillvalue)
-    card1.group.write()
+    card1.write()
     return True
 
 
@@ -919,8 +924,7 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
         query.edit_message_reply_markup(rp_markup)
         return True
     if not card1:
-        query.edit_message_text(text="找不到卡。")
-        return False
+        return errorHandler(query, "找不到卡。")
     confirm = args[2]  # 只能是True，或False
     if confirm == "False":
         rtbuttons = makejobbutton()
@@ -933,10 +937,8 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
     query.edit_message_text(
         "职业设置为："+jobname+"\n现在你可以用指令 /addskill 添加技能，首先需要设置信用点。")
     if not generatePoints(card1, jobname):
-        query.edit_message_text(
-            "生成技能点出错！")
         dicebot.sendtoAdmin("生成技能出错，位置：buttonjob")
-        return False
+        return errorHandler(query, "生成技能点出错！")
     for i in range(3, len(dicebot.joblist[jobname])):  # Classical jobs
         card1.suggestskill.set(dicebot.joblist[jobname][i], getskilllevelfromdict(
             card1, dicebot.joblist[jobname][i]))   # int
@@ -946,8 +948,7 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
 
 def buttonaddmainskill(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
     if card1 is None:
-        query.edit_message_text(text="找不到卡。")
-        return False
+        return errorHandler(query, "找不到卡。")
 
     if len(args) == 3:
         skvalue = int(args[2])
@@ -970,8 +971,7 @@ def buttonaddmainskill(query: CallbackQuery, card1: GameCard, args: List[str]) -
 
 def buttoncgmainskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -> bool:
     if card1 is None:
-        query.edit_message_text(text="找不到卡。")
-        return False
+        return errorHandler(query, "找不到卡。")
 
     if len(args) == 3:
         skvalue = int(args[2])
@@ -994,8 +994,7 @@ def buttoncgmainskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -
 
 def buttonaddsgskill(query: CallbackQuery,  card1: Optional[GameCard], args: List[str]) -> bool:
     if not card1:
-        query.edit_message_text(text="找不到卡。")
-        return False
+        return errorHandler(query, "找不到卡。")
     if len(args) == 3:
         skvalue = int(args[2])
         needpt = evalskillcost(args[1], skvalue, card1, True)
@@ -1045,8 +1044,7 @@ def buttonaddintskill(query: CallbackQuery,  card1: Optional[GameCard], args: Li
 
 def buttoncgintskill(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
     if not card1:
-        query.edit_message_text(text="找不到卡。")
-        return False
+        return errorHandler(query, "找不到卡。")
     if len(args) == 3:
         skvalue = int(args[2])
         needpt = evalskillcost(args[1], skvalue, card1, False)
@@ -1065,36 +1063,89 @@ def buttoncgintskill(query: CallbackQuery, card1: Optional[GameCard], args: List
     return True
 
 
-# def buttonstrdec(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
-#     if not card1:
-#         query.edit_message_text(text="找不到卡。")
-#         return False
-#     strdecval = int(args[2])
-#     card1, rttext, needcon = choosedec(card1, strdecval)
-#     if rttext == "输入无效":
-#         query.edit_message_text(rttext)
-#         return False
-#     if needcon:
-#         rttext += "\n使用 /setcondec 来设置CON（体质）下降值。"
-#     else:
-#         generateOtherAttributes(card1)
-#     query.edit_message_text(rttext)
-#     card1.group.write()
-#     return True
+def buttonchoosedec(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
+    if not card1:
+        return errorHandler(query, "找不到卡。")
+
+    if card1.data.datadec is None:
+        return errorHandler(query, "不需要设置降值。")
+
+    dname = args[1]
+    decnames = card1.data.datadec[0].split('_')
+    if dname not in decnames:
+        return errorHandler(query, "无法为该属性设置降值。")
+
+    if len(decnames) == 2:
+        anotherdecname = decnames[0] if dname == decnames[1] else decnames[1]
+        rtbuttons = makeIntButtons(max(0, 1-card1.data.__dict__[anotherdecname]-card1.data.datadec[1]), min(
+            card1.data.__dict__[decnames]-1, -card1.data.datadec[1]), f"{dname}dec", "", 1)
+    elif len(decnames) == 3:
+        decnames.pop(decnames.index(dname))
+        d1 = decnames[0]
+        d2 = decnames[1]
+        rtbuttons = makeIntButtons(max(0, 2-card1.data.__dict__[d1]-card1.data.__dict__[d2]-card1.data.datadec[1]), min(
+            card1.data.__dict__[dname]-1, -card1.data.datadec[1]
+        ), f"{dname}dec", "", 1)
+    else:
+        raise ValueError("datadec参数错误")
+
+    rp_markup = InlineKeyboardMarkup(rtbuttons)
+    query.edit_message_text(f"选择下降值，目前全部数值如下：\n{str(card1.data)}")
+    query.edit_message_reply_markup(rp_markup)
+
+    return True
 
 
-# def buttoncondec(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
-#     if not card1:
-#         query.edit_message_text(text="找不到卡。")
-#         return False
-#     condecval = int(args[2])
-#     card1, rttext = choosedec2(card1, condecval)
-#     query.edit_message_text(rttext)
-#     if rttext == "输入无效":
-#         return False
-#     generateOtherAttributes(card1)
-#     card1.group.write()
-#     return True
+def buttonsetdec(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
+    if not card1:
+        return errorHandler(query, "找不到卡。")
+
+    dname = args[0][:args[0].find("dec")]
+    if dname not in card1.data.alldatanames:
+        dicebot.sendtoAdmin("属性名错误，请检查代码")
+        return errorHandler(query, "属性名错误，请检查代码")
+    if card1.data.datadec is None:
+        return errorHandler(query, "该卡无需设置属性降值。")
+
+    decnames = card1.data.datadec[0].split('_')
+    decval = int(args[2])
+
+    assert(card1.data.__dict__[dname]-decval >= 1)
+    assert(card1.data.datadec[1]+decval <= 0)
+
+    if len(decnames) == 2:
+        otherdec = decnames[0] if dname == decnames[1] else decnames[1]
+        assert(card1.data.__dict__[otherdec]+card1.data.datadec[1]+decval >= 1)
+
+        card1.data.__dict__[dname] -= decval
+        card1.data.__dict__[otherdec] += card1.data.datadec[1]+decval
+        card1.data.datadec = None
+
+        generateOtherAttributes(card1)
+
+        query.edit_message_text("属性下降设置完成，请点击 /setjob 设置职业。")
+        return True
+
+    if len(decnames) == 3:
+        decnames.pop(decnames.index(dname))
+
+        card1.data.__dict__[dname] -= decval
+        card1.data.datadec = ('_'.join(decnames), card1.data.datadec[1]+decval)
+        card1.write()
+
+        query.edit_message_text(f"请继续设置属性降值，目前全部数值如下：\n{str(card1.data)}")
+
+        rtbuttons = [[]]
+        for dname in decnames:
+            rtbuttons[0].append(InlineKeyboardButton(
+                text=dname, callback_data=dicebot.IDENTIFIER+" choosedec "+dname))
+
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        query.edit_message_reply_markup(reply_markup=rp_markup)
+        return True
+
+    dicebot.sendtoAdmin("下降属性参数长度有误")
+    return errorHandler(query, "下降属性参数长度有误")
 
 
 def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
@@ -1102,13 +1153,11 @@ def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
 
     card = dicebot.getcard(cdid)
     if card is None:
-        query.edit_message_text("没有找到卡片。")
-        return False
+        return errorHandler(query, "找不到这个id的卡。")
 
     pl = __forcegetplayer(plid)
-    if not checkaccess(pl, card):
-        query.edit_message_text("该卡不可删除。")
-        return False
+    if not checkaccess(pl, card)&CANDISCARD:
+        return errorHandler(query, "该卡不可删除。")
 
     cardpop(cdid)
 
@@ -1121,8 +1170,7 @@ def buttonswitch(query: CallbackQuery, plid: int, args: List[str]) -> bool:
 
     card = getcard(gpid, cdid)
     if card is None:
-        query.edit_message_text("没有找到卡片。")
-        return False
+        return errorHandler(query, "没有找到这个id的卡。")
 
     pl = __forcegetplayer(plid)
     pl.controlling = card
@@ -1151,8 +1199,7 @@ def buttonswitch(query: CallbackQuery, plid: int, args: List[str]) -> bool:
 def buttonsetsex(query: CallbackQuery, plid: int,  args: List[str]) -> bool:
     cardi = findcard(plid)
     if cardi is None:
-        query.edit_message_text("找不到卡。")
-        return False
+        return errorHandler(query, "找不到卡。")
 
     sex = args[1]
     if sex == "other":
@@ -1446,17 +1493,31 @@ def getgamecardsid(game: GroupGame) -> KeysView[int]:
 
 def cardsetage(update: Update, cardi: GameCard, age: int) -> bool:
     if cardi.info.age > 0:
-        popOP(getchatid(update))
         return errorHandler(update, "已经设置过年龄了。")
+
     if age < 17 or age > 99:
         return errorHandler(update, "年龄应当在17-99岁。")
-    cardi.info.age = age
-    # cardi.cardcheck.check1 = True
-    cardi, detailmsg = generateAgeAttributes(cardi)
-    update.message.reply_text(
-        "年龄设置完成！详细信息如下：\n"+detailmsg+"\n如果年龄不小于40，或小于20，需要使用指令'/setstrdec number'设置STR减值。如果需要帮助，使用 /createcardhelp 来获取帮助。")
 
-    generateOtherAttributes(cardi)
+    cardi.info.age = age
+
+    cardi, detailmsg = generateAgeAttributes(cardi)
+    msg: Message = update.message.reply_text(
+        "年龄设置完成！详细信息如下：\n"+detailmsg+"\n如果年龄不小于40，或小于20，需要设置STR减值。如果需要帮助，使用 /createcardhelp 来获取帮助。")
+
+    if cardi.data.datadec is not None:
+        datas = cardi.data.datadec[0].split('_')
+
+        rtbuttons = [[]]
+        for dname in datas:
+            rtbuttons[0].append(InlineKeyboardButton(
+                text=dname, callback_data=dicebot.IDENTIFIER+" choosedec "+dname))
+
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        msg.edit_reply_markup(reply_markup=rp_markup)
+
+    else:
+        generateOtherAttributes(cardi)
+
     cardi.write()
     return True
 
@@ -1465,13 +1526,16 @@ def cardsetsex(update: Update, cardi: GameCard, sex: str) -> bool:
     if sex in ["男", "男性", "M", "m", "male", "雄", "雄性", "公", "man"]:
         cardi.info.sex = "male"
         update.message.reply_text("性别设定为男性。")
+
     elif sex in ["女", "女性", "F", "f", "female", "雌", "雌性", "母", "woman"]:
         cardi.info.sex = "female"
         update.message.reply_text("性别设定为女性。")
+
     else:
         cardi.info.sex = sex
         update.message.reply_text(
             "性别设定为："+sex+"。")
+
     return True
 
 
@@ -1563,6 +1627,8 @@ def textdelcard(update: Update, cardid: int) -> bool:
         #     cardpop(cardi.groupid, cardid))
     return True
 
+def textpassjob(update:Update, plid:int)->bool:
+    pass
 
 def getnewcard(msgid: int, gpid: int, plid: int, cdid: int = -1) -> bool:
     """指令`/newcard`的具体实现"""
@@ -1639,9 +1705,13 @@ def EDUenhance(card: GameCard, times: int) -> str:
 def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
     if card.info.age < 17 or card.info.age > 99:
         return card, "年龄尚未设定"
+
     AGE = card.info.age
+
     luck = 5*sum(dicemdn(3, 6))
+
     rttext = ""
+
     if AGE < 20:
         luck2 = 5*sum(dicemdn(3, 6))
         if luck < luck2:
@@ -1652,11 +1722,13 @@ def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
             str(luck)+", "+str(luck2)+"。教育减5，力量体型合计减5。"
         card.data.datadec = ("STR_SIZ_M", -5)
         card.data.EDU -= 5
+
     elif AGE < 40:
         # card.cardcheck["check2"] = True  # No STR decrease, check2 passes
         rttext += "年龄20-39，得到一次教育增强。"
         rttext += EDUenhance(card, 1)
         rttext += "现在教育：" + str(card.data.EDU)+"。"
+
     elif AGE < 50:
         rttext += "年龄40-49，得到两次教育增强。\n"
         rttext += EDUenhance(card, 2)
@@ -1664,6 +1736,7 @@ def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
         card.data.datadec = ("STR_CON_M", -5)
         card.data.APP -= 5
         rttext += "力量体质合计减5，外貌减5。\n"
+
     elif AGE < 60:
         rttext += "年龄50-59，得到三次教育增强。\n"
         rttext += EDUenhance(card, 3)
@@ -1671,6 +1744,7 @@ def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
         card.data.datadec = ("STR_CON_DEX_M", -10)
         card.data.APP -= 10
         rttext += "力量体质敏捷合计减10，外貌减10。\n"
+
     elif AGE < 70:
         rttext += "年龄60-69，得到四次教育增强。\n"
         rttext += EDUenhance(card, 4)
@@ -1678,6 +1752,7 @@ def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
         card.data.datadec = ("STR_CON_DEX_M", -20)
         card.data.APP -= 15
         rttext += "力量体质敏捷合计减20，外貌减15。\n"
+
     elif AGE < 80:
         rttext += "年龄70-79，得到四次教育增强。\n"
         rttext += EDUenhance(card, 4)
@@ -1685,6 +1760,7 @@ def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
         card.data.datadec = ("STR_CON_DEX_M", -40)
         card.data.APP -= 20
         rttext += "力量体质敏捷合计减40，外貌减20。\n"
+
     else:
         rttext += "年龄80以上，得到四次教育增强。\n"
         rttext += EDUenhance(card, 4)
@@ -1692,11 +1768,14 @@ def generateAgeAttributes(card: GameCard) -> Tuple[GameCard, str]:
         card.data.datadec = ("STR_CON_DEX_M", -80)
         card.data.APP -= 25
         rttext += "力量体质敏捷合计减80，外貌减25。\n"
+
     if AGE >= 20:
         card.data.LUCK = luck
         rttext += "幸运："+str(luck)+"\n"
+
     if card.data.datadec is not None:
         rttext += "使用' /setstrdec STRDEC '来设置因为年龄设定导致的STR减少值，根据所设定的年龄可能还需要设置CON减少值。根据上面的提示减少的数值进行设置。\n"
+
     rttext += "使用 /setjob 进行职业设定。完成职业设定之后，用'/addskill 技能名 技能点数' 来分配技能点，用空格分隔。"
     return card, rttext
 
@@ -1759,6 +1838,9 @@ def generateOtherAttributes(card: GameCard) -> Tuple[GameCard, str]:
     """获取到年龄之后，通过年龄计算一些衍生数据。"""
     # if not card.cardcheck["check2"]:  # This trap should not be hit
     #     return card, "Please set DATA decrease first"
+    if card.data.datadec is not None:
+        return card, "属性下降未设置"
+
     if card.attr.SAN == 0:
         card.attr.SAN = card.data.POW
 
@@ -1798,6 +1880,8 @@ def generateOtherAttributes(card: GameCard) -> Tuple[GameCard, str]:
 
     rttext += "体格: " + str(card.attr.build)+"\n"
     rttext += "伤害加深："+card.attr.DB+"\n"
+
+    card.write()
     return card, rttext
 
 

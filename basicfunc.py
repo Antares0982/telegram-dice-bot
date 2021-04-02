@@ -3,7 +3,7 @@
 from typing import Any, Dict, overload
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-
+from telegram.callbackquery import CallbackQuery
 from cfg import *
 from gameclass import Group, Player
 
@@ -83,12 +83,14 @@ def recallmsg(update: Update) -> bool:
     return True
 
 
+@overload
 def errorHandler(update: Update,  message: str, needrecall: bool = False) -> False:
     """指令无法执行时，调用的函数。
     固定返回`False`，并回复错误信息。
     如果`needrecall`为`True`，在Bot是对应群管理的情况下将删除那条消息。"""
-    if not isprivatemsg(update) and not isgroupmsg(update):
+    if ischannel(update):
         return False
+
     if needrecall and isgroupmsg(update) and isadmin(update, BOT_ID):
         recallmsg(update)
     else:
@@ -96,15 +98,33 @@ def errorHandler(update: Update,  message: str, needrecall: bool = False) -> Fal
             message += "请使用 /switch 切换当前操控的卡再试。"
         elif message.find("参数") != -1:
             message += "\n如果不会使用这个指令，请使用帮助： `/help --command`"
+
         try:
             msg = update.message.reply_text(message, parse_mode="MarkdownV2")
         except:
             msg = update.message.reply_text(message)
+
         if message.find("私聊") != -1:
             rtbutton = [[InlineKeyboardButton(
                 "跳转到私聊", callback_data="None", url="t.me/"+BOTUSERNAME)]]
             rp_markup = InlineKeyboardMarkup(rtbutton)
             msg.edit_reply_markup(reply_markup=rp_markup)
+
+    return False
+
+
+@overload
+def errorHandler(query: CallbackQuery,  message: str) -> False:
+    if message == "找不到卡。":
+        message += "请使用 /switch 切换当前操控的卡再试。"
+    elif message.find("参数") != -1:
+        message += "\n如果不会使用这个指令，请使用帮助： `/help --command`"
+
+    try:
+        query.edit_message_text(message, parse_mode="MarkdownV2")
+    except:
+        query.edit_message_text(message)
+
     return False
 
 

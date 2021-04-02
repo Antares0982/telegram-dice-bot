@@ -14,7 +14,8 @@ from telegram.replymarkup import ReplyMarkup
 from cfg import PATH_CARDS, PATH_GAME_CARDS, PATH_GROUPS, PATH_PLAYERS
 from dicefunc import *
 
-# 卡信息存储于群中
+__MAIN = "主要"
+__INT = "兴趣"
 
 
 def istrueconsttype(val) -> bool:
@@ -142,6 +143,7 @@ class GameCard(datatype):
             self.skill = Skill()
         if self.interest is None:
             self.interest = Skill()
+            self.interest.type = __INT
         if self.suggestskill is None:
             self.suggestskill = SgSkill()
         if self.attr is None:
@@ -161,6 +163,7 @@ class GameCard(datatype):
             self.skill = Skill(d=d["skill"])
         if "interest" in d:
             self.interest = Skill(d=d["interest"])
+            self.type = __INT
         if "suggestskill" in d:
             self.suggestskill = SgSkill(d=d["suggestskill"])
         if "attr" in d:
@@ -656,10 +659,12 @@ class skilltype(datatype):  # skill的基类，只包含一个属性skills
         return iter(self.skills)
 
 
+
 class Skill(skilltype):
     def __init__(self, d: dict = {}):
         super().__init__()
         self.points: int = -1
+        self.type:str = __MAIN
         if len(d) > 0:
             self.read_json(d=d)
 
@@ -668,6 +673,16 @@ class Skill(skilltype):
             return "技能未开始设置"
         if self.points > 0:
             return "技能点有剩余"
+
+    def __str__(self) -> str:
+        if self.points == -1:
+            return self.type+"技能未开始设置"
+
+        rttext: str = f"{self.type}技能剩余点数：{self.points}\n"
+        for key in self.allskills():
+            rttext += f"{key}：{self.get(key)}"
+        
+        return rttext
 
 
 class SgSkill(skilltype):
@@ -681,6 +696,12 @@ class SgSkill(skilltype):
             raise KeyError("pop("+skillname+"):没有这个技能")
         return self.skills.pop(skillname)
 
+    def __str__(self) -> str:
+        rttext: str = "建议技能：\n"
+        for key in self.allskills():
+            rttext += f"{key}：{self.get(key)}"
+        
+        return rttext
 
 class CardAttr(datatype):
     def __init__(self, d: dict = {}):

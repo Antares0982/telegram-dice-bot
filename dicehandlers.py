@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 # only define handlers
 
-from _typeshed import OpenBinaryMode
 from gameclass import Group
 import time
 from typing import Dict, List, Optional, Tuple
@@ -698,109 +697,86 @@ def setage(update: Update, context: CallbackContext):
 
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息设置年龄。")
-    cardi = utils.findcard(utils.getchatid(update))
-    if not cardi:
+
+    pl = dicebot.forcegetplayer(update)
+    card = pl.controlling
+    if card is None:
         return utils.errorHandler(update, "找不到卡。")
-    if "AGE" in cardi.info:
+
+    if card.info.age >= 17 and card.info.age <= 99:
         return utils.errorHandler(update, "已经设置过年龄了。")
+
     if len(context.args) == 0:
         update.message.reply_text("请输入年龄：")
         utils.addOP(utils.getchatid(update), "setage")
         return True
+
     age = context.args[0]
     if not utils.isint(age):
         return utils.errorHandler(update, "输入无效")
+
     age = int(age)
-    return utils.cardsetage(update, cardi, age)
+    return utils.cardsetage(update, card, age)
 
 
-# def setstrdec(update: Update, context: CallbackContext):
-#     """设置力量（STR）的减少值。因为年龄的设定，会导致力量属性减少。
-#     一般而言，年龄导致的需要减少的属性数目至少是两项，其中一项会是力量。
-#     它们减少的总值是某个定值。
-#     当只有两项需要下降时，用力量的减少值，就能自动计算出另一项减少值。
-#     但如果有三项下降，那么其中一项会是体质（CON）。
-#     那么可能需要再使用`/setcondec`指令。
+def addnewjob(update: Update, context: CallbackContext) -> bool:
+    """向bot数据库中添加一个新的职业。
+    仅限kp使用这个指令。添加后，请等待bot控制者审核该职业的信息。格式如下：
+    `/addnewjob --jobname --creditMin --creditMax --dataname1:ratio --dataname2:ratio/--dataname3_dataname4:ratio...  --skillname1 --skillname2...`
+    例如：
+    `/addnewjob 刺客 30 60 EDU:2 DEX_STR:2 乔装 电器维修 斗殴 火器 锁匠 机械维修 前行 心理学`。
+    EDU等属性名请使用大写字母。
+    审核完成后结果会私聊回复给kp，请开启与bot的私聊。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
 
-#     `/setstrdec`生成按钮来让玩家选择力量下降多少。
+    pl = dicebot.forcegetplayer(update)
+    if pl.id in dicebot.addjobrequest:
+        return utils.errorHandler(update, "已经提交过一个申请了")
 
-#     `/setstrdec --STRDEC`可以直接指定力量的下降值。"""
-#     if utils.isgroupmsg(update):
-#         return utils.errorHandler(update, "Send private message to set STR decrease.")
-#     plid = utils.getchatid(update)
-#     cardi = utils.findcard(plid)
-#     if not cardi:
-#         update.message.reply_text("Can't find card.")
-#         return False
-#     if len(context.args) == 0:
-#         if "STR_SIZ_M" in cardi.data:
-#             rtbuttons = utils.makeIntButtons(max(0, 1 - cardi.data.SIZ - cardi.data["STR_SIZ_M"]), min(
-#                 cardi.data.STR-1, -cardi.data["STR_SIZ_M"]), "strdec", "", 1)
-#         elif "STR_CON_M" in cardi.data:
-#             rtbuttons = utils.makeIntButtons(max(0, 1 - cardi.data.CON - cardi.data["STR_CON_M"]), min(
-#                 cardi.data.STR-1, -cardi.data["STR_CON_M"]), "strdec", "", 1)
-#         elif "STR_CON_DEX_M" in cardi.data:
-#             rtbuttons = utils.makeIntButtons(max(0, 2 - cardi.data.CON-cardi.data.DEX - cardi.data["STR_CON_DEX_M"]), min(
-#                 cardi.data.STR-1, -cardi.data["STR_CON_DEX_M"]), "strdec", "", 1)
-#         else:
-#             return utils.errorHandler(update, "无需设置力量下降值")
-#         rp_markup = InlineKeyboardMarkup(rtbuttons)
-#         update.message.reply_text("设置力量下降值：", reply_markup=rp_markup)
-#         return True
-#     dec = context.args[0]
-#     if not utils.isint(dec):
-#         return utils.errorHandler(update, "输入无效")
-#     dec = int(dec)
-#     cardi, hintmsg, needcon = utils.choosedec(cardi, dec)
-#     if hintmsg == "输入无效":
-#         return utils.errorHandler(update, hintmsg)
-#     update.message.reply_text(hintmsg)
-#     if needcon:
-#         update.message.reply_text("Use /setcondec to set CON decrease.")
-#     else:
-#         utils.generateOtherAttributes(cardi)
-#         update.message.reply_text("Use /setjob to set job.")
-#     utils.writecards(utils.CARDS_DICT)
-#     return True
+    if not utils.searchifkp(pl):
+        return utils.errorHandler(update, "kp才能使用该指令", True)
 
+    if len(context.args) == 0:
+        return utils.errorHandler(update, "需要参数", True)
 
-# def setcondec(update: Update, context: CallbackContext):
-#     """设置体质（CON）的减少值。请先参见帮助`/help setstrdec`。
+    if len(context.args) <= 3:
+        return utils.errorHandler(update, "参数长度不足")
 
-#     `/setcondec`生成按钮来让玩家选择体质下降多少。
+    if not utils.isint(context.args[1]) or not utils.isint(context.args[2]):
+        return utils.errorHandler(update, "信用范围参数无效")
 
-#     `/setcondec --CONDEC`可以直接指定体质的下降值。"""
-#     if utils.isgroupmsg(update):
-#         update.message.reply_text("Send private message to set CON decrease.")
-#         return False
-#     plid = utils.getchatid(update)
-#     cardi = utils.findcard(plid)
-#     if not cardi:
-#         update.message.reply_text("Can't find card.")
-#         return False
-#     if len(context.args) == 0:
-#         if "CON_DEX_M" not in cardi.data:
-#             update.message.reply_text("No need to set STR decrease.")
-#             return False
-#         rtbuttons = utils.makeIntButtons(max(0, 1 - cardi.data.DEX - cardi.data["CON_DEX_M"]), min(
-#             cardi.data.CON-1, -cardi.data["CON_DEX_M"]), "condec", "", 1)
-#         rp_markup = InlineKeyboardMarkup(rtbuttons)
-#         update.message.reply_text("Set CON decrease: ", reply_markup=rp_markup)
-#         return True
-#     dec = context.args[0]
-#     if not utils.isint(dec):
-#         update.message.reply_text("Invalid input.")
-#         return False
-#     dec = int(dec)
-#     cardi, hintmsg = utils.choosedec2(cardi, dec)
-#     if hintmsg == "输入无效":
-#         update.message.reply_text("Invalid input!")
-#         return False
-#     utils.generateOtherAttributes(cardi)
-#     utils.writecards(utils.CARDS_DICT)
-#     update.message.reply_text(hintmsg)
-#     return True
+    jobname = context.args[0]
+    mincre = int(context.args[1])
+    maxcre = int(context.args[2])
 
+    i = 3
+    ptevalpairs: List[Tuple[str, int]] = []
+    while i < len(context.args) and context.args[i].find(':') != -1:
+        p = context.args[i].split(':')
+        if not utils.isint(p[1]):
+            return utils.errorHandler(update, "参数无效")
+
+        ptevalpairs.append((p[0], int(p[1])))
+        i += 1
+
+    if sum(j for _, j in ptevalpairs) != 4:
+        return utils.errorHandler(update, "技能点数的乘数总值应该为4")
+
+    skilllist: List[str] = context.args[i:]
+    if any(j not in dicebot.skilllist for j in skilllist):
+        return utils.errorHandler(update, "存在技能表中没有的技能，请先发起技能添加申请或者核阅是否有错别字、使用了同义词")
+
+    ptevald: Dict[str, int] = {}
+    for n, j in ptevalpairs:
+        ptevald[n] = j
+    ans = (jobname, [mincre, maxcre, ptevald].append(skilllist))
+    dicebot.addjobrequest[pl.id, ans]
+    dicebot.sendtoAdmin("有新的职业添加申请："+str(ans))
+    utils.addOP(ADMIN_ID, "passjob")
+    update.message.reply_text("申请已经提交，请开启与我的私聊接收审核消息")
+    return True
 
 # Button. need 0-1 args, if len(args)==0, show button and listen
 def setjob(update: Update, context: CallbackContext) -> bool:
@@ -837,9 +813,10 @@ def setjob(update: Update, context: CallbackContext) -> bool:
         update.message.reply_text(
             "请选择职业查看详情：", reply_markup=rp_markup)
         return True
+
     jobname = context.args[0]
     if not utils.IGNORE_JOB_DICT and jobname not in utils.dicebot.joblist:
-        update.message.reply_text("This job is not allowed!")
+        return utils.errorHandler("This job is not allowed!")
         return False
     card1.info.job = jobname
     if jobname not in utils.dicebot.joblist:
@@ -950,10 +927,10 @@ def button(update: Update, context: CallbackContext):
         return utils.buttonaddintskill(query, card1, args)
     if args[0] == "cgintskill":
         return utils.buttoncgintskill(query, card1, args)
-    if args[0] == "strdec":
-        return utils.buttonstrdec(query, card1, args)
-    if args[0] == "condec":
-        return utils.buttoncondec(query, card1, args)
+    if args[0] == "choosedec":
+        return utils.buttonchoosedec(query, card1, args)
+    if args[0].find("dec") != -1:
+        return utils.buttonsetdec(query, card1, args)
     if args[0] == "discard":
         return utils.buttondiscard(query, chatid, args)
     if args[0] == "switch":
@@ -2313,6 +2290,41 @@ def addcard(update: Update, context: CallbackContext) -> bool:
     return True
 
 
+def textHandler(update: Update, context: CallbackContext) -> bool:
+    """信息处理函数，用于无指令的消息处理。
+    具体指令处理正常完成时再删除掉当前操作状态`OPERATION[chatid]`，处理出错时不删除。"""
+    if update.message is None:
+        return True
+    if update.message.text == "cancel":
+        utils.popOP(utils.getchatid(update))
+        return True
+    oper = utils.getOP(utils.getchatid(update))
+    opers = oper.split(" ")
+    if oper == "":
+        utils.botchat(update)
+        return True
+    if opers[0] == "newcard":
+        return utils.textnewcard(update, int(opers[2])) if len(opers) > 2 else utils.textnewcard(update)
+    if oper == "setage":
+        return utils.textsetage(update)
+    if oper == "setname":  # 私聊情形
+        return utils.textsetname(update, 0)
+    if opers[0] == "setname":  # 群消息情形
+        return utils.textsetname(update, int(opers[1]))
+    if oper == "setsex":  # 私聊情形
+        return utils.textsetsex(update, 0)
+    if opers[0] == "setsex":  # 群消息情形
+        return utils.textsetsex(update, int(opers[1]))
+    if opers[0] == "delcard":
+        return utils.textdelcard(update, int(opers[1]))
+    if opers[0] == "passjob":
+        return utils.textpassjob(update, int(opers[1]))
+
+
+def unknown(update: Update, context: CallbackContext) -> None:
+    utils.errorHandler(update, "没有这一指令", True)
+
+
 def helper(update: Update, context: CallbackContext) -> True:
     """查看指令对应函数的说明文档。
 
@@ -2344,39 +2356,6 @@ def helper(update: Update, context: CallbackContext) -> True:
             return False
         return True
     return utils.errorHandler(update, "找不到这个指令，或这个指令没有帮助信息。")
-
-
-def textHandler(update: Update, context: CallbackContext) -> bool:
-    """信息处理函数，用于无指令的消息处理。
-    具体指令处理正常完成时再删除掉当前操作状态`OPERATION[chatid]`，处理出错时不删除。"""
-    if update.message is None:
-        return True
-    if update.message.text == "cancel":
-        utils.popOP(utils.getchatid(update))
-        return True
-    oper = utils.getOP(utils.getchatid(update))
-    opers = oper.split(" ")
-    if oper == "":
-        utils.botchat(update)
-        return True
-    if opers[0] == "newcard":
-        return utils.textnewcard(update, int(opers[2])) if len(opers) > 2 else utils.textnewcard(update)
-    if oper == "setage":
-        return utils.textsetage(update)
-    if oper == "setname":  # 私聊情形
-        return utils.textsetname(update, 0)
-    if opers[0] == "setname":  # 群消息情形
-        return utils.textsetname(update, int(opers[1]))
-    if oper == "setsex":  # 私聊情形
-        return utils.textsetsex(update, 0)
-    if opers[0] == "setsex":  # 群消息情形
-        return utils.textsetsex(update, int(opers[1]))
-    if opers[0] == "delcard":
-        return utils.textdelcard(update, int(opers[1]))
-
-
-def unknown(update: Update, context: CallbackContext) -> None:
-    utils.errorHandler(update, "没有这一指令", True)
 
 
 ALL_HANDLER = globals()

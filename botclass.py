@@ -34,6 +34,7 @@ class DiceBot:
         self.readall()  # 先执行
         self.construct()  # 后执行
         self.operation: Dict[int, str] = {}
+        self.addjobrequest:Dict[int, dict] = {}
         # self.readhandlers()
 
     def readall(self) -> None:
