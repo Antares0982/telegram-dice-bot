@@ -1,18 +1,10 @@
 config.ini
 test.py
 tp/*
-data/cards.json
 data/cards/*.json
 data/cards/game/*.json
-data/ongame.json
 data/players/*
 data/groups/*
-data/global/*
-data/groupkpdict.json
-data/currentcarddict.json
-data/grouprules.json
-data/handlers.json
-data/holdgame.json
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

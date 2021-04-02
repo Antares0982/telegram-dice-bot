@@ -1,7 +1,10 @@
 # -*- coding:utf-8 -*-
 # only define handlers
 
-from gameclass import Group
+import copy
+from telegram.callbackquery import CallbackQuery
+from basicfunc import errorHandler
+from gameclass import CardBackground, GameCard, Group, GroupGame
 import time
 from typing import Dict, List, Optional, Tuple
 
@@ -696,7 +699,7 @@ def setage(update: Update, context: CallbackContext):
     utils.chatinit(update)
 
     if utils.isgroupmsg(update):
-        return utils.errorHandler(update, "发送私聊消息设置年龄。")
+        return utils.errorHandler(update, "发送私聊消息设置年龄。", True)
 
     pl = dicebot.forcegetplayer(update)
     card = pl.controlling
@@ -720,11 +723,11 @@ def setage(update: Update, context: CallbackContext):
 
 
 def addnewjob(update: Update, context: CallbackContext) -> bool:
-    """向bot数据库中添加一个新的职业。
+    """向bot数据库中申请添加一个新的职业。
     仅限kp使用这个指令。添加后，请等待bot控制者审核该职业的信息。格式如下：
     `/addnewjob --jobname --creditMin --creditMax --dataname1:ratio --dataname2:ratio/--dataname3_dataname4:ratio...  --skillname1 --skillname2...`
     例如：
-    `/addnewjob 刺客 30 60 EDU:2 DEX_STR:2 乔装 电器维修 斗殴 火器 锁匠 机械维修 前行 心理学`。
+    `/addnewjob 刺客 30 60 EDU:2 DEX_STR:2 乔装 电器维修 斗殴 火器 锁匠 机械维修 潜行 心理学`。
     EDU等属性名请使用大写字母。
     审核完成后结果会私聊回复给kp，请开启与bot的私聊。"""
     if utils.ischannel(update):
@@ -744,10 +747,10 @@ def addnewjob(update: Update, context: CallbackContext) -> bool:
     if len(context.args) <= 3:
         return utils.errorHandler(update, "参数长度不足")
 
-    if not utils.isint(context.args[1]) or not utils.isint(context.args[2]):
+    if not utils.isint(context.args[1]) or not utils.isint(context.args[2]) or int(context.args[1]) < 0 or int(context.args[1]) > int(context.args[2]):
         return utils.errorHandler(update, "信用范围参数无效")
 
-    jobname = context.args[0]
+    jobname: str = context.args[0]
     mincre = int(context.args[1])
     maxcre = int(context.args[2])
 
@@ -771,14 +774,70 @@ def addnewjob(update: Update, context: CallbackContext) -> bool:
     ptevald: Dict[str, int] = {}
     for n, j in ptevalpairs:
         ptevald[n] = j
-    ans = (jobname, [mincre, maxcre, ptevald].append(skilllist))
+
+    jobl = [mincre, maxcre, ptevald]
+    jobl += skilllist
+
+    ans = (jobname, jobl)
     dicebot.addjobrequest[pl.id, ans]
-    dicebot.sendtoAdmin("有新的职业添加申请："+str(ans))
+
+    pl.renew(dicebot.updater)
+    plname = pl.username if pl.username != "" else pl.name
+    if plname == "":
+        plname = str(pl.id)
+    dicebot.sendtoAdmin("有新的职业添加申请："+str(ans) +
+                        f"\n来自：@{plname}，id为：{str(pl.id)}")
     utils.addOP(ADMIN_ID, "passjob")
+
     update.message.reply_text("申请已经提交，请开启与我的私聊接收审核消息")
     return True
 
-# Button. need 0-1 args, if len(args)==0, show button and listen
+
+def addnewskill(update: Update, context: CallbackContext) -> bool:
+    """向bot数据库中申请添加一个新的技能。
+    仅限kp使用这个指令。添加后，请等待bot控制者审核该技能的信息。格式如下：
+    `/addnewskill --skillname --basicpoints`
+    例如：`/addnewskill 识破 25`。
+    审核完成后结果会私聊回复给kp，请开启与bot的私聊。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    pl = dicebot.forcegetplayer(update)
+    if pl.id in dicebot.addskillrequest:
+        return utils.errorHandler(update, "已经提交过一个申请了")
+
+    if not utils.searchifkp(pl):
+        return utils.errorHandler(update, "kp才能使用该指令", True)
+
+    if len(context.args) == 0:
+        return utils.errorHandler(update, "需要参数", True)
+
+    if len(context.args) < 2:
+        return utils.errorHandler(update, "参数长度不足")
+
+    if not utils.isint(context.args[1]) or int(context.args[1]) < 0 or int(context.args[1]) > 99:
+        return utils.errorHandler(update, "技能基础点数参数无效")
+
+    skillname: str = context.args[0]
+    bspt = int(context.args[1])
+
+    if skillname in dicebot.skilllist:
+        return utils.errorHandler(update, "该技能已经存在于列表中")
+
+    ans = (skillname, bspt)
+    dicebot.addskillrequest[pl.id, ans]
+
+    pl.renew(dicebot.updater)
+    plname = pl.username if pl.username != "" else ""
+    if plname == "":
+        plname = str(pl.id)
+    dicebot.sendtoAdmin("有新的技能添加申请："+str(ans) +
+                        f"\n来自：@{plname}，id为：{str(pl.id)}")
+    utils.addOP(ADMIN_ID, "passskill")
+
+    update.message.reply_text("申请已经提交，请开启与我的私聊接收审核消息")
+    return True
 
 
 def setjob(update: Update, context: CallbackContext) -> bool:
@@ -804,7 +863,8 @@ def setjob(update: Update, context: CallbackContext) -> bool:
     card = pl.controlling
     if card is None:
         return utils.errorHandler(update, "找不到卡。")
-
+    if card.info.age == -1:
+        return utils.errorHandler(update, "年龄未设置")
     if card.data.datadec is not None:
         return utils.errorHandler(update, "属性下降未设置完成")
 
@@ -817,33 +877,59 @@ def setjob(update: Update, context: CallbackContext) -> bool:
         return True
 
     jobname = context.args[0]
-    if not utils.IGNORE_JOB_DICT and jobname not in utils.dicebot.joblist:
-        return utils.errorHandler("This job is not allowed!")
-        return False
-    card1.info.job = jobname
+    if not IGNORE_JOB_DICT and jobname not in utils.dicebot.joblist:
+        return utils.errorHandler("该职业无法设置")
+
+    card.info.job = jobname
     if jobname not in utils.dicebot.joblist:
         update.message.reply_text(
             "这个职业不在职业表内，你可以用'/addskill 技能名 点数 (main/interest)'来选择技能！如果有interest参数，该技能将是兴趣技能并消耗兴趣技能点。")
-        card1.skill.points = int(card1.data.EDU*4)
-        utils.writecards(utils.CARDS_DICT)
+        card.skill.points = int(card.data.EDU*4)
+        card.write()
         return True
-    for i in range(3, len(utils.dicebot.joblist[jobname])):  # Classical jobs
-        card1.suggestskill[utils.dicebot.joblist[jobname][i]] = utils.getskilllevelfromdict(
-            card1, utils.dicebot.joblist[jobname][i])  # int
-    update.message.reply_text(
-        "用 /addskill 来添加技能。")
+
+    for skillname in dicebot.joblist[jobname][3:]:
+        card.suggestskill.set(skillname, utils.getskilllevelfromdict(
+            card, skillname))
+    update.message.reply_text("用 /addskill 来添加技能。")
     # This trap should not be hit
-    if not utils.generatePoints(card1, jobname):
-        return utils.errorHandler(update, "Some error occured when generating skill points!")
-    utils.writecards(utils.CARDS_DICT)
+    if not utils.generatePoints(card):
+        return utils.errorHandler(update, "生成主要技能点出现错误")
     return True
 
 
 def showjoblist(update: Update, context: CallbackContext) -> None:
     """显示职业列表"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    if not utils.isprivatemsg(update):
+        return utils.errorHandler(update, "请在私聊中使用该指令")
+
     rttext = "职业列表："
-    for job in utils.dicebot.joblist:
-        rttext += job+"\n"
+    counts = 0
+
+    for job in dicebot.joblist:
+        jobinfo = dicebot.joblist[job]
+
+        rttext += job+f"：\n信用范围 [{str(jobinfo[0])},{str(jobinfo[1])}]\n"
+
+        rttext += "技能点计算方法："
+        calcd: Dict[str, int] = jobinfo[2]
+        calcmeth = " 加 ".join("或".join(x.split('_')) +
+                              "乘"+str(calcd[x]) for x in calcd)
+        rttext += calcmeth+"\n"
+
+        rttext += "主要技能："+"、".join(x for x in jobinfo[3:])+"\n"
+
+        counts += 1
+
+        if counts == 3:
+            update.message.reply_text(rttext)
+            rttext = ""
+            counts = 0
+            time.sleep(0.2)
 
 
 def addskill(update: Update, context: CallbackContext) -> bool:
@@ -851,70 +937,84 @@ def addskill(update: Update, context: CallbackContext) -> bool:
 
     `/addskill`：生成按钮，玩家按照提示一步步操作。
     `/addskill 技能名`：修改某项技能的点数。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发私聊消息来增改技能", True)
-    plid = utils.getchatid(update)
-    card1 = utils.findcard(plid)
-    if not card1:
+
+    pl = dicebot.forcegetplayer(update)
+    card1 = pl.controlling
+    if card1 is None:
         return utils.errorHandler(update, "找不到卡。")
+
     if card1.skill.points == -1:
         return utils.errorHandler(update, "信息不完整，无法添加技能")
+
     if card1.skill.points == 0 and card1.interest.points == 0:
         if len(context.args) == 0 or (context.args[0] not in card1.skill and context.args[0] not in card1.interest):
             return utils.errorHandler(update, "你已经没有技能点了，请添加参数来修改具体的技能！")
-    if "job" not in card1.info:
+
+    if card1.info.job == "":
         return utils.errorHandler(update, "请先设置职业")
-    if "信用" not in card1.skill:
+
+    # 开始处理
+    if "信用" not in card1.skill.allskills():
         return utils.addcredit(update, context, card1)
-    if len(context.args) == 0:  # HIT GOOD TRAP
+
+    if len(context.args) == 0:
         return utils.addskill0(update, context, card1)
+
     if context.args[0] == "信用" or context.args[0] == "credit":
-        return utils.cgcredit(update, card1)
+        return utils.addcredit(update, context, card1) if "信用" not in card1.skill.allskills() else utils.cgcredit(update, card1)
+
     skillname = context.args[0]
-    # HIT BAD TRAP
-    if skillname != "母语" and skillname != "闪避" and (skillname not in utils.SKILL_DICT or skillname == "克苏鲁神话"):
+
+    if skillname != "母语" and skillname != "闪避" and (skillname not in dicebot.skilllist or skillname == "克苏鲁神话"):
         return utils.errorHandler(update, "无法设置这个技能")
-    if len(context.args) == 1:  # HIT GOOD TRAP
-        # This function only returns True
-        return utils.addskill1(update, context, card1)
-    skillvalue = context.args[1]
-    if not utils.isint(skillvalue):
-        return utils.errorHandler(update, "第二个参数：无效输入")
-    skillvalue = int(skillvalue)
-    # HIT GOOD TRAP
-    if len(context.args) >= 3:
-        # No buttons
-        return utils.addskill3(update, context, card1)
-    return utils.addskill2(update, context, card1)
+
+    # This function only returns True
+    return utils.addskill1(update, context, card1)
 
 
 def showskilllist(update: Update, context: CallbackContext) -> None:
     """显示技能列表"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     rttext = "技能：基础值\n"
     rttext += "母语：等于EDU\n"
     rttext += "闪避：等于DEX的一半\n"
-    for skill in utils.SKILL_DICT:
-        rttext += skill+"："+str(utils.SKILL_DICT[skill])+"\n"
+
+    for skill in dicebot.skilllist:
+        rttext += skill+"："+str(dicebot.skilllist[skill])+"\n"
+
     update.message.reply_text(rttext)
 
 
 def button(update: Update, context: CallbackContext):
     """所有按钮请求经该函数处理。功能十分复杂，拆分成多个子函数来处理。
     接收到按钮的参数后，转到对应的子函数处理。"""
-    query = update.callback_query
+    query: CallbackQuery = update.callback_query
     query.answer()
+
     if query.data == "None":
         return False
     if utils.isgroupmsg(update):
         return False
+
     args = query.data.split(" ")
     identifier = args[0]
-    if identifier != utils.IDENTIFIER:
-        query.edit_message_text(text="该请求已经过期。")
-        return False
+    if identifier != dicebot.IDENTIFIER:
+        return utils.errorHandler(query, "该请求已经过期。")
+
     chatid = utils.getchatid(update)
-    card1 = utils.findcard(chatid)
+    pl = dicebot.forcegetplayer(update)
+    card1 = pl.controlling
     args = args[1:]
+
     # receive types: job, skill, sgskill, intskill, cgskill, addmainskill, addintskill, addsgskill
     if args[0] == "job":  # Job in buttons must be classical
         return utils.buttonjob(query, card1, args)
@@ -937,8 +1037,8 @@ def button(update: Update, context: CallbackContext):
         return utils.buttondiscard(query, chatid, args)
     if args[0] == "switch":
         return utils.buttonswitch(query, chatid, args)
-    if args[0] == "switchkp":
-        return utils.buttonswitchkp(query, chatid, args)
+    if args[0] == "switchgamecard":
+        return utils.buttonswitchgamecard(query, chatid, args)
     if args[0] == "setsex":
         return utils.buttonsetsex(query, chatid, args)
     # HIT BAD TRAP
@@ -951,22 +1051,59 @@ def setname(update: Update, context: CallbackContext) -> bool:
     `/setname --name`：直接设定姓名。
     `/setname`：bot将等待输入姓名。
     设置的姓名可以带有空格等字符。"""
-    plid = utils.getmsgfromid(update)
-    card1 = utils.findcard(plid)
-    if not card1:
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    card1 = dicebot.forcegetplayer(update).controlling
+    if card1 is None:
         return utils.errorHandler(update, "找不到卡。")
-    gpid = card1.groupid
-    if utils.findgame(gpid):
-        return utils.errorHandler(update, "游戏已经开始，不能修改信息", True)
+
     if len(context.args) == 0:
         if utils.isprivatemsg(update):
             utils.addOP(utils.getchatid(update), "setname")
         else:
-            utils.addOP(utils.getchatid(update), "setname "+str(plid))
+            utils.addOP(utils.getchatid(update),
+                        "setname "+str(card1.playerid))
         update.message.reply_text("请输入姓名：")
         return True
+
     utils.nameset(card1, ' '.join(context.args))
     update.message.reply_text("角色的名字已经设置为"+card1.info.name+"。")
+    return True
+
+
+def additem(update: Update, context: CallbackContext) -> bool:
+    """为你的人物卡添加一些物品。用空格，制表符或回车来分隔不同物品。
+    `/additem --item1 --item2...`"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    card = dicebot.forcegetplayer(update).controlling
+    if card is None:
+        return utils.errorHandler(update, "找不到卡。")
+
+    card.additems(context.args)
+    update.message.reply_text(f"添加了{str(len(context.args))}件物品。")
+    return True
+
+
+def setasset(update: Update, context: CallbackContext) -> bool:
+    """设置你的角色卡的资金或财产，一段文字描述即可。`/setasset`"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    card = dicebot.forcegetplayer(update).controlling
+    if card is None:
+        return utils.errorHandler(update, "找不到卡。")
+
+    if len(context.args) == 0:
+        return utils.errorHandler(update, "需要参数")
+
+    card.setassets(' '.join(context.args))
+    update.message.reply_text("设置资金成功")
     return True
 
 
@@ -976,64 +1113,112 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     这一指令将拷贝本群内所有卡，之后将用拷贝的卡片副本进行游戏，修改属性将不会影响到游戏外的原卡属性。
     如果要正常结束游戏，使用`/endgame`可以将游戏的角色卡数据覆写到原本的数据上。
     如果要放弃这些游戏内进行的修改，使用`/abortgame`会直接删除这些副本副本"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "游戏需要在群里进行")
-    if utils.getkpid(utils.getchatid(update)) == -1:
-        return utils.errorHandler(update, "这个群没有KP")
-    if not utils.isfromkp(update):
-        return utils.errorHandler(update, "游戏应由KP发起", True)
-    gpid = utils.getchatid(update)
-    if utils.isholdinggame(gpid):
+
+    gp = dicebot.forcegetgroup(update)
+    kp = dicebot.forcegetplayer(update)
+    if gp.kp != kp:
+        return utils.errorHandler(update, "游戏只能由KP发起", True)
+    if gp.game is not None:
+        return utils.errorHandler(update, "游戏已经在进行中")
+
+    # 开始执行
+    if gp.pausedgame is not None:
         return continuegame(update, context)  # 检测到游戏暂停中，直接继续
-    kpid = utils.getmsgfromid(update)
-    for games in utils.ON_GAME:
-        if games.kpid == kpid:
-            return utils.errorHandler(update, "一个KP一次只能同时主持一场游戏。")
-    if utils.popallempties(utils.CARDS_DICT):
-        utils.writecards(utils.CARDS_DICT)
-    if gpid not in utils.CARDS_DICT:
-        update.message.reply_text("注意！本群没有卡片。游戏开始。")
-        utils.ON_GAME.append(
-            utils.GroupGame(groupid=utils.getchatid(update), kpid=kpid, cards=[]))
-        utils.writegameinfo(utils.ON_GAME)
-        return True
-    gamecards = []
-    for cdid in utils.CARDS_DICT[gpid]:
-        cardi = utils.CARDS_DICT[gpid][cdid]
-        utils.generateOtherAttributes(cardi)
-        cardcheckinfo = utils.showchecks(cardi)
-        if cardcheckinfo != "All pass.":
-            return utils.errorHandler(update, "卡片: "+str(cdid)+"还没有准备好。因为：\n"+cardcheckinfo)
-        gamecards.append(utils.CARDS_DICT[gpid][cdid].__dict__)
-    utils.ON_GAME.append(utils.GroupGame(groupid=utils.getchatid(update),
-                                         kpid=kpid, cards=gamecards))
-    utils.writegameinfo(utils.ON_GAME)
+
+    if len(gp.cards) == 0:
+        return utils.errorHandler(update, "本群没有任何卡片，无法开始游戏")
+
+    canstart = True
+    for card in gp.cards.values():
+        ck = card.check()
+        if ck != "":
+            canstart = False
+            update.message.reply_text(ck)
+
+    if not canstart:
+        return False
+
+    gp.game = GroupGame(gp.id, gp.cards)
     update.message.reply_text("游戏开始！")
     return True
 
 
-def holdgame(update: Update, context: CallbackContext) -> bool:
+def pausegame(update: Update, context: CallbackContext) -> bool:
     """暂停游戏。
-
     游戏被暂停时，可以视为游戏不存在，游戏中卡片被暂时保护起来。
+    当有中途加入的玩家时，使用该指令先暂停游戏，再继续游戏即可将新的角色卡加入进来。
+    可以在暂停时（或暂停前）修改：姓名、性别、随身物品、财产、背景故事，
+    继续游戏后会覆盖游戏中的这些属性。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
 
-    当有中途加入的玩家时，使用该指令先暂停游戏，再继续游戏即可将新的角色卡加入进来。"""
-    if utils.isprivatemsg(update):
+    if not utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送群消息暂停游戏")
-    gpid = utils.getchatid(update)
-    if not utils.isfromkp(update):
-        return utils.errorHandler(update, "只有KP可以中止游戏", True)
-    game = utils.gamepop(gpid)
-    if not game:
-        return utils.errorHandler(update, "没有找到游戏", True)
-    utils.HOLD_GAME.append(game)
-    utils.writeholdgameinfo(utils.HOLD_GAME)
+
+    gp = dicebot.forcegetgroup(update)
+    kp = dicebot.forcegetplayer(update)
+
+    if gp.kp != kp:
+        return utils.errorHandler(update, "只有KP可以暂停游戏", True)
+    if gp.game is None:
+        return utils.errorHandler(update, "没有进行中的游戏", True)
+
+    gp.pausedgame = gp.game
+    gp.game = None
+    gp.write()
+
     update.message.reply_text("游戏暂停，用 /continuegame 恢复游戏")
     return True
 
 
 def continuegame(update: Update, context: CallbackContext) -> bool:
-    """继续游戏。必须在`/holdgame`之后使用。"""
+    """继续游戏。必须在`/pausegame`之后使用。
+    游戏被暂停时，可以视为游戏不存在，游戏中卡片被暂时保护起来。
+    当有中途加入的玩家时，使用该指令先暂停游戏，再继续游戏即可将新的角色卡加入进来。
+    可以在暂停时（或暂停前）修改：姓名、性别、随身物品、财产、背景故事，
+    继续游戏后会覆盖游戏中的这些属性。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    if not utils.isgroupmsg(update):
+        return utils.errorHandler(update, "发送群消息暂停游戏")
+
+    gp = dicebot.forcegetgroup(update)
+    kp = dicebot.forcegetplayer(update)
+
+    if gp.kp != kp:
+        return utils.errorHandler(update, "只有KP可以暂停游戏", True)
+    if gp.pausedgame is None:
+        return utils.errorHandler(update, "没有进行中的游戏", True)
+
+    for card in gp.pausedgame.cards.values():
+        outcard = gp.getcard(card.id)
+        assert(outcard is not None)
+        card.info.name = outcard.info.name
+        card.info.sex = outcard.info.sex
+        card.item = copy.copy(outcard.item)
+        card.assets = outcard.assets
+        card.background = CardBackground(d=outcard.background.to_json())
+
+    for card in gp.cards.values():
+        if card.id not in gp.pausedgame.cards:
+            ngcard = GameCard(card.to_json())
+            ngcard.isgamecard = True
+            gp.pausedgame.cards[card.id] = ngcard
+            dicebot.gamecards[card.id] = gp.pausedgame.cards[card.id]
+
+    gp.write()
+    update.message.reply_text("游戏继续！")
+    return True
+
     # 因为逻辑修改，需要重写
     # if utils.isprivatemsg(update):
     #     return utils.errorHandler(update, "发送群消息继续游戏")
@@ -1050,18 +1235,25 @@ def continuegame(update: Update, context: CallbackContext) -> bool:
     #     for cdid in utils.CARDS_DICT[gpid]:
     #         if cdid not in gamecardidlist:
     #             utils.addcardtogame(game, utils.CARDS_DICT[gpid][cdid])
-    # update.message.reply_text("游戏继续！")
-    # return True
 
 
 def abortgame(update: Update, context: CallbackContext) -> bool:
-    if utils.isprivatemsg(update):
+    """放弃游戏。只有KP能使用该指令。这还将导致放弃在游戏中做出的所有修改，包括hp，SAN等。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    if not utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送群聊消息来中止游戏")
-    gpid = utils.getchatid(update)
-    if not utils.isfromkp(update):
+    gp = dicebot.forcegetgroup(update)
+    kp = dicebot.forcegetplayer(update)
+
+    if gp.kp != kp:
         return utils.errorHandler(update, "只有KP可以中止游戏", True)
-    if not utils.gamepop(gpid):
+
+    if utils.gamepop(gp) is None:
         return utils.errorHandler(update, "没有找到游戏", True)
+
     update.message.reply_text("游戏已终止！")
     return True
 
@@ -1070,191 +1262,186 @@ def endgame(update: Update, context: CallbackContext) -> bool:
     """结束游戏。
 
     这一指令会导致所有角色卡的所有权转移给KP，之后玩家无法再操作这张卡片。
-    游戏外的卡片会被游戏内的卡片覆写。
+    同时，游戏外的卡片会被游戏内的卡片覆写。
     如果还没有准备好进行覆写，就不要使用这一指令。"""
-    if utils.getchatid(update) > 0:
-        return utils.errorHandler(update, "该指令仅用于群聊")
-    if utils.getmsgfromid(update) != utils.getkpid(utils.getchatid(update)):
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    if not utils.isgroupmsg(update):
+        return utils.errorHandler(update, "群聊才能使用该指令")
+
+    gp = dicebot.forcegetgroup(update)
+    kp = dicebot.forcegetplayer(update)
+    if gp.kp != kp:
         return utils.errorHandler("只有KP可以结束游戏。")
-    gpid = utils.getchatid(update)
-    kpid = utils.getkpid(gpid)
-    game = utils.gamepop(gpid)
-    if not game:
+
+    game = gp.game if gp.game is not None else gp.pausedgame
+    if game is None:
         return utils.errorHandler(update, "没找到进行中的游戏。")
-    gamecards = game.cards
-    for cardi in gamecards:
-        if cardi.playerid in utils.CURRENT_CARD_DICT and utils.CURRENT_CARD_DICT[cardi.playerid][0] == gpid and utils.CURRENT_CARD_DICT[cardi.playerid][1] == cardi.id:
-            utils.CURRENT_CARD_DICT.pop(cardi.playerid)
-            utils.writecurrentcarddict(utils.CURRENT_CARD_DICT)
-        cardi.playerid = kpid
-        if cardi.id not in utils.CARDS_DICT[gpid]:
-            utils.CARDS_DICT[gpid][cardi.id] = cardi
-            continue
-        utils.CARDS_DICT[gpid].pop(cardi.id)
-        utils.CARDS_DICT[gpid][cardi.id] = cardi
-    utils.writecurrentcarddict(utils.CURRENT_CARD_DICT)
+
+    idl = list(game.cards.keys())  # 在迭代过程中改变键会抛出错误，复制键
+    for x in idl:
+        dicebot.popcard(x)
+        nocard = dicebot.popgamecard(x)
+        nocard.isgamecard = False
+        nocard.playerid = kp.id
+        dicebot.addcard(nocard)
+
     update.message.reply_text("游戏结束！")
-    utils.writecards(utils.CARDS_DICT)
     return True
 
 
-# /switch (--id): 切换进行修改操作时控制的卡，可以输入gpid，也可以是cdid
 def switch(update: Update, context: CallbackContext):
-    if utils.isgroupmsg(update):
-        update.message.reply_text("对bot私聊来切换卡。")
+    """切换目前操作的卡。
+    注意，这不是指kp在游戏中的多张卡之间切换，如果kp要切换游戏中骰骰子的卡，请参见指令`/switchgamecard`。
+    玩家只能修改目前操作的卡的基本信息，例如：年龄、性别、背景、技能点数等。
+    `/switch`：生成按钮来切换卡。
+    `/switch --cdid`切换至id为`cdid`的卡。"""
+    if utils.ischannel(update):
         return False
-    plid = utils.getchatid(update)
+    utils.chatinit(update)
+
+    if utils.isgroupmsg(update):
+        return utils.errorHandler(update, "对bot私聊来切换卡。")
+
+    pl = dicebot.forcegetplayer(update)
+
+    if len(pl.cards) == 0:
+        return utils.errorHandler(update, "你没有任何卡。")
+
+    if len(pl.cards) == 1:
+        if pl.controlling is not None:
+            return utils.errorHandler(update, "你只有一张卡，无需切换。")
+
+        for card in pl.cards.values():
+            pl.controlling = card
+            break
+        pl.write()
+
+        update.message.reply_text(
+            f"你只有一张卡，自动控制这张卡。现在操作的卡：{pl.controlling.getname()}")
+        return True
+
     if len(context.args) > 0:
         if not utils.isint(context.args[0]):
-            update.message.reply_text("输入无效。")
-            return False
-        numid = int(context.args[0])
-        if numid < 0:
-            gpid = numid
-            cardscount = 0
-            temptuple: Tuple[int, int] = (0, 0)
-            for cdid in utils.CARDS_DICT[gpid]:
-                if utils.CARDS_DICT[gpid][cdid].playerid == plid:
-                    cardscount += 1
-                    if cardscount > 1:
-                        update.message.reply_text(
-                            "在这个群你有多于一张卡，请输入具体的卡id。如果不知道自己的卡id，用 /showmycards 来显示ID。")
-                        return False
-                    temptuple = (gpid, cdid)
-            if cardscount == 0:
-                update.message.reply_text("你在这个群没有卡。")
-                return False
-            rttext = "切换成功，现在操作的卡：\n"
-            cardi = utils.CARDS_DICT[gpid][temptuple[1]]
-            if "name" in cardi.info and cardi.info.name != "":
-                rttext += cardi.info.name+": "+str(cardi.id)
-            else:
-                rttext += "(No name): "+str(cardi.id)
-            utils.CURRENT_CARD_DICT[plid] = temptuple
-            utils.writecurrentcarddict(utils.CURRENT_CARD_DICT)
-            update.message.reply_text(rttext)
-            return True
-        else:
-            cdid = numid
-            for gpid in utils.CARDS_DICT:
-                if cdid in utils.CARDS_DICT[gpid]:
-                    rttext = "切换成功，现在操作的卡：\n"
-                    cardi = utils.CARDS_DICT[gpid][cdid]
-                    if "name" in cardi.info and cardi.info.name != "":
-                        rttext += cardi.info.name+": "+str(cardi.id)
-                    else:
-                        rttext += "(No name): "+str(cardi.id)
-                    utils.CURRENT_CARD_DICT[plid] = (gpid, cdid)
-                    utils.writecurrentcarddict(utils.CURRENT_CARD_DICT)
-                    update.message.reply_text(rttext)
-                    return True
-            update.message.reply_text("找不到这张卡。")
-            return False
-    mycardslist = utils.findallplayercards(plid)
-    if len(mycardslist) == 0:
-        update.message.reply_text("你没有任何卡。")
-        return False
-    if len(mycardslist) == 1:
-        gpid, cdid = mycardslist[0]
-        rttext = "你只有一张卡，自动切换。现在操作的卡：\n"
-        cardi = utils.CARDS_DICT[gpid][cdid]
-        if "name" in cardi.info and cardi.info.name != "":
-            rttext += cardi.info.name+": "+str(cardi.id)
-        else:
-            rttext += "(No name): "+str(cardi.id)
-        update.message.reply_text(rttext)
-        utils.CURRENT_CARD_DICT[plid] = (gpid, cdid)
-        utils.writecurrentcarddict(utils.CURRENT_CARD_DICT)
+            return utils.errorHandler(update, "输入无效。")
+        cdid = int(context.args[0])
+        if cdid < 0:
+            return utils.errorHandler(update, "卡片id为正数。")
+        if cdid not in pl.cards:
+            return utils.errorHandler(update, "找不到这个id的卡。")
+
+        pl.controlling = pl.cards[cdid]
+        pl.write()
+
+        update.message.reply_text(
+            f"现在操作的卡：{pl.controlling.getname()}")
         return True
+
     # 多个选项。创建按钮
     rtbuttons = [[]]
-    for gpid, cdid in mycardslist:
-        cardi = utils.CARDS_DICT[gpid][cdid]
-        cardiname: str
-        if "name" not in cardi.info or cardi.info.name == "":
-            cardiname = str(cdid)
-        else:
-            cardiname = cardi.info.name
+    for card in pl.cards.values():
         if len(rtbuttons[len(rtbuttons)-1]) == 4:
             rtbuttons.append([])
+
         rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(
-            cardiname, callback_data=utils.IDENTIFIER+" "+"switch "+str(gpid)+" "+str(cdid)))
+            card.getname(), callback_data=dicebot.IDENTIFIER+" switch "+str(card.id)))
     rp_markup = InlineKeyboardMarkup(rtbuttons)
     update.message.reply_text("请选择要切换控制的卡：", reply_markup=rp_markup)
     # 交给按钮来完成
     return True
 
 
-def switchkp(update: Update, context: CallbackContext):
+def switchgamecard(update: Update, context: CallbackContext):
     """用于KP切换游戏中进行对抗时使用的NPC卡片。
 
-    （仅限私聊时）`/swtichkp`：创建按钮，让KP选择要用的卡。
-    （私聊群聊皆可）`/switchkp --cardid`：切换到id为cardid的卡并控制。"""
-    game = utils.findgamewithkpid(utils.getmsgfromid(update))
-    if not game:
-        return utils.errorHandler(update, "没有游戏或没有权限", True)
+    （仅限私聊时）`/swtichkp --groupid`：创建按钮，让KP选择要用的卡。
+    （私聊群聊皆可）`/switchgamecard --cardid`：切换到id为cardid的卡并控制。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if len(context.args) == 0:
-        if utils.isgroupmsg(update):
-            return utils.errorHandler(update, "请直接指定要切换的卡id，或者向bot发送私聊消息切换卡！")
-        rtbuttons = [[]]
-        for cardi in game.kpcards:
-            cardiname = utils.getname(cardi)
-            if cardiname == "None":
-                cardiname = str(cardi.id)
-            if len(rtbuttons[len(rtbuttons)-1]) == 4:
-                rtbuttons.append([])
-            rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(
-                cardiname, callback_data=utils.IDENTIFIER+" "+"switchkp "+str(cardi.id)))
-        rp_markup = InlineKeyboardMarkup(rtbuttons)
-        update.message.reply_text("请选择要切换控制的卡：", reply_markup=rp_markup)
-        # 交给按钮来完成
+        return utils.errorHandler(update, "需要参数")
+
+    if not utils.isint(context.args[0]):
+        return utils.errorHandler(update, "参数无效")
+
+    pl = dicebot.forcegetplayer(update)
+    iid = int(context.args[0])
+    if iid >= 0:
+        cdid = iid
+        if cdid not in pl.gamecards:
+            return utils.errorHandler(update, "你没有这个id的游戏中的卡")
+
+        card = pl.gamecards[cdid]
+        game: GroupGame = card.group.game if card.group.game is not None else card.group.pausedgame
+        assert(game is not None)
+        if game.kp != pl:
+            return utils.errorHandler(update, "你不是该卡对应群的kp")
+        game.kpctrl = card
+        game.write()
         return True
-    num = context.args[0]
-    if not utils.isint(num) or int(num) < 0:
-        return utils.errorHandler(update, "无效输入", True)
-    cdid = int(num)
-    cardi = utils.findcardfromgamewithid(game, cdid)
-    if not cardi or cardi.playerid != game.kpid:
-        return utils.errorHandler(update, "无效id", True)
-    game.kpctrl = cdid
-    update.message.reply_text(
-        "切换到卡" + str(num)+"，角色名称：" + cardi.info.name)
-    utils.writegameinfo(utils.ON_GAME)
+
+    gpid = iid
+
+    if utils.isgroupmsg(update):
+        return utils.errorHandler(update, "请直接指定要切换的卡id，或者向bot发送私聊消息切换卡！")
+
+    gp = dicebot.getgp(gpid)
+    if gp is None:
+        return utils.errorHandler(update, "找不到该群")
+
+    game = gp.game if gp.game is not None else gp.pausedgame
+    if game is None:
+        return utils.errorHandler(update, "该群没有在进行游戏")
+    if game.kp != pl:
+        return utils.errorHandler(update, "你不是kp")
+
+    rtbuttons = [[]]
+    for card in game.cards.values():
+        if card.player != pl:
+            continue
+
+        if len(rtbuttons[len(rtbuttons)-1]) == 4:
+            rtbuttons.append([])
+
+        rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(
+            card.getname(), callback_data=dicebot.IDENTIFIER+" switchgamecard "+str(card.id)))
+
+    rp_markup = InlineKeyboardMarkup(rtbuttons)
+    update.message.reply_text("请选择要切换控制的卡：", reply_markup=rp_markup)
+    # 交给按钮来完成
     return True
 
 
 def showmycards(update: Update, context: CallbackContext) -> bool:
-    """显示自己所持的卡"""
-    plid = utils.getmsgfromid(update)
-    allcardsTuple = utils.findallplayercards(plid)
-    if len(allcardsTuple) == 0:
+    """显示自己所持的卡。群聊时发送所有在本群可显示的卡片。私聊时发送所有卡片。"""
+    pl = dicebot.forcegetplayer(update)
+    if len(pl.cards) == 0:
         return utils.errorHandler(update, "找不到卡。")
+
     if utils.isgroupmsg(update):
         # 群消息，只发送本群的卡
+        gp = dicebot.forcegetgroup(update)
         rttext = ""
-        for gpid, cdid in allcardsTuple:
-            if gpid != utils.getchatid(update):
+        for card in pl.cards.values():
+            if card.group != gp:
                 continue
-            cardi = utils.cardget(gpid, cdid)
-            name = utils.getname(cardi)
-            rttext += str(cdid)+": "+name+"\n"
+            rttext += str(card.id)+": "+card.getname()+"\n"
+
         if rttext == "":
-            update.message.reply_text("找不到本群的卡。")
-        else:
-            update.message.reply_text(rttext)
+            return utils.errorHandler(update, "找不到本群的卡。")
+        update.message.reply_text(rttext)
         return True
     # 私聊消息，发送全部卡
     rttext = ""
-    for gpid, cdid in allcardsTuple:
-        cardi = utils.cardget(gpid, cdid)
-        name = utils.getname(cardi)
-        rttext += "群id "+str(gpid)+" 卡id "+str(cdid)+":\n"+name+"\n"
+    for card in pl.cards.values():
+        rttext += "群id "+str(card.groupid)+" 卡id " + \
+            str(card.id)+":\n"+card.getname()+"\n"
     update.message.reply_text(rttext)
     return True
-
-
-# /tempcheck --tpcheck:int: add temp check
-# /tempcheck --tpcheck:int (--cardid --dicename): add temp check for one card in a game
 
 
 def tempcheck(update: Update, context: CallbackContext):
@@ -1458,7 +1645,7 @@ def show(update: Update, context: CallbackContext) -> bool:
         if utils.isfromkp(update):
             cardi = utils.getkpctrl(game)
             if not cardi:
-                return utils.errorHandler(update, "先用 /switchkp 切换KP操作的卡")
+                return utils.errorHandler(update, "先用 /switchgamecard 切换KP操作的卡")
         else:
             cardi = utils.findcardfromgame(game, senderid)
             if not cardi:
@@ -2103,7 +2290,7 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
     if utils.getmsgfromid(update) == utils.getkpid(gpid):
         card1 = utils.getkpctrl(game)
         if not card1:
-            return utils.errorHandler(update, "请先用 /switchkp 切换到你的卡")
+            return utils.errorHandler(update, "请先用 /switchgamecard 切换到你的卡")
     else:  # 玩家进行
         plid = utils.getmsgfromid(update)
         card1 = utils.findcardfromgame(game, plid)
@@ -2320,7 +2507,9 @@ def textHandler(update: Update, context: CallbackContext) -> bool:
     if opers[0] == "delcard":
         return utils.textdelcard(update, int(opers[1]))
     if opers[0] == "passjob":
-        return utils.textpassjob(update, int(opers[1]))
+        return utils.textpassjob(update)
+    if opers[0] == "passskill":
+        return utils.textpassskill(update)
 
 
 def unknown(update: Update, context: CallbackContext) -> None:

@@ -7,6 +7,7 @@ from telegram.error import BadRequest
 
 from telegram.ext import Updater
 from telegram import Update
+from telegram.message import Message
 
 from cfg import *
 from gameclass import *
@@ -28,13 +29,14 @@ class DiceBot:
         self.cards: Dict[int, GameCard] = {}  # readall()赋值
         self.gamecards: Dict[int, GameCard] = {}  # readall()赋值
         self.joblist: dict
-        self.skilllist: dict
+        self.skilllist: Dict[str, int]
         self.allids: List[int] = []
         self.updater: Updater = updater
         self.readall()  # 先执行
         self.construct()  # 后执行
         self.operation: Dict[int, str] = {}
-        self.addjobrequest: Dict[int, dict] = {}
+        self.addjobrequest: Dict[int, Tuple[str, list]] = {}
+        self.addskillrequest: Dict[int, Tuple[str, int]] = {}
         # self.readhandlers()
 
     def readall(self) -> None:
@@ -128,9 +130,13 @@ class DiceBot:
                                      gp.name+"telegram chat无法获取")
 
             game = gp.game if gp.game is not None else gp.pausedgame
-            if game is not None and gp.kp is not None:
-                game.kp = gp.kp
-                game.kp.kpgames[gp.id] = game
+            if game is not None:
+                if gp.kp is not None:
+                    game.kp = gp.kp
+                    game.kp.kpgames[gp.id] = game
+
+                if isinstance(game.kpctrl, int):
+                    game.kpctrl = game.cards[game.kpctrl]
 
         # player
         for pl in self.players.values():
@@ -183,8 +189,10 @@ class DiceBot:
 
     def writecard(self) -> None:
         for card in self.cards.values():
+            assert(not card.isgamecard)
             card.write()
         for card in self.gamecards.values():
+            assert(card.isgamecard)
             card.write()
 
     @overload
@@ -266,6 +274,30 @@ class DiceBot:
     def getgamecard(self, cdid: int) -> Optional[GameCard]:
         return self.gamecards[cdid] if cdid in self.gamecards else None
 
+    def addcard(self, card: GameCard) -> bool:
+        """添加一张游戏外的卡，当卡id重复时返回False"""
+        assert(not card.isgamecard)
+        if card.id in self.allids:
+            raise ValueError("添加卡时，id重复")
+        # 增加id
+        self.allids.append(card.id)
+        self.allids.sort()
+        # 增加群索引
+        gp = self.forcegetgroup(card.groupid)
+        card.group = gp
+        gp.cards[card.id] = card
+        gp.write()
+        # 增加pl索引
+        pl = self.forcegetplayer(card.playerid)
+        pl.cards[card.id] = card
+        card.player = pl
+        if pl.controlling:
+            self.autoswitchhint(pl.id)
+        pl.controlling = card
+        pl.write()
+        card.write()
+        return True
+
     def popcard(self, cdid: int) -> GameCard:
         """删除一张游戏外的卡片"""
         if self.getcard(cdid) is None:
@@ -285,6 +317,8 @@ class DiceBot:
 
         # 维护allids
         self.allids.pop(self.allids.index(cdid))
+        card.delete()
+        return card
 
     def popgamecard(self, cdid: int) -> GameCard:
         if self.getgamecard(cdid) is None:
@@ -303,6 +337,26 @@ class DiceBot:
         card.player.gamecards.pop(cdid)
         card.delete()
         card.player.write()
+        return card
+
+    def cardtransferto(self, card: GameCard, newpl: Player) -> bool:
+        """转移一张卡所属权，游戏进行中则无法转移"""
+        if card.player == newpl or card.id in card.player.gamecards or card.isgamecard:
+            return False
+
+        card.player.cards.pop(card.id)
+
+        if card.player.controlling == card:
+            card.player.controlling = None
+            self.sendto(card.player, "卡片所有权被转换")
+
+        card.player.write()
+
+        card.player = newpl
+        card.playerid = newpl.id
+        newpl.cards[card.id] = card
+
+        return True
 
     def addkp(self, gp: Group, pl: Player) -> None:
         """如果要更新kp，需要先执行delkp"""
@@ -343,8 +397,30 @@ class DiceBot:
                 card.groupid = newid
                 card.write()
         gp.id = newid
+        gp.renew(self.updater)
         gp.write()
 
+    @overload
+    def sendto(self, pl: Player, msg: str) -> Message:
+        try:
+            return self.updater.bot.send_message(chat_id=pl.id, text=msg)
+        except:
+            return self.sendtoAdmin(f"无法向用户{pl.getname()}发送消息："+msg)
+
+    @overload
+    def sendto(self, plid: int, msg: str) -> Message:
+        try:
+            return self.updater.bot.send_message(chat_id=plid, text=msg)
+        except:
+            return self.sendtoAdmin(f"无法向用户{self.forcegetplayer(plid).getname()}发送消息："+msg)
+
+    def autoswitchhint(self, plid: int) -> None:
+        self.sendto(plid, "创建新卡时，控制自动切换到新卡")
+
+    def __eq__(self, o: object) -> bool:
+        if not isinstance(o, DiceBot):
+            return False
+        return self.IDENTIFIER == o.IDENTIFIER
     """
     def writekpinfo(self) -> None:
         with open(PATH_GROUP_KP, "w", encoding="utf-8") as f:
@@ -466,20 +542,6 @@ def readinfo() -> Tuple[Dict[int, int], Dict[int, Dict[int, GameCard]], List[Gro
 """
 
 
-def readskilldict() -> dict:
-    """读取SKILL_DICT"""
-    with open(PATH_SKILLDICT, 'r', encoding="utf-8") as f:
-        d = json.load(f)
-    return d
-
-
-def readjobdict() -> dict:
-    """读取JOB_DICT"""
-    with open(PATH_JOBDICT, 'r', encoding='utf-8') as f:
-        d = json.load(f)
-    return d
-
-
 """
 def readrules() -> Dict[int, GroupRule]:
     d: Dict[str, dict]
@@ -498,12 +560,6 @@ def readrules() -> Dict[int, GroupRule]:
         d1[int(key)] = GroupRule(d[key])
     return d1
 """
-
-
-def writehandlers(h: List[str]) -> None:
-    """写入Handlers"""
-    with open(PATH_HANDLERS, 'w', encoding='utf-8') as f:
-        json.dump(h, f, indent=4, ensure_ascii=False)
 
 
 dicebot = DiceBot()

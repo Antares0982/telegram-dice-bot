@@ -7,6 +7,7 @@ import os
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from telegram import Bot, Chat
+from telegram.ext.updater import Updater
 from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
 from telegram.inline.inlinekeyboardmarkup import InlineKeyboardMarkup
 from telegram.replymarkup import ReplyMarkup
@@ -78,6 +79,25 @@ class datatype:
                 d[key] = val.to_json()
         return d
 
+    def show(self, attr: str, jumpkey: List[str] = []) -> str:
+        """向下查找成员attr并返回其字符串形式，忽略jumpkey中的成员。如果不是可转换为str的类型则抛出ValueError"""
+        if hasattr(self, attr):
+            try:
+                return str(self.__dict__[attr])
+            except:
+                raise ValueError("无法转换为str")
+
+        for key in iter(self.__dict__):
+            val = self.__dict__[key]
+            if key in jumpkey or not isinstance(val, datatype):
+                continue
+
+            x = val.show(attr)
+            if x != "找不到该属性":
+                return x
+
+        return "找不到该属性"
+
     def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
         """向下查找成员attr并修改其值为val，忽略jumpkey中的成员。如果val类型和原本类型（不是None）不相同，则抛出TypeError"""
         if hasattr(self, attr):
@@ -104,14 +124,17 @@ class datatype:
 
 
 class GameCard(datatype):
+    """表示游戏中的卡片。具有属性：id, playerid, player, groupid, group, data, info, skill, interest, suggestskill, 
+    attr, background, tempstatus, item, assets, type, discard, status, isgamecard"""
+
     def __init__(self, carddict: dict = {}):
         self.id: int = None
 
         self.playerid: int = 0
-        self.player: Optional[Player] = None  # 需要在载入时赋值
+        self.player: Player = None  # 需要在载入时赋值
 
         self.groupid: int = 0
-        self.group: Optional[Group] = None  # 需要在载入时赋值
+        self.group: Group = None  # 需要在载入时赋值
 
         # 下面六项初始化后不能为None
         self.data: CardData = None
@@ -176,7 +199,10 @@ class GameCard(datatype):
     def to_json(self, jumpkey: List[str] = ["player", "group"]) -> dict:
         return super().to_json(jumpkey=jumpkey)
 
-    def modify(self, attr: str, val) -> Tuple[str, bool]:
+    def show(self, attr: str, jumpkey: List[str] = ["group", "player", "tempstatus"]) -> str:
+        return super().show(attr, jumpkey=jumpkey)
+
+    def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
         return self.tempstatus.modify(attr, val) if attr == "GLOBAL" else super().modify(attr, val, jumpkey="tempstatus")
 
     def __str__(self):
@@ -250,6 +276,7 @@ class GameCard(datatype):
         self.background.card = self
 
     def check(self) -> str:
+        """如果卡片可以开始游戏，则返回空字符串，否则返回原因"""
         rttext: str = ""
 
         t = self.data.check()
@@ -276,15 +303,22 @@ class GameCard(datatype):
         if len(self.item) == 0:
             rttext += "没有设定随身物品\n"
 
+        if self.assets == "":
+            rttext += "没有设定财产"
+
         if rttext != "":
             rttext = "角色卡(id:"+str(self.id)+")信息不完整，检查到如下问题：\n"+rttext
-        return ""
 
-    def additem(self, item: str) -> None:
-        self.item.append(item)
+        return rttext
+
+    def additems(self, item: List[str]) -> None:
+        self.item += item
+        if len(item) > 0:
+            self.write()
 
     def setassets(self, asset: str) -> None:
         self.assets = asset
+        self.write()
 
     def write(self):
         if self.id is None:
@@ -298,6 +332,7 @@ class GameCard(datatype):
                 json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
 
     def delete(self):
+        """删除文件"""
         if self.id is None:
             raise ValueError("删除文件时，GameCard实例没有id")
 
@@ -307,10 +342,14 @@ class GameCard(datatype):
             os.remove(PATH_CARDS+str(self.id)+".json")
 
     def __eq__(self, o: object) -> bool:
+        if not isinstance(o, GameCard):
+            return False
         return self.id == o.id and self.isgamecard == o.isgamecard
 
 
 class Player(datatype):
+    """表示一个玩家。具有如下属性：id, cards, gamecards, controlling, name, username, kpgroups, kpgames, chat"""
+
     def __init__(self, plid: Optional[int] = None, d: dict = {}):
         self.cards: Dict[int, GameCard] = {}  # 需要在载入时赋值。存储时：存储卡id。读取时忽略
         self.gamecards: Dict[int, GameCard] = {}  # 需要在载入时赋值。存储时：存储卡id。读取时忽略
@@ -318,13 +357,14 @@ class Player(datatype):
         self.controlling: Optional[GameCard] = None
         self.id = plid
         self.name: str = ""  # 读取时忽略
+        self.username: str = ""  # 读取时忽略
         self.kpgroups: Dict[int, Group] = {}  # 需要在载入时赋值。存储时：存储int列表。读取时忽略
         self.kpgames: Dict[int, GroupGame] = {}  # 需要在载入时赋值。存储时：存储int列表。读取时忽略
         self.chat: Optional[Chat] = None  # 载入时赋值。存储与读取均忽略
         if len(d) > 0:
             self.read_json(d=d)
 
-    def read_json(self, d: dict, jumpkeys: List[str] = ["cards", "gamecards", "kpgroups", "kpgames", "chat", "name"]) -> None:
+    def read_json(self, d: dict, jumpkeys: List[str] = ["cards", "gamecards", "kpgroups", "kpgames", "chat", "name", "username"]) -> None:
         return super().read_json(d, jumpkeys=jumpkeys)
 
     def to_json(self, jumpkey: List[str] = ["cards", "gamecards", "kpgroups", "kpgames", "controlling", "chat"]) -> dict:
@@ -356,14 +396,35 @@ class Player(datatype):
         d["kpgames"] = idlist
         return d
 
+    def show(self, attr: str, jumpkey: List[str] = []) -> str:
+        if hasattr(self, attr):
+            try:
+                return str(self.__dict__[attr])
+            except:
+                raise ValueError("无法转换为str")
+
+        return "找不到该属性"
+
+    def modify(self, attr: str, val, jumpkey: List[str]) -> Tuple[str, bool]:
+        return "无法修改Player实例", False
+
     def getname(self) -> str:
         if self.id is None:
             raise TypeError("Player实例没有id")
         if self.chat is None:
             return self.name
+        self.username = self.chat.username
         name = self.chat.full_name
-        self.name = name if name is not None else ""
+        self.name = name if name is not None else str(self.id)
         return self.name
+
+    def renew(self, updater: Updater) -> None:
+        try:
+            self.chat = updater.bot.get_chat(chat_id=self.id)
+            self.getname()
+        except:
+            ...
+        return None
 
     def iskp(self, gpid: int) -> bool:
         return gpid in self.kpgroups
@@ -386,19 +447,24 @@ class Player(datatype):
             json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
 
     def __eq__(self, o: object) -> bool:
+        if not isinstance(o, Player):
+            return False
         return self.id == o.id
 
 
 class Group(datatype):
+    """表示一个群。具有如下属性：id, cards, game, pausedgame, rule, name, username, kp, chat"""
+
     def __init__(self, gpid: Optional[int] = None, d: dict = {}):
         if len(d) == 0 and gpid is None:
             raise TypeError("Group的初始化需要gpid或d两个参数中的至少一个")
         self.id: Optional[int] = gpid
         self.cards: Dict[int, GameCard] = {}  # 在construct()中赋值。读取时忽略
         self.game: Optional[GroupGame] = None
-        self.rule: GroupRule = GroupRule()
         self.pausedgame: Optional[GroupGame] = None
+        self.rule: GroupRule = GroupRule()
         self.name: str = ""
+        self.username: str = ""
         # kp 需要在载入时赋值。读取、存储时为int。经过函数construct()正确载入后类型为 Player | None
         self.kp: Optional[Player] = None
         self.chat: Chat = None  # 需要在载入时赋值。不存储
@@ -423,6 +489,18 @@ class Group(datatype):
             d['kp'] = self.kp.id
         return d
 
+    def show(self, attr: str, jumpkey: List[str] = []) -> str:
+        if hasattr(self, attr):
+            try:
+                return str(self.__dict__[attr])
+            except:
+                raise ValueError("无法转换为str")
+
+        return "找不到该属性"
+
+    def modify(self, attr: str, val, jumpkey: List[str]) -> Tuple[str, bool]:
+        return "无法修改Group实例", False
+
     def groupconstruct(self):
         if self.game is not None:
             self.game.group = self
@@ -437,14 +515,31 @@ class Group(datatype):
             return True
         return False
 
+    def renew(self, updater: Updater) -> None:
+        try:
+            self.chat = updater.bot.get_chat(chat_id=self.id)
+            self.getname()
+        except:
+            ...
+        return None
+
     def getname(self) -> str:
         if self.id is None:
             raise TypeError("Group实例没有id")
+
         if self.chat is None:
             return self.name
-        name = self.chat.title
-        self.name = name if name is not None else ""
+
+        self.username = self.chat.username if self.chat.username is not None else ""
+        self.name = self.chat.title if self.chat.title is not None else ""
+
+        self.write()
+
         return self.name
+
+    def getusername(self) -> str:
+        self.getname()
+        return self.username
 
     def getcard(self, cardid: int) -> Optional[GameCard]:
         if cardid in self.cards:
@@ -476,6 +571,8 @@ class Group(datatype):
         return rttext
 
     def __eq__(self, o: object) -> bool:
+        if not isinstance(o, Group):
+            return False
         return self.id == o.id
 
 
@@ -502,6 +599,15 @@ class CardData(datatype):
             self.randdata()
         else:
             self.read_json(d)
+
+    def to_json(self, jumpkey: List[str] = ["card"]) -> dict:
+        return super().to_json(jumpkey=jumpkey)
+
+    def show(self, attr: str, jumpkey: List[str] = ["card"]) -> str:
+        return super().show(attr, jumpkey=jumpkey)
+
+    def modify(self, attr: str, val, jumpkey: List[str] = ["card"]) -> Tuple[str, bool]:
+        return super().modify(attr, val, jumpkey=jumpkey)
 
     def getdata(self, dataname: str) -> int:
         if dataname not in self.alldatanames:
@@ -551,9 +657,6 @@ class CardData(datatype):
             if self.__dict__[key] < 50:
                 countless50 += 1
         return countless50 >= 3
-
-    def modify(self, attr: str, val, jumpkey: List[str] = ["card"]) -> Tuple[str, bool]:
-        return super().modify(attr, val, jumpkey=jumpkey)
 
     def __str__(self) -> str:
         rttext = "\n".join([self.__dict__[x] for x in self.alldatanames])
@@ -749,6 +852,12 @@ class CardBackground(datatype):
         if len(d) > 0:
             self.read_json(d=d)
 
+    def to_json(self, jumpkey: List[str] = ["card"]) -> dict:
+        return super().to_json(jumpkey=jumpkey)
+
+    def show(self, attr: str, jumpkey: List[str] = ["card"]) -> str:
+        return super().show(attr, jumpkey=jumpkey)
+
     def modify(self, attr: str, val, jumpkey: List[str] = ["card"]) -> Tuple[str, bool]:
         return super().modify(attr, val, jumpkey=jumpkey)
 
@@ -887,6 +996,9 @@ class CardBackground(datatype):
 
 
 class GroupGame(datatype):  # If defined, game is started.
+    """表示一个正在进行（或暂停）的游戏。属性：
+    group, groupid, kp, cards, kpctrl, tpcheck"""
+
     def __init__(self, groupid: Optional[int] = None, cards: Dict[int, GameCard] = {}, d: dict = {}):
         if len(d) == 0 and groupid is None:
             raise TypeError("GroupGame的初始化需要groupid或d两个参数中的至少一个")
@@ -896,7 +1008,7 @@ class GroupGame(datatype):  # If defined, game is started.
         self.groupid: int = None
         self.kp: Optional[Player] = None  # 不需要存储，读取时通过construct()赋值
         self.cards: Dict[int, GameCard] = {}  # 不需要存储，读取时通过construct()赋值
-        self.kpctrl: GameCard = None
+        self.kpctrl: GameCard = None  # 存储时：int，读取时通过construct()赋值
         self.tpcheck: int = 0
 
         if len(d) > 0:
@@ -908,13 +1020,29 @@ class GroupGame(datatype):  # If defined, game is started.
         self.cards: Dict[int, GameCard] = {}
 
         for i in cards.values():
-            self.cards[i.id] = GameCard(i.to_json())
+            ngcard = GameCard(i.to_json())
+            ngcard.isgamecard = True
+            self.cards[i.id] = ngcard
 
     def read_json(self, d: dict, jumpkeys: List[str] = ["cards", "kp"]) -> None:
         super().read_json(d, jumpkeys=jumpkeys)
 
-    def to_json(self, jumpkey: List[str] = ["cards", "kp"]) -> dict:
-        return super().to_json(jumpkey=jumpkey)
+    def to_json(self, jumpkey: List[str] = ["group", "cards", "kp", "kpctrl"]) -> dict:
+        d = super().to_json(jumpkey=jumpkey)
+        d["kpctrl"] = self.kpctrl.id
+        return d
+
+    def show(self, attr: str, jumpkey: List[str] = []) -> str:
+        if hasattr(self, attr):
+            try:
+                return str(self.__dict__[attr])
+            except:
+                raise ValueError("无法转换为str")
+
+        return "找不到该属性"
+
+    def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
+        return "无法修改GroupGame实例", False
 
     def __str__(self):
         rttext = ""
@@ -932,13 +1060,16 @@ class GroupGame(datatype):  # If defined, game is started.
 
     def __eq__(self, o: object) -> bool:
         assert(self.group is not None)
+        if not isinstance(o, GroupGame):
+            return False
         return self.group == o.group
 
 
 class GroupRule(datatype):
     """一场游戏的规则。
 
-    KP在群里用`/setrule`设置规则。群中如果没有规则，会自动生成默认规则。"""
+    KP在群里用`/setrule`设置规则。群中如果没有规则，会自动生成默认规则。
+    具有如下属性：group, skillmax, skillmaxAged, skillcost, greatsuccess, greatfail"""
 
     def __init__(self, rules: Dict[str, List[int]] = {}):
         self.group: Group = None  # 用cardConstruct()初始化
@@ -952,8 +1083,11 @@ class GroupRule(datatype):
         self.greatsuccess: List[int] = [1, 1, 1, 1]
         # 在检定需要骰出大于等于50时，greatfail[0]~greatfail[1]算大失败，否则greatfail[2]~greatfail[3]算大失败
         self.greatfail: List[int] = [100, 100, 96, 100]
-        for key in rules:
-            self.__dict__[key] = rules[key]
+        if len(rules) > 0:
+            self.read_json(rules)
+
+    def to_json(self, jumpkey: List[str] = ["group"]) -> dict:
+        return super().to_json(jumpkey=jumpkey)
 
     def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
         return "不允许通过modify()修改rule，请使用self.changeRules()", False

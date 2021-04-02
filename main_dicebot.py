@@ -2,6 +2,7 @@
 # version: 1.0.9
 
 import asyncio
+import json
 import logging
 import signal
 from inspect import isfunction
@@ -14,12 +15,19 @@ from telegram.ext import (CallbackContext, CallbackQueryHandler,
                           CommandHandler, Filters, MessageHandler)
 
 import dicehandlers
+from cfg import *
 from dicehandlers import dicebot
 
 dispatcher = dicebot.updater.dispatcher
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+
+def writehandlers(h: List[str]) -> None:
+    """写入Handlers"""
+    with open(PATH_HANDLERS, 'w', encoding='utf-8') as f:
+        json.dump(h, f, indent=4, ensure_ascii=False)
 
 
 def botexec(s: str, needreturn: bool = False):
@@ -34,7 +42,7 @@ def botexec(s: str, needreturn: bool = False):
         exec("t="+s)
     except:
         dicebot.sendtoAdmin("执行失败")
-        return 
+        return
     return locals()["t"]
 
 

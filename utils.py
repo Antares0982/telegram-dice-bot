@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+import json
 from typing import (Dict, Iterable, Iterator, KeysView, List, Optional, Tuple,
                     TypeVar, Union, overload)
 
@@ -56,19 +57,17 @@ SKILL_PAGES: List[List[str]]
 dicebot.sendtoAdmin("Bot is live!")
 
 
-def __getgp(gpid: int) -> Optional[Group]:
+def __getgp(gpid: Union[int, Update]) -> Optional[Group]:
     return dicebot.getgp(gpid)
 
 
 def initgroup(gpid: int) -> Optional[Group]:
     """若gpid未存储过，创建Group对象并返回，否则返回None"""
     gp = __getgp(gpid)
-    if gp:
-        return None
-    return dicebot.creategp(gpid)
+    return gp.renew(dicebot.updater) if gp else dicebot.creategp(gpid)
 
 
-def __forcegetgroup(gpid: int) -> Group:
+def __forcegetgroup(gpid: Union[int, Update]) -> Group:
     return dicebot.forcegetgroup(gpid)
 
 
@@ -79,6 +78,11 @@ def updateinitgroup(update: Update) -> Optional[Group]:
     return initgroup(gpid)
 
 
+def renewgroup(update: Update) -> None:
+    gp = dicebot.forcegetgroup(update)
+    gp.renew(dicebot.updater)
+
+
 def __getplayer(plid: Union[int, Update]) -> Optional[Player]:
     return dicebot.getplayer(plid)
 
@@ -86,9 +90,7 @@ def __getplayer(plid: Union[int, Update]) -> Optional[Player]:
 def initplayer(plid: int) -> Optional[Player]:
     """若plid未存储过，创建Player对象并返回，否则返回None"""
     pl = __getplayer(plid)
-    if pl:
-        return None
-    return dicebot.createplayer(plid)
+    return pl.renew(dicebot.updater) if pl else dicebot.createplayer(plid)
 
 
 def __forcegetplayer(plid: Union[int, Update]) -> Player:
@@ -102,21 +104,23 @@ def updateinitplayer(update: Update) -> Optional[Player]:
     return initplayer(plid)
 
 
+def renewplayer(update: Update) -> None:
+    pl = __forcegetplayer(update)
+    pl.renew(dicebot.updater)
+
+
 def chatinit(update: Update) -> Union[Player, Group, None]:
     """所有指令使用前调用该函数"""
     if isprivatemsg(update):
         return updateinitplayer(update)
     if isgroupmsg(update):
+        initplayer(getmsgfromid(update))
         return updateinitgroup(update)
     return None
 
 
 def __getcard(cdid: int) -> Optional[GameCard]:
     return dicebot.getcard(cdid)
-
-
-def autoswitchhint(plid: int) -> None:
-    dicebot.updater.bot.send_message(chat_id=plid, text="创建新卡时，控制自动切换到新卡")
 
 
 # 卡片相关：查 增 删
@@ -136,7 +140,7 @@ def cardpop(id: int) -> Optional[GameCard]:
 
 
 def cardadd(card: GameCard, gpid: int) -> bool:
-    """添加一张游戏外的卡，当卡id重复时返回False"""
+    """添加一张游戏外的卡，当卡id重复时返回False。该函数忽略原本card.groupid"""
     if card.id in dicebot.allids:
         return False
     # 增加id
@@ -153,7 +157,7 @@ def cardadd(card: GameCard, gpid: int) -> bool:
     pl.cards[card.id] = card
     card.player = pl
     if pl.controlling:
-        autoswitchhint(pl.id)
+        dicebot.autoswitchhint(pl.id)
     pl.controlling = card
     pl.write()
     return True
@@ -934,7 +938,7 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
     card1.info.job = jobname
     query.edit_message_text(
         "职业设置为："+jobname+"\n现在你可以用指令 /addskill 添加技能，首先需要设置信用点。")
-    if not generatePoints(card1, jobname):
+    if not generatePoints(card1):
         dicebot.sendtoAdmin("生成技能出错，位置：buttonjob")
         return errorHandler(query, "生成技能点出错！")
     for i in range(3, len(dicebot.joblist[jobname])):  # Classical jobs
@@ -1164,34 +1168,38 @@ def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
 
 
 def buttonswitch(query: CallbackQuery, plid: int, args: List[str]) -> bool:
-    gpid, cdid = int(args[1]), int(args[2])
+    pl = __forcegetplayer(plid)
+    cdid = int(args[1])
 
-    card = getcard(gpid, cdid)
-    if card is None:
+    if cdid not in pl.cards:
         return errorHandler(query, "没有找到这个id的卡。")
 
-    pl = __forcegetplayer(plid)
-    pl.controlling = card
+    pl.controlling = pl.cards[cdid]
     pl.write()
 
-    query.edit_message_text("修改成功，现在操作的卡是："+card.getname())
+    query.edit_message_text("修改成功，现在操作的卡是："+pl.controlling.getname())
     return True
 
 
-# def buttonswitchkp(query: CallbackQuery, kpid: int, args: List[str]) -> bool:
-#     ctrlid = int(args[1])
-#     game = findgamewithkpid(kpid)
-#     if not game:
-#         query.edit_message_text("没有找到游戏。")
-#         return False
-#     cardi = findcardfromgamewithid(game, ctrlid)
-#     if not cardi or cardi.playerid != kpid:
-#         query.edit_message_text("没有找到这张npc卡。")
-#         return False
-#     game.kpctrl = ctrlid
-#     writegameinfo(ON_GAME)
-#     query.edit_message_text("修改操纵的npc卡成功，id为："+str(ctrlid))
-#     return True
+def buttonswitchgamecard(query: CallbackQuery, kpid: int, args: List[str]) -> bool:
+    kp = __forcegetplayer(kpid)
+    cdid = int(args[1])
+    card = dicebot.getgamecard(cdid)
+
+    if card is None:
+        return errorHandler(query, "没有这张卡")
+    if card.player != kp:
+        return errorHandler(query, "这不是你的卡片")
+    if card.group.kp != kp:
+        return errorHandler(query, "你不是对应群的kp")
+
+    game = card.group.game if card.group.game is not None else card.group.pausedgame
+    assert(game is not None)
+
+    game.kpctrl = card
+    game.write()
+    query.edit_message_text("修改操纵的npc卡成功，现在正在使用："+card.getname())
+    return True
 
 
 def buttonsetsex(query: CallbackQuery, plid: int,  args: List[str]) -> bool:
@@ -1421,11 +1429,13 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
 #         await asyncio.sleep(30)
 
 
-def gamepop(gpid: int) -> Optional[GroupGame]:
+def gamepop(gp: Group) -> Optional[GroupGame]:
     """终止一场游戏。`/abortgame`的具体实现。"""
-    gp = __forcegetgroup(gpid)
-    ans = gp.game
+    ans = gp.game if gp.game is not None else gp.pausedgame
     gp.game = None
+    gp.pausedgame = None
+    if ans is not None:
+        gp.write()
     return ans
 
 
@@ -1627,7 +1637,59 @@ def textdelcard(update: Update, cardid: int) -> bool:
 
 
 def textpassjob(update: Update, plid: int) -> bool:
-    pass
+    t = update.message.text.split()
+    if getmsgfromid(update) != ADMIN_ID or (t[0] != "jobcomfirm" and t[0] != "jobreject"):
+        return botchat(update)
+
+    if len(t) < 2 or not isint(t[1]):
+        return errorHandler(update, "参数无效")
+
+    plid = int(t[1])
+    if plid not in dicebot.addjobrequest:
+        return errorHandler(update, "没有该id的职业新增申请")
+
+    popOP(ADMIN_ID)
+    if t[0] == "jobcomfirm":
+        dicebot.joblist[dicebot.addjobrequest[plid]
+                        [0]] = dicebot.addjobrequest[plid][1]
+
+        with open(PATH_JOBDICT, 'w', encoding='utf-8') as f:
+            json.dump(dicebot.joblist, f, indent=4, ensure_ascii=False)
+
+        dicebot.sendto(plid, "您的新增职业申请已通过。")
+
+    else:
+        dicebot.sendto(plid, "您的新增职业申请没有通过。")
+
+    return True
+
+
+def textpassskill(update: Update, plid: int) -> bool:
+    t = update.message.text.split()
+    if getmsgfromid(update) != ADMIN_ID or (t[0] != "skillcomfirm" and t[0] != "skillreject"):
+        return botchat(update)
+
+    if len(t) < 2 or not isint(t[1]):
+        return errorHandler(update, "参数无效")
+
+    plid = int(t[1])
+    if plid not in dicebot.addskillrequest:
+        return errorHandler(update, "没有该id的技能新增申请")
+
+    popOP(ADMIN_ID)
+    if t[0] == "skillcomfirm":
+        dicebot.skilllist[dicebot.addskillrequest[plid]
+                          [0]] = dicebot.addskillrequest[plid][1]
+
+        with open(PATH_SKILLDICT, 'w', encoding='utf-8') as f:
+            json.dump(dicebot.skilllist, f, indent=4, ensure_ascii=False)
+
+        dicebot.sendto(plid, "您的新增技能申请已通过。")
+
+    else:
+        dicebot.sendto(plid, "您的新增技能申请没有通过。")
+
+    return True
 
 
 def getnewcard(msgid: int, gpid: int, plid: int, cdid: int = -1) -> bool:
