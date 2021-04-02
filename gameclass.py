@@ -659,12 +659,11 @@ class skilltype(datatype):  # skill的基类，只包含一个属性skills
         return iter(self.skills)
 
 
-
 class Skill(skilltype):
     def __init__(self, d: dict = {}):
         super().__init__()
         self.points: int = -1
-        self.type:str = __MAIN
+        self.type: str = __MAIN
         if len(d) > 0:
             self.read_json(d=d)
 
@@ -681,7 +680,7 @@ class Skill(skilltype):
         rttext: str = f"{self.type}技能剩余点数：{self.points}\n"
         for key in self.allskills():
             rttext += f"{key}：{self.get(key)}"
-        
+
         return rttext
 
 
@@ -700,8 +699,9 @@ class SgSkill(skilltype):
         rttext: str = "建议技能：\n"
         for key in self.allskills():
             rttext += f"{key}：{self.get(key)}"
-        
+
         return rttext
+
 
 class CardAttr(datatype):
     def __init__(self, d: dict = {}):

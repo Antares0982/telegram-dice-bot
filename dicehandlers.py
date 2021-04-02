@@ -779,6 +779,8 @@ def addnewjob(update: Update, context: CallbackContext) -> bool:
     return True
 
 # Button. need 0-1 args, if len(args)==0, show button and listen
+
+
 def setjob(update: Update, context: CallbackContext) -> bool:
     """设置职业。
 

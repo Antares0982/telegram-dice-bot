@@ -1,10 +1,9 @@
 # -*- coding:utf-8 -*-
 
-import asyncio
-from typing import (Any, Dict, Iterable, Iterator, KeysView, List, Optional, Tuple,
+from typing import (Dict, Iterable, Iterator, KeysView, List, Optional, Tuple,
                     TypeVar, Union, overload)
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, error
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext
 from telegram.message import Message
@@ -599,7 +598,6 @@ def changeKP(gp: Group, newkp: Player) -> bool:
     return True
 
 
-
 def makejobbutton() -> List[List[InlineKeyboardButton]]:
     """生成全部职业的按钮"""
     rtbuttons = [[]]
@@ -1156,7 +1154,7 @@ def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
         return errorHandler(query, "找不到这个id的卡。")
 
     pl = __forcegetplayer(plid)
-    if not checkaccess(pl, card)&CANDISCARD:
+    if not checkaccess(pl, card) & CANDISCARD:
         return errorHandler(query, "该卡不可删除。")
 
     cardpop(cdid)
@@ -1627,8 +1625,10 @@ def textdelcard(update: Update, cardid: int) -> bool:
         #     cardpop(cardi.groupid, cardid))
     return True
 
-def textpassjob(update:Update, plid:int)->bool:
+
+def textpassjob(update: Update, plid: int) -> bool:
     pass
+
 
 def getnewcard(msgid: int, gpid: int, plid: int, cdid: int = -1) -> bool:
     """指令`/newcard`的具体实现"""
