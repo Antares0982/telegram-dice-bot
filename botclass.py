@@ -3,16 +3,15 @@ import json
 import os
 import time
 from typing import overload
-from telegram.error import BadRequest
 
-from telegram.ext import Updater
 from telegram import Update
+from telegram.error import BadRequest
+from telegram.ext import Updater
 from telegram.message import Message
 
+from basicfunc import *
 from cfg import *
 from gameclass import *
-
-from basicfunc import *
 
 if PROXY:
     updater = Updater(token=TOKEN, request_kwargs={
@@ -423,28 +422,43 @@ class DiceBot:
     def groupmigrate(self, oldid: int, newid: int) -> None:
         gp = self.getgp(oldid)
         assert(gp is not None)
+        # 维护dicebot
+        self.groups[newid] = self.groups.pop(oldid)
+        # 维护card
         for card in gp.cards.values():
             card.groupid = newid
             card.write()
+        # 维护game, gamecard
         if gp.game is not None:
             gp.game.groupid = newid
             for card in gp.game.cards.values():
                 card.groupid = newid
                 card.write()
+        # 维护Player
+        if gp.kp is not None:
+            gp.kp.kpgroups[newid] = gp.kp.kpgroups.pop(oldid)
+            if oldid in gp.kp.kpgames:
+                gp.kp.kpgames[newid] = gp.kp.kpgames.pop(oldid)
+            gp.kp.write()
+
         gp.id = newid
         gp.renew(self.updater)
         gp.write()
 
     @overload
-    def sendto(self, pl: Player, msg: str) -> Message:
+    def sendto(self, pl: Player, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Message:
         try:
+            if rpmarkup is not None:
+                return self.updater.bot.send_message(chat_id=pl.id, text=msg, reply_markup=rpmarkup)
             return self.updater.bot.send_message(chat_id=pl.id, text=msg)
         except:
             return self.sendtoAdmin(f"无法向用户{pl.getname()}发送消息："+msg)
 
     @overload
-    def sendto(self, plid: int, msg: str) -> Message:
+    def sendto(self, plid: int, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Message:
         try:
+            if rpmarkup is not None:
+                return self.updater.bot.send_message(chat_id=plid, text=msg, reply_markup=rpmarkup)
             return self.updater.bot.send_message(chat_id=plid, text=msg)
         except:
             return self.sendtoAdmin(f"无法向用户{self.forcegetplayer(plid).getname()}发送消息："+msg)

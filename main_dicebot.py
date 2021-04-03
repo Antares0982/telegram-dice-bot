@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 # version: 1.0.9
 
-import asyncio
 import json
 import logging
 import signal
@@ -17,6 +16,7 @@ from telegram.ext import (CallbackContext, CallbackQueryHandler,
 import dicehandlers
 from cfg import *
 from dicehandlers import dicebot
+from utils import chatinit, errorHandler, ischannel
 
 dispatcher = dicebot.updater.dispatcher
 
@@ -49,21 +49,28 @@ def botexec(s: str, needreturn: bool = False):
 def bot(update: Update, context: CallbackContext) -> bool:
     """直接控制控制程序的行为。可以直接调用updater。使用方法：
 
+    `/bot check`将检查数据的一致性。
+
     `/bot stop`将结束程序。
 
     `/bot restart`将调用`reload`方法重新加载所有数据。
 
-    `/bot exec --command`执行python代码，仅限bot控制者使用"""
-    if dicehandlers.utils.getmsgfromid(update) != dicehandlers.utils.ADMIN_ID:
-        return dicehandlers.utils.errorHandler(update, "没有权限", True)
+    `/bot exec --command`执行python代码，如果第一个参数是小写字母r，则计算后面的代码结果并返回"""
+    if ischannel(update):
+        return False
+    chatinit(update)
+
+    if dicebot.forcegetplayer(update).id != ADMIN_ID:
+        return errorHandler(update, "没有权限", True)
 
     if len(context.args) == 0:
-        return dicehandlers.utils.errorHandler(update, "参数无效", True)
+        return errorHandler(update, "需要参数", True)
 
     inst = context.args[0]
     if inst == "check":
-        update.message.reply_text("开始数据自检")
-        return True if dicehandlers.utils.botcheckdata("bot自检中……") else bool(dicehandlers.utils.sendtoAdmin("出现了未知的错误，请检查报错信息"))
+        update.message.reply_text("开始数据维护")
+        dicebot.checkconsistency()
+        return True
 
     if inst == "stop":
 
@@ -80,21 +87,21 @@ def bot(update: Update, context: CallbackContext) -> bool:
         else:  # Other
             kill(pid, signal.SIGKILL)
 
-        return dicehandlers.utils.errorHandler(update, "关闭失败！")
+        return errorHandler(update, "关闭失败！")
 
     if inst == "restart":
         return dicehandlers.reload(update, context)
 
     if inst == "exec":
         if context.args[1] == 'r' and len(context.args) > 2:
-            return botexec(context.args[2:], True)
+            dicebot.sendtoAdmin(str(botexec(context.args[2:], True)))
         if len(context.args) > 1:
             ans = str(botexec(context.args[1:]))
             dicebot.sendtoAdmin(ans)
 
-        return dicehandlers.utils.errorHandler(update, "参数无效")
+        return errorHandler(update, "参数无效")
 
-    return dicehandlers.utils.errorHandler(update, "没有这一指令", True)
+    return errorHandler(update, "没有这一指令", True)
 
 
 def makehandlerlist() -> List[str]:
@@ -109,7 +116,7 @@ def makehandlerlist() -> List[str]:
 
     ans.sort()
 
-    dicehandlers.utils.writehandlers(ans)
+    writehandlers(ans)
 
     return ans
 
@@ -132,11 +139,9 @@ def main() -> None:
     dispatcher.add_handler(MessageHandler(Filters.text & (
         ~Filters.command) & (~Filters.audio) & (~Filters.video) & (~Filters.photo) & (~Filters.sticker), dicehandlers.textHandler))
 
-    dicehandlers.utils.updater.start_polling(clean=True)
-    dicehandlers.utils.updater.idle()
+    dicebot.updater.start_polling(clean=True)
+    dicebot.updater.idle()
 
 
 if __name__ == "__main__":
     main()
-
-    asyncio.run(dicehandlers.utils.timer())

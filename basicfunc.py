@@ -4,6 +4,7 @@ from typing import Any, Dict, overload
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.callbackquery import CallbackQuery
+
 from cfg import *
 from gameclass import Group, Player
 
@@ -256,6 +257,7 @@ def templateNewCard() -> dict:
         "assets": "",
         "type": "PL",
         "discard": False,
-        "status": "alive"
+        "status": "alive",
+        "isgamecard": False
     }
     return t

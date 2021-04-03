@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 from typing import List
+
 import numpy as np
 
 
@@ -34,6 +35,7 @@ def get2d6_6str(dtname: str, a: int, b: int) -> str:
 
 
 def commondice(dicename) -> str:
+    """只能计算含d的表达式，返回完整的表达式以及结果"""
     if dicename.find('+') < 0:
         if dicename.find('d') < 0:
             return "Invalid input."
@@ -53,6 +55,7 @@ def commondice(dicename) -> str:
                 ans += str(ansint[i])
         ans += " = "+str(int(sum(ansint)))
         return ans
+
     dicess = dicename.split('+')
     ansint: List[int] = []
     for i in range(len(dicess)):

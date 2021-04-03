@@ -78,11 +78,6 @@ def updateinitgroup(update: Update) -> Optional[Group]:
     return initgroup(gpid)
 
 
-def renewgroup(update: Update) -> None:
-    gp = dicebot.forcegetgroup(update)
-    gp.renew(dicebot.updater)
-
-
 def __getplayer(plid: Union[int, Update]) -> Optional[Player]:
     return dicebot.getplayer(plid)
 
@@ -104,11 +99,6 @@ def updateinitplayer(update: Update) -> Optional[Player]:
     return initplayer(plid)
 
 
-def renewplayer(update: Update) -> None:
-    pl = __forcegetplayer(update)
-    pl.renew(dicebot.updater)
-
-
 def chatinit(update: Update) -> Union[Player, Group, None]:
     """所有指令使用前调用该函数"""
     if isprivatemsg(update):
@@ -117,10 +107,6 @@ def chatinit(update: Update) -> Union[Player, Group, None]:
         initplayer(getmsgfromid(update))
         return updateinitgroup(update)
     return None
-
-
-def __getcard(cdid: int) -> Optional[GameCard]:
-    return dicebot.getcard(cdid)
 
 
 # 卡片相关：查 增 删
@@ -163,36 +149,6 @@ def cardadd(card: GameCard, gpid: int) -> bool:
     return True
 
 
-# def getcard(gpid: int, cdid: int) -> Optional[GameCard]:
-#     gp = __getgp(gpid)
-#     if not gp:
-#         return None
-#     card = gp.getcard(cdid)
-#     if not card:
-#         return None
-#     return card
-
-
-def gamecardadd(card: GameCard, gpid: int) -> bool:
-    """向游戏内添加一张卡，当卡id重复时返回False"""
-    gp = __forcegetgroup(gpid)
-    if card.id not in gp.cards or card.id in gp.game.cards:
-        return False
-    # 增加群索引
-
-    card.group = gp
-    card.groupid = gpid
-    gp.game.cards[card.id] = card
-    gp.write()
-    # 增加pl索引
-
-    pl = __forcegetplayer(card.playerid)
-    pl.gamecards[card.id] = card
-    card.player = pl
-    pl.write()
-    return True
-
-
 # operation 查增删
 def addOP(chatid: int, op: str) -> None:
     dicebot.operation[chatid] = op
@@ -227,13 +183,9 @@ SKILL_PAGES = createSkillPages(dicebot.skilllist)
 # id相关
 
 
-def getallid() -> List[int]:
-    return dicebot.allids()
-
-
 def getnewids(n: int) -> List[int]:
     """获取n个新的卡id，这些id尽可能小"""
-    ids = getallid()
+    ids = dicebot.allids
     ans: List[int] = []
     nid = 0
     for _ in range(n):
@@ -364,6 +316,13 @@ def findgame(gpid: int) -> Optional[GroupGame]:
     if not gp:
         return None
     return gp.game
+
+
+def findexistgame(gpid: int) -> Optional[GroupGame]:
+    gp = __getgp(gpid)
+    if not gp:
+        return None
+    return gp.getexistgame()
 
 
 def findcardfromgame(game: GroupGame, pl: Player) -> GameCard:
@@ -510,8 +469,9 @@ def findattrindict(d: dict, key: str) -> dict:
     搜索子字典时，如果`key`不是`global`，忽略`tempstatus`对应的字典。"""
     if key in d:
         return d
+
     for k1 in d:
-        if not isinstance(d[k1], dict) or (k1 == "tempstatus" and key != "global"):
+        if not isinstance(d[k1], dict) or (k1 == "tempstatus" and key != "GLOBAL"):
             continue
         t = findattrindict(d[k1], key)
         if t:
@@ -834,7 +794,7 @@ def cgintskill(skillname: str, skillvalue: int, card1: GameCard, update: Update)
     return True
 
 
-def addcredit(update: Update, context: CallbackContext, card1: GameCard) -> bool:
+def addcredit(update: Update, card1: GameCard) -> bool:
     update.message.reply_text("请先设置信用！")
     gp = card1.group
     if card1.info.job in dicebot.joblist:
@@ -876,7 +836,7 @@ def cgcredit(update: Update, card1: GameCard) -> bool:
 def showskillpages(page: int, card1: GameCard) -> Tuple[str, List[List[InlineKeyboardButton]]]:
     IDENTIFIER = dicebot.IDENTIFIER
     thispageskilllist = SKILL_PAGES[page]
-    rttext = "添加/修改兴趣技能，目前的数值/基础值如下："
+    rttext = f"添加/修改兴趣技能，剩余点数：{str(card1.interest.points)}。目前的数值/基础值如下："
     rtbuttons = [[]]
     for key in thispageskilllist:
         if key in card1.skill.allskills() or key in card1.suggestskill.allskills():
@@ -972,6 +932,8 @@ def buttonaddmainskill(query: CallbackQuery, card1: GameCard, args: List[str]) -
         query.edit_message_text(
             text="主要技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.skill.points))
         card1.group.write()
+        if card1.skill.points or card1.interest.points:
+            addskill0(card1)
         return True
 
     m = getskilllevelfromdict(card1, args[1])
@@ -995,6 +957,8 @@ def buttoncgmainskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -
         query.edit_message_text(
             text="主要技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.skill.points))
         card1.group.write()
+        if card1.skill.points or card1.interest.points:
+            addskill0(card1)
         return True
 
     m = getskilllevelfromdict(card1, args[1])
@@ -1018,7 +982,10 @@ def buttonaddsgskill(query: CallbackQuery,  card1: Optional[GameCard], args: Lis
             text="主要技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.skill.points))
         card1.suggestskill.pop(args[1])
         card1.group.write()
+        if card1.skill.points or card1.interest.points:
+            addskill0(card1)
         return True
+
     m = getskilllevelfromdict(card1, args[1])
     mm = skillmaxval(args[1], card1, True)
     rtbuttons = makeIntButtons(m, mm, args[0], args[1])
@@ -1046,6 +1013,8 @@ def buttonaddintskill(query: CallbackQuery,  card1: Optional[GameCard], args: Li
         query.edit_message_text(
             text="兴趣技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.interest.points))
         card1.group.write()
+        if card1.skill.points or card1.interest.points:
+            addskill0(card1)
         return True
     m = getskilllevelfromdict(card1, args[1])
     mm = skillmaxval(args[1], card1, False)
@@ -1067,7 +1036,10 @@ def buttoncgintskill(query: CallbackQuery, card1: Optional[GameCard], args: List
         query.edit_message_text(
             text="兴趣技能："+args[1]+"的值现在是"+str(skvalue)+"。剩余技能点："+str(card1.interest.points))
         card1.group.write()
+        if card1.skill.points or card1.interest.points:
+            addskill0(card1)
         return True
+
     m = getskilllevelfromdict(card1, args[1])
     mm = skillmaxval(args[1], card1, False)
     rtbuttons = makeIntButtons(m, mm, args[0], args[1])
@@ -1256,12 +1228,13 @@ def changecardgpid(oldgpid: int, newgpid: int) -> bool:
 
 def groupcopy(oldgpid: int, newgpid: int, copyall: bool) -> bool:
     """copyall为False则只复制NPC卡片"""
-    if findgame(oldgpid) or findgame(newgpid):
+    if findexistgame(oldgpid) is not None or findexistgame(newgpid) is not None:
         return False
+
     oldgp = __forcegetgroup(oldgpid)
     srclist: List[GameCard] = []
     for card in oldgp.cards.values():
-        if not copyall and (card.type != "PL" or (card.group.kp is not None and card.playerid == card.group.kp.id)):
+        if not copyall and card.type == "PL":
             continue
         srclist.append(card)
 
@@ -1284,12 +1257,13 @@ def groupcopy(oldgpid: int, newgpid: int, copyall: bool) -> bool:
     return True
 
 
-def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool:
+def addskill0(card1: GameCard) -> bool:
     """表示指令/addskill 中没有参数的情况。
     创建技能按钮来完成技能的添加。
-
     因为兴趣技能过多，使用可以翻页的按钮列表。"""
     rtbuttons = [[]]
+    card1.player.renew(dicebot.updater)
+    pl = card1.player
     # If card1.skill.points is 0, turn to interest.
     # Then it must be main skill. After all main skills are added, add interest skills.
     if card1.skill.points > 0:
@@ -1303,8 +1277,8 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
                 rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys +
                                                                         ": "+str(card1.skill.get(keys)), callback_data=dicebot.IDENTIFIER+" "+"cgmainskill "+keys))
             rp_markup = InlineKeyboardMarkup(rtbuttons)
-            update.message.reply_text("剩余点数："+str(
-                card1.skill.points)+"\n请选择一项主要技能用于增加技能点", reply_markup=rp_markup)
+            dicebot.sendto(pl, "剩余点数："+str(
+                card1.skill.points)+"\n请选择一项主要技能用于增加技能点", rpmarkup=rp_markup)
             return True
         # GOOD TRAP: addsgskill
         for keys in card1.suggestskill.allskills():
@@ -1313,17 +1287,18 @@ def addskill0(update: Update, context: CallbackContext, card1: GameCard) -> bool
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys+": " +
                                                                     str(card1.suggestskill.get(keys)), callback_data=dicebot.IDENTIFIER+" "+"addsgskill "+keys))
         rp_markup = InlineKeyboardMarkup(rtbuttons)
-        update.message.reply_text("剩余点数："+str(
-            card1.skill.points)+"\n请选择一项主要技能", reply_markup=rp_markup)
+        dicebot.sendto(pl, "剩余点数："+str(
+            card1.skill.points)+"\n请选择一项主要技能", rpmarkup=rp_markup)
         return True
     # turn to interest.
     if card1.interest.points <= 0:  # HIT BAD TRAP
-        return errorHandler(update, "你已经没有多余的点数了，如果需要重新设定某项具体技能的点数，用 '/addskill 技能名'")
+        dicebot.sendto(pl, "你已经没有多余的点数了，如果需要重新设定某项具体技能的点数，用 '/addskill 技能名'")
+        return False
     # GOOD TRAP: add interest skill.
     # 显示第一页，每个参数后面带一个当前页码标记
     rttext, rtbuttons = showskillpages(0, card1)
     rp_markup = InlineKeyboardMarkup(rtbuttons)
-    update.message.reply_text(rttext, reply_markup=rp_markup)
+    dicebot.sendto(pl, rttext, rpmarkup=rp_markup)
     return True
 
 
@@ -1708,7 +1683,7 @@ def getnewcard(msgid: int, gpid: int, plid: int, cdid: int = -1) -> bool:
     """指令`/newcard`的具体实现"""
     gp = __forcegetgroup(gpid)
     new_card, detailmsg = generateNewCard(plid, gpid)
-    allids = getallid()
+    allids = dicebot.allids
     if cdid >= 0 and cdid not in allids:
         new_card.id = cdid
     else:
