@@ -2,21 +2,26 @@
 import copy
 import json
 from inspect import isfunction
-from io import TextIOWrapper
 import os
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from telegram import Bot, Chat
+from telegram import Chat
 from telegram.ext.updater import Updater
 from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
 from telegram.inline.inlinekeyboardmarkup import InlineKeyboardMarkup
-from telegram.replymarkup import ReplyMarkup
 
-from cfg import PATH_CARDS, PATH_GAME_CARDS, PATH_GROUPS, PATH_PLAYERS
+from cfg import PATH_CARDS, PATH_GAME_CARDS, PATH_GROUPS, PATH_PLAYERS, PATH_SKILLDICT
 from dicefunc import *
 
 __MAIN = "主要"
 __INT = "兴趣"
+PLTYPE = "PL"
+NPCTYPE = "NPC"
+
+__skd: List[str]
+
+with open(PATH_SKILLDICT, 'r', encoding='utf-8') as f:
+    __skd = list(json.load(f).keys())
 
 
 def istrueconsttype(val) -> bool:
@@ -98,29 +103,53 @@ class datatype:
 
         return "找不到该属性"
 
-    def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
+    def modify(self, attr: str, val: str, jumpkey: List[str] = []) -> Tuple[str, bool]:
         """向下查找成员attr并修改其值为val，忽略jumpkey中的成员。如果val类型和原本类型（不是None）不相同，则抛出TypeError"""
         if hasattr(self, attr):
-            if not isinstance(val, list) and istrueconsttype(val) and (type(val) == type(self.__dict__[attr]) or self.__dict__[attr] is None):
+            if not istrueconsttype(self.__dict__[attr]):
+                raise TypeError("成员"+attr+"类型是无法修改的类型")
+
+            if attr in jumpkey:
+                raise TypeError("该属性不支持修改")
+
+            if isinstance(self.__dict__[attr], int):
+                if not isint(val):
+                    raise TypeError("给定参数不是int")
+
                 rttext = str(self.__dict__[attr])
+                self.__dict__[attr] = int(val)
+
+            elif isinstance(self.__dict__[attr], bool):
+                rttext = str(self.__dict__[attr])
+                if val in ["F", "false", "False", "假"]:
+                    self.__dict__[attr] = False
+                elif val in ["T", "true", "True", "真"]:
+                    self.__dict__[attr] = True
+                else:
+                    raise TypeError("给定参数无法识别为bool")
+
+            else:
+                # str
+                rttext = self.__dict__[attr]
                 self.__dict__[attr] = val
-                if hasattr(self, "write") and isfunction(self.write):
-                    self.write()
-                return rttext, True
-            raise TypeError("成员"+attr+"类型与修改目标值不符")
+
+            if hasattr(self, "write") and isfunction(self.write):
+                self.write()
+            return rttext, True
 
         # 向下查找递归调用modify()
         for key in iter(self.__dict__):
-            val = self.__dict__[key]
             if key in jumpkey:
                 continue
-            if isinstance(val, datatype):
-                rttext, ok = val.modify(attr, val)  # 使用下一级的默认参数
+
+            v = self.__dict__[key]
+            if isinstance(v, datatype):
+                rttext, ok = v.modify(attr, val)  # 使用下一级的默认参数
                 if ok:
                     if hasattr(self, "write") and isfunction(self.write):
                         self.write()
                     return rttext, True
-        return "找不到成员："+attr, False
+        return "", False  # 支持重载，返回False不一定代表找不到
 
 
 class GameCard(datatype):
@@ -202,10 +231,33 @@ class GameCard(datatype):
     def show(self, attr: str, jumpkey: List[str] = ["group", "player", "tempstatus"]) -> str:
         return super().show(attr, jumpkey=jumpkey)
 
-    def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
-        return self.tempstatus.modify(attr, val) if attr == "GLOBAL" else super().modify(attr, val, jumpkey="tempstatus")
+    def modify(self, attr: str, val: str, jumpkey: List[str] = ["player", "playerid", "group", "groupid", "id", "tempstatus"]) -> Tuple[str, bool]:
+        if attr == "points":
+            return "需指明为mainpoints或intpoints", False
+        if attr == "mainpoints":
+            return self.skill.modify("points", val)
+        if attr == "intpoints":
+            return self.interest.modify("points", val)
+        return super().modify(attr, val, jumpkey=jumpkey)
 
-    def __str__(self):
+    def basicinfo(self) -> str:
+        rttext: str = ""
+        rttext += "角色卡id: "+str(self.id)+"\n"
+        rttext += "playerid: "+str(self.playerid)+"\n"
+        rttext += "groupid: "+str(self.groupid)+"\n"
+
+        rttext += "基础数值: "+"\n"
+        rttext += str(self.data)+"\n"
+
+        rttext += "信息: "+"\n"
+        rttext += str(self.info)+"\n"
+
+        rttext += "其他属性: "+"\n"
+        rttext += str(self.attr)+"\n"
+
+        return rttext
+
+    def __str__(self) -> str:
         rttext: str = ""
 
         rttext += "角色卡id: "+str(self.id)+"\n"
@@ -270,6 +322,12 @@ class GameCard(datatype):
         self.item = []
         self.assets: str = ""
         self.write()
+
+    def hasstatus(self, attr: str) -> bool:
+        return self.tempstatus.hasstatus(attr)
+
+    def getstatus(self, attr: str) -> bool:
+        return self.tempstatus.getstatus(attr)
 
     def cardConstruct(self):
         self.data.card = self
@@ -606,8 +664,10 @@ class CardData(datatype):
     def show(self, attr: str, jumpkey: List[str] = ["card"]) -> str:
         return super().show(attr, jumpkey=jumpkey)
 
-    def modify(self, attr: str, val, jumpkey: List[str] = ["card"]) -> Tuple[str, bool]:
-        return super().modify(attr, val, jumpkey=jumpkey)
+    def modify(self, attr: str, val, jumpkey: List[str] = ["card", "TOTAL", "datainfo", "__datanames", "alldatanames", "datadec"]) -> Tuple[str, bool]:
+        ans = super().modify(attr, val, jumpkey=jumpkey)
+        self.total()
+        return ans
 
     def getdata(self, dataname: str) -> int:
         if dataname not in self.alldatanames:
@@ -620,6 +680,7 @@ class CardData(datatype):
             self.TOTAL += self.__dict__[key]
         if self.datadec is not None:
             self.TOTAL += self.datadec[1]
+        self.write()
         return self.TOTAL
 
     def randdata(self) -> None:
@@ -692,6 +753,8 @@ class CardStatus(datatype):
 
             if self.__dict__[key] != 0:
                 if key == "GLOBAL":
+                    if self.GLOBAL == 0:
+                        continue
                     rttext += "全局修正："+str(self.GLOBAL)
                 else:
                     rttext += key+"修正："+str(self.__dict__[key])
@@ -699,15 +762,18 @@ class CardStatus(datatype):
         return rttext if rttext != "" else "没有检定修正"
 
     def modify(self, attr: str, val, jumpkey: List[str] = []) -> Tuple[str, bool]:
-        if attr != "GLOBAL":
-            return "CardStatus实例不可以使用modify()修改一般成员", False
-        super().modify("GLOBAL", val)
+        return "CardStatus实例不可以使用modify()修改一般成员", False
 
-    def changestatus(self, attr: str, addval: int) -> bool:
-        if attr not in self.__dict__:
-            self.__dict__[attr] = addval
-        else:
-            self.__dict__[attr] += addval
+    def hasstatus(self, attr: str) -> bool:
+        return hasattr(self, attr) and isinstance(self.__dict__[attr], int)
+
+    def getstatus(self, attr: str) -> int:
+        return self.__dict__[attr]
+
+    def setstatus(self, attr: str, val: int) -> bool:
+        if hasattr(self, attr) and not isinstance(self.__dict__[attr], int):
+            raise TypeError(f"CardStatus属性：{attr}不是可修改的int类型")
+        self.__dict__[attr] = val
         return True
 
 
@@ -755,8 +821,16 @@ class skilltype(datatype):  # skill的基类，只包含一个属性skills
     def set(self, skillname: str, val: int) -> None:
         self.skills[skillname] = val
 
-    def modify(self, attr: str, val, jumpkey: List[str]) -> Tuple[str, bool]:
-        return "", False  # 这里没有可修改的成员
+    def modify(self, attr: str, val: str, jumpkey: List[str] = []) -> Tuple[str, bool]:
+        if attr in __skd:
+            if not isint(val):
+                raise TypeError("技能值不是int")
+            ans = (str(self.skills[attr]),
+                   True) if attr in self.skills else ("无", True)
+            self.skills[attr] = int(val)
+            return ans
+
+        return "没有该技能", False
 
     def allskills(self) -> Iterator[str]:
         return iter(self.skills)
@@ -769,6 +843,23 @@ class Skill(skilltype):
         self.type: str = __MAIN
         if len(d) > 0:
             self.read_json(d=d)
+
+    def show(self, attr: str, jumpkey: List[str] = []) -> str:
+        if attr == "points":
+            return str(self.points)
+        if attr in self.skills:
+            return str(self.skills[attr])
+        return "找不到该属性"
+
+    def modify(self, attr: str, val: str, jumpkey: List[str] = []) -> Tuple[str, bool]:
+        if attr == "points":
+            ans = (str(self.points), True)
+            if not isint(val):
+                raise TypeError("点数值不是int")
+            self.points = int(val)
+            return ans
+
+        return super().modify(attr, val, jumpkey=jumpkey)
 
     def check(self) -> str:
         if self.points < 0:
@@ -792,6 +883,9 @@ class SgSkill(skilltype):
         super().__init__()
         if len(d) > 0:
             self.read_json(d=d)
+
+    def show(self, attr: str, jumpkey: List[str] = []) -> str:
+        return str(self.skills[attr]) if attr in self.skills else "找不到该属性"
 
     def pop(self, skillname: str) -> int:
         if skillname not in self.skills:

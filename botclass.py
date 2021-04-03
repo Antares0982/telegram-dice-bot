@@ -277,8 +277,12 @@ class DiceBot:
     def addcard(self, card: GameCard) -> bool:
         """添加一张游戏外的卡，当卡id重复时返回False"""
         assert(not card.isgamecard)
+
         if card.id in self.allids:
             raise ValueError("添加卡时，id重复")
+
+        # 维护dicebot
+        self.cards[card.id] = card
         # 增加id
         self.allids.append(card.id)
         self.allids.sort()
@@ -291,9 +295,11 @@ class DiceBot:
         pl = self.forcegetplayer(card.playerid)
         pl.cards[card.id] = card
         card.player = pl
+
         if pl.controlling:
             self.autoswitchhint(pl.id)
         pl.controlling = card
+
         pl.write()
         card.write()
         return True
@@ -319,6 +325,35 @@ class DiceBot:
         self.allids.pop(self.allids.index(cdid))
         card.delete()
         return card
+
+    def addgamecard(self, card: GameCard) -> bool:
+        # 排查
+        assert(card.isgamecard)
+
+        if card.id in self.gamecards:
+            raise ValueError("添加游戏卡时，id重复")
+
+        gp = self.forcegetgroup(card.groupid)
+        if gp.game is None and gp.pausedgame is None:
+            raise ValueError("没有对应的游戏")
+
+        assert(gp.game is None or gp.pausedgame is None)
+
+        # 维护dicebot
+        self.gamecards[card.id] = card
+        # 不考虑allids的问题
+        # 维护群、游戏
+        game = gp.game if gp.game is not None else gp.pausedgame
+        game.cards[card.id] = card
+        card.group = gp
+        gp.write()
+        # 维护Player
+        pl = self.forcegetplayer(card.playerid)
+        card.player = pl
+        pl.gamecards[card.id] = card
+
+        pl.write()
+        card.write()
 
     def popgamecard(self, cdid: int) -> GameCard:
         if self.getgamecard(cdid) is None:

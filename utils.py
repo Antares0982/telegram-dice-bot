@@ -292,6 +292,7 @@ def findcardwithid(cdid: int) -> Optional[GameCard]:
 
 
 def getreplyplayer(update: Update) -> Optional[Player]:
+    """如果有回复的人，调用forcegetplayer获取玩家信息，否则返回None"""
     if isprivatemsg(update):
         return dicebot.forcegetplayer(update)
     if isgroupmsg(update):
@@ -365,20 +366,31 @@ def findgame(gpid: int) -> Optional[GroupGame]:
     return gp.game
 
 
-def findcardfromgame(game: GroupGame, plid: int) -> GameCard:
+def findcardfromgame(game: GroupGame, pl: Player) -> GameCard:
     """从`game`中返回对应的`plid`的角色卡"""
-    for i in dicebot.forcegetplayer(plid).gamecards.values():
+    for i in pl.gamecards.values():
         if i.group == game.group:
             return i
     return None
 
 
-def findcardfromgamewithid(game: GroupGame, cdid: int) -> GameCard:
-    """从`game`中返回`id`为`cdid`的角色卡"""
-    for i in game.cards.values():
-        if i.id == cdid:
+@overload
+def findcardfromgroup(gp: Group, pl: Player) -> Optional[GameCard]:
+    """返回pl在gp中的其中一张卡，无法返回多张卡"""
+    for i in pl.cards.values():
+        if i.group == gp:
             return i
     return None
+
+
+@overload
+def findcardfromgroup(pl: Player, gp: Group) -> Optional[GameCard]:
+    return findcardfromgroup(gp, pl)
+
+
+def findcardfromgamewithid(game: GroupGame, cdid: int) -> GameCard:
+    """从`game`中返回`id`为`cdid`的角色卡"""
+    return game.cards[cdid] if cdid in game.cards else None
 
 
 def findAllDiscardCards(pl: Player) -> List[GameCard]:
@@ -2015,17 +2027,17 @@ def checkaccess(pl: Player, card: GameCard) -> int:
     if card.id in pl.cards or card.id in pl.gamecards:
         f |= CANREAD | OWNCARD
 
-    if f & OWNCARD == 0:
-        if card.type == "PL" and checkaccess(pl, card.group) & INGROUP != 0:
+    if not f & OWNCARD:
+        if card.type == "PL" and checkaccess(pl, card.group) & INGROUP:
             f |= CANREAD
 
-    if f & OWNCARD != 0 and (not card.isgamecard or card.group.game is None):
+    if f & OWNCARD and not card.isgamecard and card.group.game is None:
         f |= CANSETINFO
 
-    if f & OWNCARD != 0 and card.groupid == -1 or (card.discard and not card.isgamecard and card.id not in dicebot.gamecards):
+    if f & OWNCARD and (card.groupid == -1 or (card.discard and not card.isgamecard and card.id not in dicebot.gamecards)):
         f |= CANDISCARD
 
-    if card.group.kp is not None and card.group.kp == pl:
+    if (card.group.kp is not None and card.group.kp == pl) or pl.id == ADMIN_ID:
         f |= CANMODIFY
 
     return f

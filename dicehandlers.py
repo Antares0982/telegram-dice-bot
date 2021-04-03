@@ -2,9 +2,10 @@
 # only define handlers
 
 import copy
+from numpy.core.fromnumeric import argmax
+from numpy.core.getlimits import _register_type
 from telegram.callbackquery import CallbackQuery
-from basicfunc import errorHandler
-from gameclass import CardBackground, GameCard, Group, GroupGame
+from gameclass import CardBackground, GameCard, Group, GroupGame, PLTYPE, NPCTYPE, Player
 import time
 from typing import Dict, List, Optional, Tuple
 
@@ -1418,58 +1419,75 @@ def switchgamecard(update: Update, context: CallbackContext):
 
 def showmycards(update: Update, context: CallbackContext) -> bool:
     """显示自己所持的卡。群聊时发送所有在本群可显示的卡片。私聊时发送所有卡片。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     pl = dicebot.forcegetplayer(update)
     if len(pl.cards) == 0:
-        return utils.errorHandler(update, "找不到卡。")
+        return utils.errorHandler(update, "你没有任何卡。")
 
     if utils.isgroupmsg(update):
         # 群消息，只发送本群的卡
         gp = dicebot.forcegetgroup(update)
-        rttext = ""
-        for card in pl.cards.values():
-            if card.group != gp:
-                continue
-            rttext += str(card.id)+": "+card.getname()+"\n"
+        rttexts: List[str] = []
 
-        if rttext == "":
+        for card in pl.cards.values():
+            if card.group != gp or card.type != PLTYPE:
+                continue
+            rttexts.append(str(card))
+
+        if len(rttexts) == 0:
             return utils.errorHandler(update, "找不到本群的卡。")
-        update.message.reply_text(rttext)
+
+        for x in rttexts:
+            update.message.reply_text(x)
+            time.sleep(0.2)
         return True
+
     # 私聊消息，发送全部卡
-    rttext = ""
     for card in pl.cards.values():
-        rttext += "群id "+str(card.groupid)+" 卡id " + \
-            str(card.id)+":\n"+card.getname()+"\n"
-    update.message.reply_text(rttext)
+        update.message.reply_text(str(card))
+        time.sleep(0.2)
     return True
 
 
 def tempcheck(update: Update, context: CallbackContext):
     """增加一个临时的检定修正。该指令只能在游戏中使用。
     `/tempcheck --tpcheck`只能用一次的检定修正。使用完后消失
-    `/tempcheck --tpcheck --cardid --dicename`对某张卡，持久生效的检定修正"""
+    `/tempcheck --tpcheck --cardid --dicename`对某张卡，持久生效的检定修正。
+    如果需要对这张卡全部检定都有修正，dicename参数请填大写单词`GLOBAL`。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if len(context.args) == 0:
         return utils.errorHandler(update, "没有参数", True)
-    if utils.getchatid(update) > 0:
+    if not utils.isgroupmsg(update):
         return utils.errorHandler(update, "在群里设置临时检定")
     if not utils.isint(context.args[0]):
         return utils.errorHandler(update, "临时检定修正应当是整数", True)
-    game = utils.findgame(utils.getchatid(update))
-    if not game:
+
+    gp = dicebot.forcegetgroup(update)
+    game = gp.game if gp.game is not None else gp.pausedgame
+    if game is None:
         return utils.errorHandler(update, "没有进行中的游戏", True)
-    if utils.getkpid(utils.getchatid(update)) != utils.getmsgfromid(update):
+    if game.kp != dicebot.forcegetplayer(update):
         return utils.errorHandler(update, "KP才可以设置临时检定", True)
+
     if len(context.args) >= 3 and utils.isint(context.args[1]) and 0 <= int(context.args[1]):
-        card = utils.findcardfromgamewithid(game, int(context.args[1]))
-        if not card:
-            return utils.errorHandler(update, "找不到这张卡", True)
-        card.tempstatus[context.args[2]] = int(context.args[0])
+        card = dicebot.getgamecard(int(context.args[1]))
+        if card is None or card.group != gp:
+            return utils.errorHandler(update, "找不到这张卡")
+
+        card.tempstatus.setstatus(context.args[2], int(context.args[0]))
+        card.write()
         update.message.reply_text(
-            "新增了对id为"+context.args[1]+"卡的检定修正\n修正项："+context.args[2]+"修正值："+context.args[0])
+            "新增了对id为"+context.args[1]+"卡的检定修正\n修正项："+context.args[2]+"，修正值："+context.args[0])
     else:
         game.tpcheck = int(context.args[0])
         update.message.reply_text("新增了仅限一次的全局检定修正："+context.args[0])
-    utils.writegameinfo(utils.ON_GAME)
+        game.write()
     return True
 
 
@@ -1477,7 +1495,7 @@ def roll(update: Update, context: CallbackContext):
     """基本的骰子功能。
 
     只接受第一个空格前的参数`dicename`。
-    `dicename`可能是技能名，可能是`3d6`，可能是`1d4+2d10`。
+    `dicename`可能是技能名、属性名（仅限游戏中），可能是`3d6`，可能是`1d4+2d10`。
     骰子环境可能是游戏中，游戏外。
 
     `/roll`：默认1d100。
@@ -1489,290 +1507,370 @@ def roll(update: Update, context: CallbackContext):
     如果要进行一个暗骰，可以输入
     `/roll 暗骰`进行一次检定为50的暗骰，或者
     `/roll 暗骰60`进行一次检定为60的暗骰。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if len(context.args) == 0:
         update.message.reply_text(utils.commondice("1d100"))  # 骰1d100
         return True
+
     dicename = context.args[0]
-    gpid = utils.getchatid(update)
-    if utils.isgroupmsg(update):  # Group msg
-        utils.initrules(gpid)
-        game = utils.findgame(gpid)
-        # 检查输入参数是不是一个基础骰子，如果是则直接计算骰子
-        if not game or dicename.find('d') >= 0:
-            rttext = utils.commondice(dicename)
-            if rttext == "Invalid input.":
-                return utils.errorHandler(update, "无效输入")
-            update.message.reply_text(rttext)
-            return True
-        # 确认不是基础骰子的计算，转到卡检定
-        # 获取临时检定
-        tpcheck, game.tpcheck = game.tpcheck, 0
-        if tpcheck != 0:
-            utils.writegameinfo(utils.ON_GAME)
-        senderid = utils.getmsgfromid(update)
-        gpid = utils.getchatid(update)
-        # 获取卡
-        if senderid != utils.getkpid(gpid):
-            gamecard = utils.findcardfromgame(game, senderid)
-        else:
-            gamecard = utils.getkpctrl(game)
-        if not gamecard:
-            return utils.errorHandler(update, "找不到游戏中的卡。")
-        # 找卡完成，开始检定
-        test = 0
-        if dicename in gamecard.skill:
-            test = gamecard.skill[dicename]
-        elif dicename in gamecard.interest:
-            test = gamecard.interest[dicename]
-        elif dicename == "母语":
-            test = gamecard.data.EDU
-        elif dicename == "闪避":
-            test = gamecard.data.DEX//2
-        elif dicename in gamecard.data:
-            test = gamecard.data[dicename]
-        elif dicename == "力量":
-            dicename = "STR"
-            test = gamecard.data[dicename]
-        elif dicename == "体质":
-            dicename = "CON"
-            test = gamecard.data[dicename]
-        elif dicename == "体型":
-            dicename = "SIZ"
-            test = gamecard.data[dicename]
-        elif dicename == "敏捷":
-            dicename = "DEX"
-            test = gamecard.data[dicename]
-        elif dicename == "外貌":
-            dicename = "APP"
-            test = gamecard.data[dicename]
-        elif dicename == "智力" or dicename == "灵感":
-            dicename = "INT"
-            test = gamecard.data[dicename]
-        elif dicename == "意志":
-            dicename = "POW"
-            test = gamecard.data[dicename]
-        elif dicename == "教育":
-            dicename = "EDU"
-            test = gamecard.data[dicename]
-        elif dicename == "幸运":
-            dicename = "LUCK"
-            test = gamecard.data[dicename]
-        elif dicename in utils.SKILL_DICT:
-            test = utils.SKILL_DICT[dicename]
-        elif dicename[:2] == "暗骰" and (utils.isint(dicename[2:]) or len(dicename) == 2):
-            if len(dicename) != 2:
-                test = int(dicename[2:])
-            else:
-                test = 50
-        else:  # HIT BAD TRAP
-            return utils.errorHandler(update, "无效输入")
-        if "global" in gamecard.tempstatus:
-            test += gamecard.tempstatus.GLOBAL
-        if dicename in gamecard.tempstatus:
-            test += gamecard.tempstatus[dicename]
-        test += tpcheck
-        testval = utils.dicemdn(1, 100)[0]
-        rttext = dicename+" 检定/出目："+str(test)+"/"+str(testval)+" "
-        greatsuccessrule = utils.GROUP_RULES[gpid].greatsuccess
-        greatfailrule = utils.GROUP_RULES[gpid].greatfail
-        if (test < 50 and testval >= greatfailrule[2] and testval <= greatfailrule[3]) or (test >= 50 and testval >= greatfailrule[0] and testval <= greatfailrule[1]):
-            rttext += "大失败"
-        elif (test < 50 and testval >= greatsuccessrule[2] and testval <= greatsuccessrule[3]) or (test >= 50 and testval >= greatsuccessrule[0] and testval <= greatsuccessrule[1]):
-            rttext += "大成功"
-        elif testval > test:
-            rttext += "失败"
-        elif testval > test//2:
-            rttext += "普通成功"
-        elif testval > test//5:
-            rttext += "困难成功"
-        else:
-            rttext += "极难成功"
-        if dicename == "心理学" or dicename[:2] == "暗骰":
-            if utils.getkpid(gpid) == -1:
-                return utils.errorHandler(update, "本群没有KP！请先添加一个KP再试！！")
-            update.message.reply_text(dicename+" 检定/出目："+str(test)+"/???")
-            context.bot.send_message(
-                chat_id=utils.getkpid(gpid), text=rttext)
-        else:
-            update.message.reply_text(rttext)
+
+    if utils.isprivatemsg(update):
+        update.message.reply_text(utils.commondice(dicename))
         return True
-    rttext = utils.commondice(dicename)  # private msg
-    update.message.reply_text(rttext)
-    if rttext == "Invalid input.":
-        return False
+
+    gp = dicebot.forcegetgroup(update)
+
+    # 检查输入参数是不是一个基础骰子，如果是则直接计算骰子
+    if gp.game is None or dicename.find('d') >= 0 or utils.isint(dicename):
+        if utils.isint(dicename) and dicename > 0:
+            dicename = "1d"+dicename
+        rttext = utils.commondice(dicename)
+        if rttext == "Invalid input.":
+            return utils.errorHandler(update, "输入无效")
+        update.message.reply_text(rttext)
+        return True
+
+    if gp.game is None:
+        return utils.errorHandler(update, "输入无效")
+    # 确认不是基础骰子的计算，转到卡检定
+    # 获取临时检定
+    tpcheck, gp.game.tpcheck = gp.game.tpcheck, 0
+    if tpcheck != 0:
+        gp.write()
+
+    pl = dicebot.forcegetplayer(update)
+
+    # 获取卡
+    if pl != gp.kp:
+        gamecard = utils.findcardfromgame(gp.game, pl)
+    else:
+        gamecard = gp.game.kpctrl
+        if gamecard is None:
+            return utils.errorHandler(update, "请用switchgamecard切换kp要用的卡")
+    if not gamecard:
+        return utils.errorHandler(update, "找不到游戏中的卡。")
+    # 找卡完成，开始检定
+    test = 0
+
+    if dicename in gamecard.skill.allskills():
+        test = gamecard.skill.get(dicename)
+    elif dicename in gamecard.interest.allskills():
+        test = gamecard.interest.get(dicename)
+    elif dicename == "母语":
+        test = gamecard.data.EDU
+    elif dicename == "闪避":
+        test = gamecard.data.DEX//2
+
+    elif dicename in gamecard.data.alldatanames:
+        test = gamecard.data.__dict__[dicename]
+    elif dicename == "力量":
+        dicename = "STR"
+        test = gamecard.data.STR
+    elif dicename == "体质":
+        dicename = "CON"
+        test = gamecard.data.CON
+    elif dicename == "体型":
+        dicename = "SIZ"
+        test = gamecard.data.SIZ
+    elif dicename == "敏捷":
+        dicename = "DEX"
+        test = gamecard.data.DEX
+    elif dicename == "外貌":
+        dicename = "APP"
+        test = gamecard.data.APP
+    elif dicename == "智力" or dicename == "灵感":
+        dicename = "INT"
+        test = gamecard.data.INT
+    elif dicename == "意志":
+        dicename = "POW"
+        test = gamecard.data.POW
+    elif dicename == "教育":
+        dicename = "EDU"
+        test = gamecard.data.EDU
+    elif dicename == "幸运":
+        dicename = "LUCK"
+        test = gamecard.data.LUCK
+
+    elif dicename in dicebot.skilllist:
+        test = dicebot.skilllist[dicename]
+
+    elif dicename[:2] == "暗骰" and (utils.isint(dicename[2:]) or len(dicename) == 2):
+        if len(dicename) != 2:
+            test = int(dicename[2:])
+        else:
+            test = 50
+
+    else:  # HIT BAD TRAP
+        return utils.errorHandler(update, "输入无效")
+
+    # 将所有检定修正相加
+    test += gamecard.tempstatus.GLOBAL
+    if gamecard.hasstatus(dicename):
+        test += gamecard.getstatus(dicename)
+    test += tpcheck
+
+    testval = utils.dicemdn(1, 100)[0]
+    rttext = dicename+" 检定/出目："+str(test)+"/"+str(testval)+" "
+
+    greatsuccessrule = gp.rule.greatsuccess
+    greatfailrule = gp.rule.greatfail
+
+    if (test < 50 and testval >= greatfailrule[2] and testval <= greatfailrule[3]) or (test >= 50 and testval >= greatfailrule[0] and testval <= greatfailrule[1]):
+        rttext += "大失败"
+    elif (test < 50 and testval >= greatsuccessrule[2] and testval <= greatsuccessrule[3]) or (test >= 50 and testval >= greatsuccessrule[0] and testval <= greatsuccessrule[1]):
+        rttext += "大成功"
+    elif testval > test:
+        rttext += "失败"
+    elif testval > test//2:
+        rttext += "普通成功"
+    elif testval > test//5:
+        rttext += "困难成功"
+    else:
+        rttext += "极难成功"
+
+    if dicename == "心理学" or dicename[:2] == "暗骰":
+        if gp.kp is None:
+            return utils.errorHandler(update, "本群没有KP，请先添加一个KP再试！")
+
+        update.message.reply_text(dicename+" 检定/出目："+str(test)+"/???")
+        dicebot.sendto(gp.kp, rttext)
+    else:
+        update.message.reply_text(rttext)
+
     return True
 
 
 def show(update: Update, context: CallbackContext) -> bool:
-    """显示目前操作中的卡片的信息。
+    """显示目前操作中的卡片的信息。私聊时默认显示游戏外的卡，群聊时优先显示游戏内的卡。
     （如果有多张卡，用`/switch`切换目前操作的卡。）
+    `/show`：显示最基础的卡片信息；
     `/show card`：显示当前操作的整张卡片的信息；
     `/show --attrname`：显示卡片的某项具体属性。
-    回复某人消息，并使用本指令`/show card或--attrname`：同上，但显示的是被回复者的卡片的信息
+    （回复某人消息）`/show card或--attrname`：同上，但显示的是被回复者的卡片的信息。
+
     例如，`/show skill`显示主要技能，
     `/show interest`显示兴趣技能。
     如果当前卡中没有这个属性，则无法显示。
     可以显示的属性例子：
     `STR`,`description`,`SAN`,`MAGIC`,`name`,`item`,`job`"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    pl = dicebot.forcegetplayer(update)
+    rppl = utils.getreplyplayer(update)
+    rpcard: Optional[GameCard] = None
+    if rppl is not None:
+        gp = dicebot.forcegetgroup(update)
+        rpcard = utils.findcardfromgroup(rppl, gp)
+        if rpcard is None:
+            return utils.errorHandler(update, "该玩家在本群没有卡")
+
+    card = rpcard if rpcard is not None else None
+    if card is None:
+        if utils.isgroupmsg(update):
+            gp = dicebot.forcegetgroup(update)
+            card = utils.findcardfromgroup(pl, gp)
+            if card is None:
+                return utils.errorHandler(update, "请先在本群创建卡")
+        else:
+            card = pl.controlling
+            if card is None:
+                return utils.errorHandler(update, "请先创建卡，或者使用 /switch 选中一张卡")
+
+    game = card.group.game if card.group.game is not None else card.group.pausedgame
+
+    rttext = ""
+
+    if game is not None and utils.isgroupmsg(update):
+        if card.id in game.cards:
+            rttext = "显示游戏中的卡：\n"
+            card = game.cards[card.id]
+
+    if rttext == "":
+        rttext = "显示游戏外的卡：\n"
+
+    if not utils.checkaccess(pl, card) & CANREAD:
+        return utils.errorHandler(update, "没有权限")
+
+    if card.type != PLTYPE and utils.isgroupmsg(update):
+        return utils.errorHandler(update, "非玩家卡片不可以在群内显示")
+
     if len(context.args) == 0:
-        return utils.errorHandler(update, "需要参数：card或者attrname其中一个")
-    if utils.isprivatemsg(update):
-        plid = utils.getchatid(update)
-        card1 = utils.findcard(plid)
-        if not card1:
-            return utils.errorHandler(update, "找不到卡。")
-        if context.args[0] == "card":
-            update.message.reply_text(utils.showcardinfo(card1))
-            return True
-        attrname = context.args[0]
-        return utils.showattrinfo(update, card1, attrname)
-    # 群消息
-    gpid = utils.getchatid(update)
-    senderid = utils.getmsgfromid(update)
-    if update.message.reply_to_message:
-        rpplid = update.message.reply_to_message.from_user.id
-        if utils.getkpid(gpid) == rpplid:
-            return utils.errorHandler(update, "不可以查看KP卡片信息", True)
-        senderid = rpplid  # 直接修改senderid，继续套用下面的代码。上一步保证了rpplid不会是kpid
-    elif utils.getkpid(gpid) == senderid and context.args[0] == "card":
-        return utils.errorHandler(update, "为保护NPC或敌人信息，不可以在群内显示KP整张卡片", True)
-    game = utils.findgame(gpid)
-    if not game:  # 显示游戏外数据，需要提示
-        cardi = utils.findcard(senderid)
-        if not cardi:
-            return utils.errorHandler(update, "找不到卡。")
-    else:
-        if utils.isfromkp(update):
-            cardi = utils.getkpctrl(game)
-            if not cardi:
-                return utils.errorHandler(update, "先用 /switchgamecard 切换KP操作的卡")
-        else:
-            cardi = utils.findcardfromgame(game, senderid)
-            if not cardi:
-                return utils.errorHandler(update, "找不到卡。")
-    # 显示游戏内数据，需要提示是游戏内/外的卡
-    if context.args[0] == "card":
-        rttext = ""
-        if game:
-            rttext += "显示游戏中的卡片：\n"
-        else:
-            rttext += "显示游戏外的卡片：\n"
-        rttext += utils.showcardinfo(cardi)
-        update.message.reply_text(rttext)
+        update.message.reply_text(card.basicinfo())
         return True
-    attrname = context.args[0]
-    if game:
-        update.message.reply_text("显示游戏中的卡片：")
-    else:
-        update.message.reply_text("显示游戏外的卡片：")
-    return utils.showattrinfo(update, cardi, attrname)
+
+    if context.args[0] == "card":
+        update.message.reply_text(str(card))
+        return True
+
+    ans = card.show(context.args[0])
+    if ans == "找不到该属性":
+        return utils.errorHandler(update, "找不到该属性")
+
+    update.message.reply_text(update, rttext+ans)
+    return True
 
 
 def showkp(update: Update, context: CallbackContext) -> bool:
     """这一指令是为KP设计的。不能在群聊中使用。
 
-    `/showkp game`: 显示发送者主持的游戏中所有的卡
+    `/showkp game --groupid`: 显示发送者在某个群主持的游戏中所有的卡
     `/showkp card`: 显示发送者作为KP控制的所有卡
     `/showkp group --groupid`: 显示发送者是KP的某个群内的所有卡"""
-    # Should not return game info, unless args[0] == "game"
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "使用该指令请发送私聊消息", True)
+
     if len(context.args) == 0:
         return utils.errorHandler(update, "需要参数")
+
     arg = context.args[0]
     if arg == "group":
-        kpid = utils.getchatid(update)
+        kp = dicebot.forcegetplayer(update)
         # args[1] should be group id
         if len(context.args) < 2:
             return utils.errorHandler(update, "需要群ID")
         gpid = context.args[1]
-        if not utils.isint(gpid):
+        if not utils.isint(gpid) or int(gpid) >= 0:
             return utils.errorHandler(update, "无效ID")
+
         gpid = int(gpid)
-        if gpid not in utils.CARDS_DICT:
-            return utils.errorHandler(update, "这个群没有卡")
-        ans: List[utils.GameCard] = []
-        for cdid in utils.CARDS_DICT[gpid]:
-            ans.append(utils.CARDS_DICT[gpid][cdid])
+        if gpid < 0 or dicebot.getgp(gpid) is None or dicebot.getgp(gpid).kp != kp:
+            return utils.errorHandler(update, "这个群没有卡或没有权限")
+
+        gp: Group = dicebot.getgp(gpid)
+        ans: List[GameCard] = []
+        for card in kp.cards.values():
+            if card.group != gp:
+                continue
+            ans.append(card)
+
         if len(ans) == 0:
-            return utils.errorHandler(update, "没有找到卡")
+            return utils.errorHandler(update, "该群没有你的卡")
+
         for i in ans:
-            update.message.reply_text(utils.showcardinfo(i))
+            update.message.reply_text(str(i))
+            time.sleep(0.2)
         return True
+
     if arg == "game":
-        kpid = utils.getchatid(update)
-        game = utils.findgamewithkpid(kpid)
-        if not game:
+        kp = dicebot.forcegetplayer(update)
+
+        if len(context.args) < 2:
+            return utils.errorHandler(update, "需要群ID")
+        gpid = context.args[1]
+        if not utils.isint(gpid) or int(gpid) >= 0:
+            return utils.errorHandler(update, "无效群ID")
+
+        gp = dicebot.getgp(gpid)
+        if gp is None or (gp.game is None and gp.pausedgame is None):
             return utils.errorHandler(update, "没有找到游戏")
-        for i in game.cards:
-            update.message.reply_text(utils.showcardinfo(i))
-        return True
+
+        if gp.kp != kp:
+            return utils.errorHandler(update, "你不是这个群的kp")
+
+        game = gp.game if gp.game is not None else gp.pausedgame
+
+        hascard = False
+        for i in game.cards.values():
+            if i.player != kp:
+                continue
+            hascard = True
+            update.message.reply_text(str(i))
+            time.sleep(0.2)
+
+        return True if hascard else utils.errorHandler(update, "你没有控制的游戏中的卡")
+
     if arg == "card":
-        kpid = utils.getchatid(update)
-        cards = utils.findkpcards(kpid)
-        if len(cards) == 0:
-            return utils.errorHandler(update, "你没有控制的卡")
-        for i in range(len(cards)):
-            update.message.reply_text(utils.showcardinfo(cards[i]))
-        return True
+        kp = dicebot.forcegetplayer(update)
+
+        hascard = False
+        for card in kp.cards.values():
+            if card.group.kp != kp:
+                continue
+            hascard = True
+            update.message.reply_text(str(card))
+            time.sleep(0.2)
+
+        return True if hascard else utils.errorHandler(update, "你没有控制NPC卡片")
+
     return utils.errorHandler(update, "无法识别的参数")
 
 
 def showcard(update: Update, context: CallbackContext) -> bool:
     """显示某张卡的信息。
 
-    `/showcard --cardid (--attrname)`: 显示卡id为`cardid`的卡片的信息。
-    如果第二个参数存在，则显示这一项数据。群聊时使用该指令，优先查看游戏内的卡片。
+    `/showcard --cardid (card/--attrname)`: 显示卡id为`cardid`的卡片的信息。
+    如果第二个参数是`card`，显示整张卡；否则，显示这一项数据。
+    如果第二个参数不存在，显示卡片基本信息。
+    群聊时使用该指令，优先查看游戏内的卡片。
 
     显示前会检查发送者是否有权限显示这张卡。在这些情况下，无法显示卡：
 
-    群聊环境：显示非本群的卡片，或者显示本群PL以外的卡片；
+    群聊环境：显示非本群的卡片，或者显示本群的type不为PL的卡片；
 
-    私聊环境：作为PL，显示非自己控制的卡片；KP想显示非自己管理的群的卡片。"""
+    私聊环境：显示没有查看权限的卡片。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if len(context.args) == 0:
         return utils.errorHandler(update, "需要参数")
-    if not utils.isint(context.args[0]):
-        return utils.errorHandler(update, "参数不是整数", True)
+    if not utils.isint(context.args[0]) or int(context.args[0]) < 0:
+        return utils.errorHandler(update, "卡id参数无效", True)
     cdid = int(context.args[0])
-    cardi = None
+
+    rttext: str = ""
+    cardi: Optional[GameCard] = None
+
     if utils.isgroupmsg(update):
-        game = utils.findgame(utils.getchatid(update))
-        if game:
-            cardi = utils.findcardfromgamewithid(game, cdid)
-            if cardi:
-                update.message.reply_text("显示游戏内的卡片")
-    if not cardi:
-        cardi = utils.findcardwithid(cdid)
-        if cardi:
-            update.message.reply_text("显示游戏外的卡片")
-        else:
-            return utils.errorHandler(update, "没有这张卡", True)
+        cardi = dicebot.getgamecard(cdid)
+        if cardi is not None:
+            rttext = "显示游戏内的卡片\n"
+
+    if cardi is None:
+        cardi = dicebot.getcard(cdid)
+
+        if cardi is None:
+            return utils.errorHandler(update, "找不到这张卡")
+
+    if rttext == "":
+        rttext = "显示游戏内的卡片\n"
+
+    # 检查是否有权限
     if utils.isprivatemsg(update):
-        # 检查是否合法
-        if utils.isfromkp(update):  # KP
-            kpid = utils.getchatid(update)
-            if kpid != utils.ADMIN_ID and utils.getkpid(cardi.groupid) != kpid:
-                return utils.errorHandler(update, "没有权限")
-        else:
-            # 非KP，只能显示自己的卡
-            plid = utils.getchatid(update)
-            if plid != utils.ADMIN_ID and cardi.playerid != plid:
-                return utils.errorHandler(update, "没有权限")
-        # 有权限，开始处理
-        if len(context.args) >= 2:
-            return utils.showattrinfo(update, cardi, context.args[1])
-        # 显示整张卡
-        update.message.reply_text(utils.showcardinfo(cardi))
-        return True
-    # 处理群聊消息
-    gpid = utils.getchatid(update)
-    if cardi.groupid != gpid or cardi.playerid == utils.getkpid(gpid) or cardi.type != "PL":
-        return utils.errorHandler(update, "不可显示该卡", True)
-    # 有权限，开始处理
+
+        pl = dicebot.forcegetplayer(update)
+
+        if utils.checkaccess(pl, cardi) & CANREAD == 0:
+            return utils.errorHandler(update, "没有权限")
+    else:
+        if cardi.group != dicebot.forcegetgroup(update) or cardi.type != PLTYPE:
+            return utils.errorHandler(update, "没有权限", True)
+
+    # 开始处理
     if len(context.args) >= 2:
-        return utils.showattrinfo(update, cardi, context.args[1])
-    update.message.reply_text(utils.showcardinfo(cardi))
+        if context.args[1] == "card":
+            update.message.reply_text(rttext+str(cardi))
+        else:
+            ans = cardi.show(context.args[1])
+            if ans == "找不到该属性":
+                return utils.errorHandler(update, ans)
+
+            update.message.reply_text(rttext+ans)
+        return True
+
+    # 显示基本属性
+    update.message.reply_text(rttext+cardi.basicinfo())
     return True
+
 
 # (private)
 # (private)showids game: return all card ids in a game
@@ -1786,91 +1884,84 @@ def showids(update: Update, context: CallbackContext) -> bool:
 
     `showids game`: 显示游戏中的卡id。
 
-    私聊时，只有KP可以使用该指令。两个指令同上，但结果将更详细，结果会包括KP主持游戏的所有群的卡片。额外有一个功能：
+    私聊时，只有KP可以使用该指令，显示的是该玩家作为KP的所有群的id对，按群分开。
+    两个指令同上，但结果将更详细，结果会包括KP主持游戏的所有群的卡片。
+    KP使用时有额外的一个功能：
 
     `showids kp`: 返回KP游戏中控制的所有卡片id"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if utils.isgroupmsg(update):
-        gpid = utils.getchatid(update)
-        if len(context.args) == 0:
-            if gpid not in utils.CARDS_DICT:
-                return utils.errorHandler(update, "本群没有卡")
-            rttext = ""
-            for cdid in utils.CARDS_DICT[gpid]:
-                cardi = utils.CARDS_DICT[gpid][cdid]
-                if cardi.playerid == utils.getkpid(gpid) or cardi.type != "PL":
-                    continue
-                rttext += str(cardi.id)+": "
-                if "name" not in cardi.info or cardi.info.name == "":
-                    rttext += "No name\n"
-                else:
-                    rttext += cardi.info.name+"\n"
-            if rttext == "":
-                return utils.errorHandler(update, "本群没有卡")
-            update.message.reply_text(rttext)
-            return True
-        if context.args[0] != "game":
-            return utils.errorHandler(update, "无法识别的参数", True)
-        game = utils.findgame(gpid)
-        if not game:
-            return utils.errorHandler(update, "没有进行中的游戏", True)
-        rttext = ""
-        for cardi in game.cards:
-            if cardi in game.kpcards or cardi.type != "PL":
-                continue
-            rttext += str(cardi.id)+": "
-            if "name" not in cardi.info or cardi.info.name == "":
-                rttext += "No name\n"
-            else:
-                rttext += cardi.info.name+"\n"
-        if rttext == "":
-            return utils.errorHandler(update, "游戏中没有卡")
-        update.message.reply_text(rttext)
-        return True
-    # 下面处理私聊消息
-    if not utils.isfromkp(update):
-        return utils.errorHandler(update, "没有权限")
-    kpid = utils.getchatid(update)
-    game = utils.findgamewithkpid(kpid)
-    if len(context.args) >= 1:
-        if context.args[0] != "kp" and context.args[0] != "game":
-            return utils.errorHandler(update, "无法识别的参数")
-        if context.args[0] == "kp":
-            if not game:
-                return utils.errorHandler(update, "该参数只返回游戏中你的卡片，但你目前没有主持游戏")
-            cards = game.kpcards
+        gp = dicebot.forcegetgroup(update)
+
+        out = len(context.args) == 0 or context.args[0] != "game"
+
+        if not out and gp.game is None and gp.pausedgame is None:
+            return utils.errorHandler(update, "没有进行中的游戏")
+
+        hascard = False
+        if out:
+            cdd = gp.cards
         else:
-            if not game:
-                return utils.errorHandler(update, "你目前没有主持游戏")
-            cards = game.cards
-        rttext = ""
-        if len(cards) == 0:
-            return utils.errorHandler(update, "游戏中KP没有卡")
-        for cardi in cards:
-            if "name" in cardi.info and cardi.info.name != "":
-                rttext += str(cardi.id)+": "+cardi.info.name+"\n"
-            else:
-                rttext += str(cardi.id) + ": No name\n"
+            game = gp.game if gp.game is not None else gp.pausedgame
+            cdd = game.cards
+
+        rttext = "卡id：卡名\n"
+        for card in cdd.values():
+            if card.type != PLTYPE:
+                continue
+            hascard = True
+            rttext += str(card.id)+"："+card.getname()+"\n"
+
+        if not hascard:
+            return utils.errorHandler(update, "本群没有卡")
+
         update.message.reply_text(rttext)
         return True
-    # 不带参数，显示全部该KP做主持的群中的卡id
-    kpgps = utils.findkpgroups(kpid)
-    rttext = ""
-    if utils.popallempties(utils.CARDS_DICT):
-        utils.writecards(utils.CARDS_DICT)
-    for gpid in kpgps:
-        if gpid not in utils.CARDS_DICT:
+
+    # 下面处理私聊消息
+    kp = dicebot.forcegetplayer(update)
+    if not utils.searchifkp(kp):
+        return utils.errorHandler(update, "没有权限")
+
+    searchtype = 0
+    if len(context.args) > 0:
+        if context.args[0] == "game":
+            searchtype = 1
+        elif context.args[0] == "kp":
+            searchtype = 2
+    allempty = True
+    for gp in kp.kpgroups.values():
+        game = gp.game if gp.game is not None else gp.pausedgame
+        if game is None and searchtype > 0:
             continue
-        for cdid in utils.CARDS_DICT[gpid]:
-            if utils.CARDS_DICT[gpid][cdid].playerid == kpid:
-                rttext += "(KP) "
-            if "name" in utils.CARDS_DICT[gpid][cdid].info and utils.CARDS_DICT[gpid][cdid].info.name.strip() != "":
-                rttext += str(utils.CARDS_DICT[gpid][cdid].id) + \
-                    ": "+utils.CARDS_DICT[gpid][cdid].info.name+"\n"
-            else:
-                rttext += str(utils.CARDS_DICT[gpid][cdid].id) + ": No name\n"
-    if rttext == "":
-        return utils.errorHandler(update, "没有可显示的卡")
-    update.message.reply_text(rttext)
+
+        if searchtype > 0:
+            cdd = game.cards
+        else:
+            cdd = gp.cards
+
+        hascard = False
+        rttext = "群id："+str(gp.id)+"，群名："+gp.getname()+"，id信息如下\n"
+        rttext += "卡id：卡名\n"
+        for card in cdd.values():
+            if searchtype == 2 and card.player != kp:
+                continue
+            allempty = False
+            hascard = True
+            rttext += str(card.id)+"："+card.getname()+"\n"
+
+        if not hascard:
+            continue
+
+        update.message.reply_text(rttext)
+        time.sleep(0.2)
+
+    if allempty:
+        return utils.errorHandler(update, "没有可显示的卡。")
+
     return True
 
 
@@ -1882,84 +1973,53 @@ def modify(update: Update, context: CallbackContext) -> bool:
     带game时修改的是游戏内卡片数据，不指明时默认游戏外
     （对于游戏中与游戏外卡片区别，参见 `/help startgame`）。
     修改对应卡片的信息必须要有对应的KP权限，或者是BOT的管理者。
-    id和groupid这两个属性不可以修改。
+    如果要修改主要技能点和兴趣技能点，请使用`mainpoints`, `intpoints`作为`arg`，而不要使用points。
+    id, playerid, groupid这三个属性不可以修改。
     想要修改id，请使用指令
     `/changeid --cardid --newid`
     （参考`/help changeid`）。
     想要修改所属群，使用指令
     `/changegroup --cardid --newgroupid`
     （参考`/help changegroup`）。"""
-    if not utils.isfromkp(update) and utils.getchatid(update) != utils.ADMIN_ID:
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    pl = dicebot.forcegetplayer(update)
+    if not utils.searchifkp(pl) and pl.id != ADMIN_ID:
         return utils.errorHandler(update, "没有权限", True)
+
     # need 3 args, first: card id, second: attrname, third: value
     if len(context.args) < 3:
         return utils.errorHandler(update, "需要至少3个参数", True)
-    if context.args[1] == "id" or context.args[1] == "groupid":
-        return utils.errorHandler(update, "该属性无法修改", True)
+
     card_id = context.args[0]
-    if not utils.isint(card_id):
+    if not utils.isint(card_id) or int(card_id) < 0:
         return utils.errorHandler(update, "无效ID", True)
+
     card_id = int(card_id)
-    if utils.getmsgfromid(update) == utils.ADMIN_ID:  # 最高控制权限
-        if len(context.args) == 3 or context.args[3] != "game":
-            cardi = utils.findcardwithid(card_id)
-            if not cardi:
-                return utils.errorHandler(update, "找不到该ID对应的卡。")
-            rtmsg, ok = utils.modifycardinfo(
-                cardi, context.args[1], context.args[2])
-            if not ok:
-                update.message.reply_text(rtmsg)
-                return False
-            update.message.reply_text("修改了游戏外的卡片！\n"+rtmsg)
-            utils.writecards(utils.CARDS_DICT)
-            return True
-        cardi = utils.findcardwithid(card_id)
-        if not cardi:
-            return utils.errorHandler(update, "找不到游戏外对应卡片，请务必核查ID是否输入有误！")
-        game = utils.findgame(cardi.groupid)
-        if not game:
-            return utils.errorHandler(update, "找不到游戏", True)
-        cardi = utils.findcardfromgamewithid(game, card_id)
-        if not cardi:
-            update.message.reply_text("警告：找不到游戏中的卡，数据出现不一致！")
-            utils.sendtoAdmin("警告：游戏内外卡片信息出现不一致，位置：/modify")
-            return False
-        rtmsg, ok = utils.modifycardinfo(
-            cardi, context.args[1], context.args[2])
-        if not ok:
-            update.message.reply_text(rtmsg)
-            return False
-        update.message.reply_text("修改了游戏中的卡片！\n"+rtmsg)
-        utils.writecards(utils.ON_GAME)
-        return True
-    # 处理有权限的非BOT控制者，即kp
-    kpid = utils.getmsgfromid(update)
-    if len(context.args) <= 3 or context.args[3] != "game":
-        cardi = utils.findcardwithid(card_id)
-        if not cardi:
-            return utils.errorHandler(update, "找不到该ID对应的卡。")
-        if utils.getkpid(cardi.groupid) != kpid:
-            return utils.errorHandler(update, "没有权限", True)
-        rtmsg, ok = utils.modifycardinfo(
-            cardi, context.args[1], context.args[2])
-        if not ok:
-            update.message.reply_text(rtmsg)
-            return False
-        update.message.reply_text("修改了游戏外的卡片！\n"+rtmsg)
-        utils.writecards(utils.CARDS_DICT)
-        return True
-    game = utils.findgamewithkpid(kpid)
-    if not game:
-        return utils.errorHandler(update, "没有进行中的游戏", True)
-    cardi = utils.findcardfromgamewithid(card_id)
-    if not cardi:
-        return utils.errorHandler(update, "找不到游戏中的卡")
-    rtmsg, ok = utils.modifycardinfo(cardi, context.args[1], context.args[2])
+    if len(context.args) > 3 and context.args[3] == "game":
+        card = dicebot.getgamecard(card_id)
+        rttext = "修改了游戏内的卡片：\n"
+    else:
+        card = dicebot.getcard(card_id)
+        rttext = "修改了游戏外的卡片：\n"
+
+    if card is None:
+        return utils.errorHandler(update, "找不到这张卡")
+
+    if not utils.checkaccess(pl, card) & CANMODIFY:
+        return utils.errorHandler(update, "没有权限", True)
+    try:
+        ans, ok = card.modify(context.args[1], context.args[2])
+    except TypeError as e:
+        return utils.errorHandler(update, str(e))
+
     if not ok:
-        update.message.reply_text(rtmsg)
-        return False
-    update.message.reply_text("修改了游戏中的卡片！\n"+rtmsg)
-    utils.writecards(utils.ON_GAME)
+        return utils.errorHandler(update, "修改失败。"+ans)
+
+    rttext += context.args[1]+"从"+ans+"变为"+context.args[2]
+    update.message.reply_text(rttext)
     return True
 
 
@@ -1971,47 +2031,76 @@ def changeid(update: Update, context: CallbackContext) -> bool:
 
     如果`newid`已经被占用，则指令无效。
     这一行为将同时改变游戏内以及游戏外的卡id。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
     if len(context.args) < 2:
         return utils.errorHandler(update, "至少需要两个参数。")
+
     if not utils.isint(context.args[0]) or not utils.isint(context.args[1]):
-        return utils.errorHandler(update, "参数错误", True)
+        return utils.errorHandler(update, "参数无效", True)
+
     oldid = int(context.args[0])
     newid = int(context.args[1])
+
     if newid < 0:
-        return utils.errorHandler(update, "负数id无效", True)
+        return utils.errorHandler(update, "卡id不能为负数", True)
     if newid == oldid:
         return utils.errorHandler(update, "前后id相同", True)
-    addids = utils.getallid()
-    if newid in addids:
+    if newid in dicebot.allids:
         return utils.errorHandler(update, "该ID已经被占用")
-    cardi = utils.findcardwithid(oldid)
-    if not cardi:
+
+    card = dicebot.getcard(oldid)
+    if card is None:
         return utils.errorHandler(update, "找不到该ID对应的卡")
-    plid = utils.getmsgfromid(update)
-    gpid = cardi.groupid
-    if plid != utils.ADMIN_ID and cardi.playerid != plid and utils.getkpid(gpid) != plid:
-        return utils.errorHandler(update, "非控制者且没有权限", True)
-    # 有修改权限，开始处理
-    utils.CARDS_DICT[gpid][newid] = utils.CARDS_DICT[gpid].pop(oldid)
-    utils.CARDS_DICT[gpid][newid].id = newid
-    utils.writecards(utils.CARDS_DICT)
-    if "name" in cardi.info and cardi.info.name != "":
-        rtmsg = "修改了卡片："+cardi.info.name+"的id至"+str(newid)
-    else:
-        rtmsg = "修改了卡片：No name 的id至"+str(newid)
-    # 判断游戏是否也在进行，进行的话也要修改游戏内的卡
-    game = utils.findgame(gpid)
-    if game:
-        card2 = utils.findcardfromgamewithid(game, oldid)
-        if not card2:
-            utils.errorHandler(update, "游戏内没有找到对应的卡")
-            utils.sendtoAdmin("游戏内外数据不一致，位置：changeid")
-        else:
-            rtmsg += "\n游戏内id同步修改了。"
-        card2.id = newid
-        utils.writegameinfo(utils.ON_GAME)
-    update.message.reply_text(rtmsg)
+
+    pl = dicebot.forcegetplayer(update)
+    if not utils.checkaccess(pl, card) & (OWNCARD | CANMODIFY):
+        return utils.errorHandler(update, "没有权限")
+
+    gamecard = dicebot.getgamecard(oldid)
+    if gamecard is not None:
+        gamecard = dicebot.popgamecard(oldid)
+        gamecard.id = newid
+        dicebot.addgamecard(gamecard)
+
+    card = dicebot.popcard(oldid)
+    card.id = newid
+    dicebot.addcard(card)
+    rttext = "修改卡片的id：从"+str(oldid)+"修改为"+str(newid)
+    if gamecard is not None:
+        rttext += "\n游戏内卡片id同步修改完成。"
+
+    update.message.reply_text(rttext)
     return True
+
+
+def cardtransfer(update: Update, context: CallbackContext) -> bool:
+    """转移卡片所有者。格式为
+    `/cardtransfer --cardid --playerid`将卡转移给playerid。
+    (回复某人)`/cardtransfer --cardid`将卡转移给被回复的人。
+    只有卡片拥有者或者KP有权使用该指令。
+    如果对方不是KP且对方已经在本群有卡，则无法转移。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    if len(context.args) == 0:
+        return utils.errorHandler(update, "需要参数")
+    if len(context.args) == 1 and utils.getreplyplayer(update) is None:
+        return utils.errorHandler(update, "参数不足")
+    if not utils.isint(context.args[0]) or (len(context.args) > 1 and not utils.isint(context.args[1])):
+        return utils.errorHandler(update, "参数无效")
+    if int(context.args[0]) < 0 or (len(context.args) > 1 and int(context.args[1]) < 0):
+        return utils.errorHandler(update, "负数参数无效")
+
+    if len(context.args) == 1:
+        pl: Player = utils.getreplyplayer(update)
+    else:
+        pl = dicebot.forcegetplayer(int(context.args[1]))
+    pass
+    card = dicebot.getcard()
 
 
 def changegroup(update: Update, context: CallbackContext) -> bool:
@@ -2293,7 +2382,7 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
             return utils.errorHandler(update, "请先用 /switchgamecard 切换到你的卡")
     else:  # 玩家进行
         plid = utils.getmsgfromid(update)
-        card1 = utils.findcardfromgame(game, plid)
+        card1 = utils.findcardfromgame(game, pl)
         if not card1:
             return utils.errorHandler(update, "找不到卡。")
     rttext = "检定：理智 "
@@ -2371,7 +2460,7 @@ def lp(update: Update, context: CallbackContext) -> bool:
     if not rpmsg:
         return utils.errorHandler(update, "请用回复来选择玩家改变lp")
     plid = rpmsg.from_user.id
-    cardi = utils.findcardfromgame(game, plid)
+    cardi = utils.findcardfromgame(game, pl)
     if not cardi:
         return utils.errorHandler(update, "找不到这名玩家的卡。")
     if "LP" not in cardi.attr:
