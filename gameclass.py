@@ -895,7 +895,12 @@ class CardData(datatype):
         else:
             self.read_json(d)
 
-    def to_json(self, jumpkey: List[str] = ["card"]) -> dict:
+    def read_json(self, d: dict, jumpkeys: List[str] = ["datadec"]) -> None:
+        super().read_json(d, jumpkeys=jumpkeys)
+        if "datadec" in d:
+            self.datadec = (d["datadec"][0], d["datadec"][1])
+
+    def to_json(self, jumpkey: List[str] = ["card", "__datanames", "alldatanames"]) -> dict:
         return super().to_json(jumpkey=jumpkey)
 
     def show(self, attr: str, jumpkey: List[str] = ["card"]) -> str:
