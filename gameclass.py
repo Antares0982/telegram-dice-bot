@@ -14,8 +14,7 @@ from cfg import (PATH_CARDS, PATH_GAME_CARDS, PATH_GROUPS, PATH_PLAYERS,
                  PATH_SKILLDICT)
 from dicefunc import *
 
-__MAIN = "主要"
-__INT = "兴趣"
+
 PLTYPE = "PL"
 NPCTYPE = "NPC"
 
@@ -196,7 +195,7 @@ class GameCard(datatype):
             self.skill = Skill()
         if self.interest is None:
             self.interest = Skill()
-            self.interest.type = __INT
+            self.interest.type = "兴趣"
         if self.suggestskill is None:
             self.suggestskill = SgSkill()
         if self.attr is None:
@@ -216,7 +215,7 @@ class GameCard(datatype):
             self.skill = Skill(d=d["skill"])
         if "interest" in d:
             self.interest = Skill(d=d["interest"])
-            self.type = __INT
+            self.type = "兴趣"
         if "suggestskill" in d:
             self.suggestskill = SgSkill(d=d["suggestskill"])
         if "attr" in d:
@@ -493,10 +492,10 @@ class Player(datatype):
         rttext += f"昵称：{self.getname()}\n"
         if self.controlling is not None:
             rttext += "当前正在操作的卡片id："+str(self.controlling.id)+"\n"
-        rttext += "所有卡片id："+' '.join(self.cards.keys())+"\n"
+        rttext += "所有卡片id："+' '.join(map(str, self.cards.keys()))+"\n"
         rttext += "所有游戏中卡片的id："+' '.join(self.gamecards.keys())+"\n"
-        rttext += "作为kp的群id："+' '.join(self.kpgroups.keys())+"\n"
-        rttext += "正在进行游戏的群id："+' '.join(self.kpgames.keys())+"\n"
+        rttext += "作为kp的群id："+' '.join(map(str, self.kpgroups.keys()))+"\n"
+        rttext += "正在进行游戏的群id："+' '.join(map(str, self.kpgames.keys()))+"\n"
         return rttext
 
     def write(self):
@@ -1082,7 +1081,7 @@ class Skill(skilltype):
     def __init__(self, d: dict = {}):
         super().__init__()
         self.points: int = -1
-        self.type: str = __MAIN
+        self.type: str = "主要"
         if len(d) > 0:
             self.read_json(d=d)
 

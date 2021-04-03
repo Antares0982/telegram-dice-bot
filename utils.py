@@ -2,8 +2,8 @@
 
 import json
 from typing import (Dict, Iterable, Iterator, KeysView, List, Optional, Tuple,
-                    TypeVar, Union, overload)
-
+                    TypeVar, Union)
+from typing import overload
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext
@@ -113,16 +113,22 @@ def chatinit(update: Update) -> Union[Player, Group, None]:
 
 @overload
 def cardpop(card: GameCard) -> Optional[GameCard]:
-    """删除一张卡并返回其数据。返回None则删除失败"""
-    if card.isgamecard:
-        dicebot.popgamecard(card.id)
-    else:
-        dicebot.popcard(card.id)
+    ...
 
 
 @overload
 def cardpop(id: int) -> Optional[GameCard]:
-    return dicebot.popcard(id) if dicebot.getcard(id) is not None else None
+    ...
+
+
+def cardpop(id) -> Optional[GameCard]:
+    """删除一张卡并返回其数据。返回None则删除失败"""
+    if isinstance(id, int):
+        return dicebot.popcard(id) if dicebot.getcard(id) is not None else None
+    card = id
+    if card.isgamecard:
+        return dicebot.popgamecard(card.id)
+    return dicebot.popcard(card.id)
 
 
 def cardadd(card: GameCard, gpid: int) -> bool:
@@ -333,18 +339,12 @@ def findcardfromgame(game: GroupGame, pl: Player) -> GameCard:
     return None
 
 
-@overload
-def findcardfromgroup(gp: Group, pl: Player) -> Optional[GameCard]:
+def findcardfromgroup(pl: Player, gp: Group) -> Optional[GameCard]:
     """返回pl在gp中的其中一张卡，无法返回多张卡"""
     for i in pl.cards.values():
         if i.group == gp:
             return i
     return None
-
-
-@overload
-def findcardfromgroup(pl: Player, gp: Group) -> Optional[GameCard]:
-    return findcardfromgroup(gp, pl)
 
 
 def findcardfromgamewithid(game: GroupGame, cdid: int) -> GameCard:
@@ -898,7 +898,7 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
         query.edit_message_reply_markup(rp_markup)
         return True
     if not card1:
-        return errorHandler(query, "找不到卡。")
+        return errorHandlerQ(query, "找不到卡。")
     confirm = args[2]  # 只能是True，或False
     if confirm == "False":
         rtbuttons = makejobbutton()
@@ -912,7 +912,7 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
         "职业设置为："+jobname+"\n现在你可以用指令 /addskill 添加技能，首先需要设置信用点。")
     if not generatePoints(card1):
         dicebot.sendtoAdmin("生成技能出错，位置：buttonjob")
-        return errorHandler(query, "生成技能点出错！")
+        return errorHandlerQ(query, "生成技能点出错！")
     for i in range(3, len(dicebot.joblist[jobname])):  # Classical jobs
         card1.suggestskill.set(dicebot.joblist[jobname][i], getskilllevelfromdict(
             card1, dicebot.joblist[jobname][i]))   # int
@@ -922,7 +922,7 @@ def buttonjob(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
 
 def buttonaddmainskill(query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
     if card1 is None:
-        return errorHandler(query, "找不到卡。")
+        return errorHandlerQ(query, "找不到卡。")
 
     if len(args) == 3:
         skvalue = int(args[2])
@@ -947,7 +947,7 @@ def buttonaddmainskill(query: CallbackQuery, card1: GameCard, args: List[str]) -
 
 def buttoncgmainskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -> bool:
     if card1 is None:
-        return errorHandler(query, "找不到卡。")
+        return errorHandlerQ(query, "找不到卡。")
 
     if len(args) == 3:
         skvalue = int(args[2])
@@ -972,7 +972,7 @@ def buttoncgmainskill(query: CallbackQuery,  card1: GameCard, args: List[str]) -
 
 def buttonaddsgskill(query: CallbackQuery,  card1: Optional[GameCard], args: List[str]) -> bool:
     if not card1:
-        return errorHandler(query, "找不到卡。")
+        return errorHandlerQ(query, "找不到卡。")
     if len(args) == 3:
         skvalue = int(args[2])
         needpt = evalskillcost(args[1], skvalue, card1, True)
@@ -1027,7 +1027,7 @@ def buttonaddintskill(query: CallbackQuery,  card1: Optional[GameCard], args: Li
 
 def buttoncgintskill(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
     if not card1:
-        return errorHandler(query, "找不到卡。")
+        return errorHandlerQ(query, "找不到卡。")
     if len(args) == 3:
         skvalue = int(args[2])
         needpt = evalskillcost(args[1], skvalue, card1, False)
@@ -1051,15 +1051,15 @@ def buttoncgintskill(query: CallbackQuery, card1: Optional[GameCard], args: List
 
 def buttonchoosedec(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
     if not card1:
-        return errorHandler(query, "找不到卡。")
+        return errorHandlerQ(query, "找不到卡。")
 
     if card1.data.datadec is None:
-        return errorHandler(query, "不需要设置降值。")
+        return errorHandlerQ(query, "不需要设置降值。")
 
     dname = args[1]
     decnames = card1.data.datadec[0].split('_')
     if dname not in decnames:
-        return errorHandler(query, "无法为该属性设置降值。")
+        return errorHandlerQ(query, "无法为该属性设置降值。")
 
     if len(decnames) == 2:
         anotherdecname = decnames[0] if dname == decnames[1] else decnames[1]
@@ -1084,14 +1084,14 @@ def buttonchoosedec(query: CallbackQuery, card1: Optional[GameCard], args: List[
 
 def buttonsetdec(query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
     if not card1:
-        return errorHandler(query, "找不到卡。")
+        return errorHandlerQ(query, "找不到卡。")
 
     dname = args[0][:args[0].find("dec")]
     if dname not in card1.data.alldatanames:
         dicebot.sendtoAdmin("属性名错误，请检查代码")
-        return errorHandler(query, "属性名错误，请检查代码")
+        return errorHandlerQ(query, "属性名错误，请检查代码")
     if card1.data.datadec is None:
-        return errorHandler(query, "该卡无需设置属性降值。")
+        return errorHandlerQ(query, "该卡无需设置属性降值。")
 
     decnames = card1.data.datadec[0].split('_')
     decval = int(args[2])
@@ -1131,7 +1131,7 @@ def buttonsetdec(query: CallbackQuery, card1: Optional[GameCard], args: List[str
         return True
 
     dicebot.sendtoAdmin("下降属性参数长度有误")
-    return errorHandler(query, "下降属性参数长度有误")
+    return errorHandlerQ(query, "下降属性参数长度有误")
 
 
 def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
@@ -1139,11 +1139,11 @@ def buttondiscard(query: CallbackQuery, plid: int, args: List[str]) -> bool:
 
     card = dicebot.getcard(cdid)
     if card is None:
-        return errorHandler(query, "找不到这个id的卡。")
+        return errorHandlerQ(query, "找不到这个id的卡。")
 
     pl = __forcegetplayer(plid)
     if not checkaccess(pl, card) & CANDISCARD:
-        return errorHandler(query, "该卡不可删除。")
+        return errorHandlerQ(query, "该卡不可删除。")
 
     cardpop(cdid)
 
@@ -1156,7 +1156,7 @@ def buttonswitch(query: CallbackQuery, plid: int, args: List[str]) -> bool:
     cdid = int(args[1])
 
     if cdid not in pl.cards:
-        return errorHandler(query, "没有找到这个id的卡。")
+        return errorHandlerQ(query, "没有找到这个id的卡。")
 
     pl.controlling = pl.cards[cdid]
     pl.write()
@@ -1171,11 +1171,11 @@ def buttonswitchgamecard(query: CallbackQuery, kpid: int, args: List[str]) -> bo
     card = dicebot.getgamecard(cdid)
 
     if card is None:
-        return errorHandler(query, "没有这张卡")
+        return errorHandlerQ(query, "没有这张卡")
     if card.player != kp:
-        return errorHandler(query, "这不是你的卡片")
+        return errorHandlerQ(query, "这不是你的卡片")
     if card.group.kp != kp:
-        return errorHandler(query, "你不是对应群的kp")
+        return errorHandlerQ(query, "你不是对应群的kp")
 
     game = card.group.game if card.group.game is not None else card.group.pausedgame
     assert(game is not None)
@@ -1189,7 +1189,7 @@ def buttonswitchgamecard(query: CallbackQuery, kpid: int, args: List[str]) -> bo
 def buttonsetsex(query: CallbackQuery, plid: int,  args: List[str]) -> bool:
     cardi = findcard(plid)
     if cardi is None:
-        return errorHandler(query, "找不到卡。")
+        return errorHandlerQ(query, "找不到卡。")
 
     sex = args[1]
     if sex == "other":
@@ -1990,42 +1990,51 @@ def generatePoints(card: GameCard) -> bool:
 #     return rttext
 @overload
 def checkaccess(pl: Player, card: GameCard) -> int:
-    """用FLAG给出玩家对角色卡的控制权限。
+    ...
+
+
+@overload
+def checkaccess(pl: Player, gp: Group) -> int:
+    ...
+
+
+def checkaccess(pl: Player, thing) -> int:
+    """用FLAG给出玩家对角色卡或群聊的权限。
+    卡片：
     CANREAD = 1
     OWNCARD = 2
     CANSETINFO = 4
     CANDISCARD = 8
     CANMODIFY = 16
-    """
-    f = 0
-
-    if card.id in pl.cards or card.id in pl.gamecards:
-        f |= CANREAD | OWNCARD
-
-    if not f & OWNCARD:
-        if card.type == "PL" and checkaccess(pl, card.group) & INGROUP:
-            f |= CANREAD
-
-    if f & OWNCARD and not card.isgamecard and card.group.game is None:
-        f |= CANSETINFO
-
-    if f & OWNCARD and (card.groupid == -1 or (card.discard and not card.isgamecard and card.id not in dicebot.gamecards)):
-        f |= CANDISCARD
-
-    if (card.group.kp is not None and card.group.kp == pl) or pl.id == ADMIN_ID:
-        f |= CANMODIFY
-
-    return f
-
-
-@overload
-def checkaccess(pl: Player, gp: Group) -> int:
-    """用FLAG给出玩家与群的关系。
+    群聊：
     INGROUP = 1
     GROUPKP = 2
     GROUPADMIN = 4
     BOTADMIN = 8
     """
+    if isinstance(thing, GameCard):
+        card = thing
+        f = 0
+
+        if card.id in pl.cards or card.id in pl.gamecards:
+            f |= CANREAD | OWNCARD
+
+        if not f & OWNCARD:
+            if card.type == "PL" and checkaccess(pl, card.group) & INGROUP:
+                f |= CANREAD
+
+        if f & OWNCARD and not card.isgamecard and card.group.game is None:
+            f |= CANSETINFO
+
+        if f & OWNCARD and (card.groupid == -1 or (card.discard and not card.isgamecard and card.id not in dicebot.gamecards)):
+            f |= CANDISCARD
+
+        if (card.group.kp is not None and card.group.kp == pl) or pl.id == ADMIN_ID:
+            f |= CANMODIFY
+
+        return f
+
+    gp: Group = thing
     f = 0
 
     if isingroup(gp, pl):
@@ -2037,7 +2046,7 @@ def checkaccess(pl: Player, gp: Group) -> int:
     if gp.kp is not None and gp.kp == pl:
         f |= GROUPKP
 
-    if isadmin(gp, pl):
+    if ispladmin(gp, pl):
         f |= GROUPADMIN
 
     if pl.id == ADMIN_ID:

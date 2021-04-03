@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
-from typing import Any, Dict, overload
-
+from typing import Any, Dict
+from typing import overload
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.callbackquery import CallbackQuery
 
@@ -54,7 +54,7 @@ def isingroup(gp: Group, pl: Player) -> bool:
     return True
 
 
-@overload
+
 def isadmin(update: Update, userid: int) -> bool:
     """检测发消息的人是不是群管理员"""
     if isprivatemsg(update):
@@ -66,8 +66,7 @@ def isadmin(update: Update, userid: int) -> bool:
     return False
 
 
-@overload
-def isadmin(gp: Group, pl: Player) -> bool:
+def ispladmin(gp: Group, pl: Player) -> bool:
     """检测pl是不是gp的管理员"""
     admins = gp.chat.get_administrators()
     for admin in admins:
@@ -84,7 +83,7 @@ def recallmsg(update: Update) -> bool:
     return True
 
 
-@overload
+
 def errorHandler(update: Update,  message: str, needrecall: bool = False) -> False:
     """指令无法执行时，调用的函数。
     固定返回`False`，并回复错误信息。
@@ -113,9 +112,7 @@ def errorHandler(update: Update,  message: str, needrecall: bool = False) -> Fal
 
     return False
 
-
-@overload
-def errorHandler(query: CallbackQuery,  message: str) -> False:
+def errorHandlerQ(query: CallbackQuery,  message: str) -> False:
     if message == "找不到卡。":
         message += "请使用 /switch 切换当前操控的卡再试。"
     elif message.find("参数") != -1:

@@ -164,16 +164,62 @@ class DiceBot:
     def sendtoAdmin(self, msg: str) -> None:
         self.updater.bot.send_message(chat_id=ADMIN_ID, text=msg)
 
-    @overload
-    def checkconsistency():
+    def checkconsistency(self):
         # TODO 检查群名称是否有变化
         # TODO 检查allids是否正确
         # TODO 检查kp对是否完整
         # kp对如果出现不一致，用assert抛出AssertionError
-        pass
+        for card in self.cards.values():
+            if card.player is None or card.player.id != card.playerid:
+                card.player = self.forcegetplayer(card.playerid)
+                self.sendtoAdmin("card.player出现问题")
 
-    @overload
-    def checkconsistency(update: Update):
+            if card.id not in card.player.cards:
+                card.player.cards[card.id] = card
+                self.sendtoAdmin("player.cards出现问题")
+
+            if card.group is None or card.group.id != card.groupid:
+                card.group = self.forcegetgroup(card.groupid)
+                self.sendtoAdmin("card.group出现问题")
+
+        for card in self.gamecards.values():
+            if card.player is None or card.player.id != card.playerid:
+                card.player = self.forcegetplayer(card.playerid)
+                self.sendtoAdmin("gamecard.player出现问题")
+
+            if card.id not in card.player.gamecards:
+                card.player.gamecards[card.id] = card
+                self.sendtoAdmin("player.gamecards出现问题")
+
+            if card.group.getexistgame() is None:
+                self.sendtoAdmin("Game未开始却拥有gamecard")
+            else:
+                game = card.group.getexistgame()
+                if card.group != game.group:
+                    self.sendtoAdmin("card.gamegroup出现问题")
+
+        self.allids.sort()
+        t = list(self.cards.keys())
+        t.sort()
+        if self.allids != t:
+            self.sendtoAdmin("id出现不一致")
+
+        for gp in self.groups.values():
+            if gp.kp is not None:
+                if gp.id not in gp.kp.kpgroups:
+                    self.sendtoAdmin("kp对出现不一致")
+                    gp.kp[gp.id] = gp
+
+            game = gp.getexistgame()
+            if game is not None:
+                if game.kp != gp.kp:
+                    self.sendtoAdmin("game kp和group不一致")
+                    game.kp = gp.kp
+                if game.group.id not in game.kp.kpgames:
+                    game.kp.kpgames[game.group.id] = game
+                    self.sendtoAdmin("kp.kpgames出现不一致")
+
+    def checkconsistency2(update: Update):
         # TODO 检查是否是新群、新玩家
         # 每隔几分钟，做一次该操作
         pass
@@ -196,15 +242,33 @@ class DiceBot:
 
     @overload
     def getgp(self, gpid: int) -> Optional[Group]:
-        return None if gpid not in self.groups else self.groups[gpid]
+        ...
 
     @overload
     def getgp(self, update: Update) -> Optional[Group]:
-        assert(isgroupmsg(update))
-        return self.getgp(getchatid(update))
+        ...
+
+    def getgp(self, update):
+        if isinstance(update, Update):
+            assert(isgroupmsg(update))
+            return None if getchatid(update) not in self.groups else self.groups[getchatid(update)]
+        if isinstance(update, int):
+            gpid = update
+            return None if gpid not in self.groups else self.groups[gpid]
 
     @overload
     def creategp(self, gpid: int) -> Group:
+        ...
+
+    @overload
+    def creategp(self, update: Update) -> Group:
+        ...
+
+    def creategp(self, update) -> Group:
+        if isinstance(update, Update):
+            assert(isgroupmsg(update))
+            return self.creategp(getchatid(update))
+        gpid: int = update
         assert(gpid not in self.groups)
 
         gp = Group(gpid=gpid)
@@ -219,29 +283,47 @@ class DiceBot:
         gp.write()
 
     @overload
-    def creategp(self, update: Update) -> Group:
-        assert(isgroupmsg(update))
-        return self.creategp(getchatid(update))
-
-    @overload
     def forcegetgroup(self, gpid: int) -> Group:
-        return self.getgp(gpid) if gpid in self.groups else self.creategp(gpid)
+        ...
 
     @overload
     def forcegetgroup(self, update: Update) -> Group:
-        assert(isgroupmsg(update))
-        return self.forcegetgroup(getchatid(update))
+        ...
+
+    def forcegetgroup(self, update) -> Group:
+        if isinstance(update, Update):
+            assert(isgroupmsg(update))
+            return self.forcegetgroup(getchatid(update))
+        gpid: int = update
+        return self.getgp(gpid) if gpid in self.groups else self.creategp(gpid)
 
     @overload
     def getplayer(self, plid: int) -> Optional[Player]:
-        return None if plid not in self.players else self.players[plid]
+        ...
 
     @overload
     def getplayer(self, update: Update) -> Optional[Player]:
-        return self.getplayer(getmsgfromid(update))
+        ...
+
+    def getplayer(self, update) -> Optional[Player]:
+        if isinstance(update, Update):
+            return None if getmsgfromid(update) not in self.players else self.players[getmsgfromid(update)]
+        if isinstance(update, int):
+            plid = update
+            return None if plid not in self.players else self.players[plid]
 
     @overload
     def createplayer(self, plid: int) -> Player:
+        ...
+
+    @overload
+    def createplayer(self, update: Update) -> Player:
+        ...
+
+    def createplayer(self, update) -> Player:
+        if isinstance(update, Update):
+            return self.createplayer(getmsgfromid(update))
+        plid: int = update
         assert(plid not in self.players)
 
         pl = Player(plid=plid)
@@ -256,16 +338,18 @@ class DiceBot:
         pl.write()
 
     @overload
-    def createplayer(self, update: Update) -> Player:
-        return self.createplayer(getmsgfromid(update))
-
-    @overload
     def forcegetplayer(self, plid: int) -> Player:
-        return self.getplayer(plid) if plid in self.players else self.createplayer(plid)
+        ...
 
     @overload
     def forcegetplayer(self, update: Update) -> Player:
-        return self.forcegetplayer(getmsgfromid(update))
+        ...
+
+    def forcegetplayer(self, update) -> Player:
+        if isinstance(update, Update):
+            return self.forcegetplayer(getmsgfromid(update))
+        plid: int = update
+        return self.getplayer(plid) if plid in self.players else self.createplayer(plid)
 
     def getcard(self, cdid: int) -> Optional[GameCard]:
         return self.cards[cdid] if cdid in self.cards else None
@@ -447,21 +531,25 @@ class DiceBot:
 
     @overload
     def sendto(self, pl: Player, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Message:
-        try:
-            if rpmarkup is not None:
-                return self.updater.bot.send_message(chat_id=pl.id, text=msg, reply_markup=rpmarkup)
-            return self.updater.bot.send_message(chat_id=pl.id, text=msg)
-        except:
-            return self.sendtoAdmin(f"无法向用户{pl.getname()}发送消息："+msg)
+        ...
 
     @overload
     def sendto(self, plid: int, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Message:
+        ...
+
+    def sendto(self, pl, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Message:
         try:
             if rpmarkup is not None:
-                return self.updater.bot.send_message(chat_id=plid, text=msg, reply_markup=rpmarkup)
-            return self.updater.bot.send_message(chat_id=plid, text=msg)
+                if isinstance(pl, Player):
+                    return self.updater.bot.send_message(chat_id=pl.id, text=msg, reply_markup=rpmarkup)
+                return self.updater.bot.send_message(chat_id=pl, text=msg, reply_markup=rpmarkup)
+            if isinstance(pl, Player):
+                return self.updater.bot.send_message(chat_id=pl.id, text=msg)
+            return self.updater.bot.send_message(chat_id=pl, text=msg)
         except:
-            return self.sendtoAdmin(f"无法向用户{self.forcegetplayer(plid).getname()}发送消息："+msg)
+            if isinstance(pl, Player):
+                return self.sendtoAdmin(f"无法向用户{self.forcegetplayer(pl.id).getname()}发送消息："+msg)
+            return self.sendtoAdmin(f"无法向用户{self.forcegetplayer(pl).getname()}发送消息："+msg)
 
     def autoswitchhint(self, plid: int) -> None:
         self.sendto(plid, "创建新卡时，控制自动切换到新卡")

@@ -1009,7 +1009,7 @@ def button(update: Update, context: CallbackContext):
     args = query.data.split(" ")
     identifier = args[0]
     if identifier != dicebot.IDENTIFIER:
-        return utils.errorHandler(query, "该请求已经过期。")
+        return utils.errorHandlerQ(query, "该请求已经过期。")
 
     chatid = utils.getchatid(update)
     pl = dicebot.forcegetplayer(update)

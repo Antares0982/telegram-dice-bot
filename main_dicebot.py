@@ -34,14 +34,14 @@ def botexec(s: str, needreturn: bool = False):
     if not needreturn:
         try:
             exec(s)
-        except:
-            dicebot.sendtoAdmin("执行失败")
+        except Exception as e:
+            dicebot.sendtoAdmin("执行失败"+str(e))
         return
 
     try:
         exec("t="+s)
-    except:
-        dicebot.sendtoAdmin("执行失败")
+    except Exception as e:
+        dicebot.sendtoAdmin("执行失败"+str(e))
         return
     return locals()["t"]
 
@@ -94,10 +94,12 @@ def bot(update: Update, context: CallbackContext) -> bool:
 
     if inst == "exec":
         if context.args[1] == 'r' and len(context.args) > 2:
-            dicebot.sendtoAdmin(str(botexec(context.args[2:], True)))
+            dicebot.sendtoAdmin(str(botexec(' '.join(context.args[2:]), True)))
+            return True
         if len(context.args) > 1:
-            ans = str(botexec(context.args[1:]))
+            ans = str(botexec(' '.join(context.args[1:])))
             dicebot.sendtoAdmin(ans)
+            return True
 
         return errorHandler(update, "参数无效")
 
