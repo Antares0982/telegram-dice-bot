@@ -29,27 +29,6 @@ GROUPKP = 2
 GROUPADMIN = 4
 BOTADMIN = 8
 
-# 数据
-"""
-GROUP_KP_DICT: Dict[int, int]
-CARDS_DICT: Dict[int, Dict[int, GameCard]]
-ON_GAME: List[GroupGame]
-HOLD_GAME: List[GroupGame]
-GROUP_RULES: Dict[int, GroupRule]
-CURRENT_CARD_DICT: Dict[int, Tuple[int, int]]
-OPERATION: Dict[int, str] = {}
-
-SKILL_DICT: dict
-dicebot.joblist: dict
-
-
-
-DETAIL_DICT: Dict[int, str] = {}  # 临时地存储详细信息
-
-  # 在每个按钮的callback加上该标志，如果标志不相等则不处理
-"""
-# 数据操作
-
 SKILL_PAGES: List[List[str]]
 
 
