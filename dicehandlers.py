@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Tuple
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.callbackquery import CallbackQuery
+from telegram.error import ChatMigrated
 from telegram.ext import CallbackContext
 
 import utils
@@ -277,20 +278,17 @@ def getid(update: Update, context: CallbackContext) -> None:
     utils.chatinit(update)
 
     chatid = utils.getchatid(update)
-    fromuser = utils.getmsgfromid(update)
-
+    pl = dicebot.forcegetplayer(update)
+    fromuser = pl.id
     # 检测是否处于newcard状态
     opers = utils.getOP(fromuser)
-
-    msg = update.message.reply_text("<code>"+str(chatid) +
-                                    "</code> \n点击即可复制", parse_mode='HTML')
 
     if opers != "" and utils.isgroupmsg(update):
         opers = opers.split(" ")
         if utils.isgroupmsg(update) and opers[0] == "newcard":
             utils.popOP(fromuser)
 
-            if utils.hascard(fromuser, chatid) and dicebot.getgp(update).kp is not None and dicebot.getgp(update).kp != fromuser:
+            if utils.hascard(fromuser, chatid) and dicebot.getgp(update).kp is not None and dicebot.getgp(update).kp != pl:
                 context.bot.send_message(
                     chat_id=fromuser, text="你在这个群已经有一张卡了！")
                 return
@@ -304,7 +302,12 @@ def getid(update: Update, context: CallbackContext) -> None:
                 text="跳转到私聊", callback_data="None", url="t.me/"+utils.BOTUSERNAME)]]
             rp_markup = InlineKeyboardMarkup(rtbutton)
 
-            msg.edit_reply_markup(reply_markup=rp_markup)
+            update.message.reply_text("<code>"+str(chatid) +
+                                      "</code> \n点击即可复制", parse_mode='HTML', reply_markup=rp_markup)
+            return True
+
+    update.message.reply_text("<code>"+str(chatid) +
+                              "</code> \n点击即可复制", parse_mode='HTML')
 
 
 def showrule(update: Update, context: CallbackContext) -> bool:
@@ -494,8 +497,9 @@ def newcard(update: Update, context: CallbackContext) -> bool:
         return True
 
     # 检查(pl)是否已经有卡
-    plid = utils.getchatid(update)
-    if utils.hascard(plid, gpid):
+    pl = dicebot.forcegetplayer(update)
+    plid = pl.id
+    if utils.hascard(plid, gpid) and pl != gp.kp:
         return utils.errorHandler(update, "你在这个群已经有一张卡了！")
 
     # 符合建卡条件，生成新卡
@@ -506,6 +510,7 @@ def newcard(update: Update, context: CallbackContext) -> bool:
 
 
 def renewcard(update: Update, context: CallbackContext) -> bool:
+    """如果卡片是可以discard的状态，使用该指令可以将卡片重置。"""
     if utils.ischannel(update):
         return False
     utils.chatinit(update)
@@ -513,8 +518,8 @@ def renewcard(update: Update, context: CallbackContext) -> bool:
     pl = dicebot.forcegetplayer(update)
     if pl.controlling is None:
         return utils.errorHandler(update, "没有操作中的卡")
-
-    if utils.checkaccess(pl, pl.controlling) & CANDISCARD == 0:
+    f = utils.checkaccess(pl, pl.controlling)
+    if f & CANDISCARD == 0:
         return utils.errorHandler(update, "选中的卡不可重置。如果您使用了 /switch 切换操作中的卡，请使用 /switch 切换回要重置的卡")
 
     pl.controlling.backtonewcard()
@@ -523,7 +528,8 @@ def renewcard(update: Update, context: CallbackContext) -> bool:
         pl.controlling.discard = True
         update.message.reply_text(
             "因为有三项属性小于50，如果你愿意的话可以再次点击 /renewcard 来重置这张角色卡。如果停止创建卡，点击 /discard 来放弃建卡。\n设定年龄后则不能再删除这张卡。")
-
+    else:
+        pl.controlling.discard = False
     return True
 
 
@@ -635,7 +641,7 @@ def delcard(update: Update, context: CallbackContext) -> bool:
 
     # 开始处理
     update.message.reply_text(
-        f"请确认是否删除卡片：{card.getname()}\n如果确认删除，请回复：确认。否则，请回复其他任何文字。")
+        f"请确认是否删除卡片\n姓名：{card.getname()}\n如果确认删除，请回复：确认。否则，请回复其他任何文字。")
     utils.addOP(utils.getchatid(update), "delcard "+context.args[0])
     return True
 
@@ -677,23 +683,6 @@ def link(update: Update, context: CallbackContext) -> bool:
     return True
 
 
-# def details(update: Update, context: CallbackContext):
-#     """显示详细信息。
-#     该指令主要是为了与bot交互时产生尽量少的文本消息而设计。
-#     目前版本只有discard指令可能会使用到details。
-
-#     当一些指令产生了“详细信息”时，这些详细信息会被暂时存储。
-#     当使用`/details`查看了这些“详细信息”，该“信息”将从存储中删除，即只能读取一次。
-#     如果没有查看上一个“详细信息”，就又获取到了下一个“详细信息”，
-#     上一个“详细信息”将会被覆盖。"""
-#     if utils.getchatid(update) not in utils.DETAIL_DICT or utils.DETAIL_DICT[utils.getchatid(update)] == "":
-#         utils.DETAIL_DICT[utils.getchatid(update)] = ""
-#         return utils.errorHandler(update, "没有可显示的信息。")
-#     update.message.reply_text(utils.DETAIL_DICT[utils.getchatid(update)])
-#     utils.DETAIL_DICT[utils.getchatid(update)] = ""
-#     return True
-
-
 def setage(update: Update, context: CallbackContext):
     if utils.ischannel(update):
         return False
@@ -721,6 +710,26 @@ def setage(update: Update, context: CallbackContext):
 
     age = int(age)
     return utils.cardsetage(update, card, age)
+
+
+def choosedec(update: Update, context: CallbackContext) -> bool:
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update)
+
+    if utils.isgroupmsg(update):
+        return utils.errorHandler(update, "私聊使用该指令")
+
+    pl = dicebot.forcegetplayer(update)
+
+    if pl.controlling is None:
+        return utils.errorHandler(update, "请先使用 /switch 切换回要设定降值的卡。")
+
+    if pl.controlling.data.datadec is None:
+        return utils.errorHandler(update, "该卡不需要进行降值设定。请先使用 /switch 切换回要设定降值的卡。")
+
+    utils.choosedec(update, pl.controlling)
+    return True
 
 
 def addnewjob(update: Update, context: CallbackContext) -> bool:
@@ -1009,10 +1018,12 @@ def button(update: Update, context: CallbackContext):
     args = query.data.split(" ")
     identifier = args[0]
     if identifier != dicebot.IDENTIFIER:
+        if args[1].find("dec") != -1:
+            return utils.errorHandlerQ(query, "该请求已经过期，请点击 /choosedec 重新进行操作。")
         return utils.errorHandlerQ(query, "该请求已经过期。")
 
     chatid = utils.getchatid(update)
-    pl = dicebot.forcegetplayer(update)
+    pl = dicebot.forcegetplayer(query.from_user.id)
     card1 = pl.controlling
     args = args[1:]
 
@@ -1137,6 +1148,9 @@ def startgame(update: Update, context: CallbackContext) -> bool:
 
     canstart = True
     for card in gp.cards.values():
+        card.generateOtherAttributes()
+        if card.type != PLTYPE:
+            continue
         ck = card.check()
         if ck != "":
             canstart = False
@@ -1146,6 +1160,17 @@ def startgame(update: Update, context: CallbackContext) -> bool:
         return False
 
     gp.game = GroupGame(gp.id, gp.cards)
+    # 构建数据关联
+    gp.game.group = gp
+    gp.game.kp = gp.kp
+    kp.kpgames[gp.id] = gp.game
+    for card in gp.game.cards.values():
+        dicebot.gamecards[card.id] = card
+        card.write()
+        card.group = gp
+        card.player = dicebot.getcard(card.id).player
+        card.player.gamecards[card.id] = card
+
     update.message.reply_text("游戏开始！")
     return True
 
@@ -1220,23 +1245,6 @@ def continuegame(update: Update, context: CallbackContext) -> bool:
     update.message.reply_text("游戏继续！")
     return True
 
-    # 因为逻辑修改，需要重写
-    # if utils.isprivatemsg(update):
-    #     return utils.errorHandler(update, "发送群消息继续游戏")
-    # gpid = utils.getchatid(update)
-    # if not utils.isfromkp(update):
-    #     return utils.errorHandler(update, "只有KP可以继续游戏", True)
-    # game = utils.holdgamepop(gpid)
-    # if not game:
-    #     return utils.errorHandler(update, "没有找到暂停的游戏", True)
-    # utils.ON_GAME.append(game)
-    # utils.writegameinfo(utils.ON_GAME)
-    # gamecardidlist = utils.getgamecardsid(game)
-    # if gpid in utils.CARDS_DICT:
-    #     for cdid in utils.CARDS_DICT[gpid]:
-    #         if cdid not in gamecardidlist:
-    #             utils.addcardtogame(game, utils.CARDS_DICT[gpid][cdid])
-
 
 def abortgame(update: Update, context: CallbackContext) -> bool:
     """放弃游戏。只有KP能使用该指令。这还将导致放弃在游戏中做出的所有修改，包括hp，SAN等。"""
@@ -1288,6 +1296,10 @@ def endgame(update: Update, context: CallbackContext) -> bool:
         nocard.isgamecard = False
         nocard.playerid = kp.id
         dicebot.addcard(nocard)
+
+    gp.game = None
+    gp.pausedgame = None
+    gp.kp.kpgames.pop(gp.id)
 
     update.message.reply_text("游戏结束！")
     return True
@@ -1549,7 +1561,7 @@ def roll(update: Update, context: CallbackContext):
     else:
         gamecard = gp.game.kpctrl
         if gamecard is None:
-            return utils.errorHandler(update, "请用switchgamecard切换kp要用的卡")
+            return utils.errorHandler(update, "请用 /switchgamecard 切换kp要用的卡")
     if not gamecard:
         return utils.errorHandler(update, "找不到游戏中的卡。")
     # 找卡完成，开始检定
@@ -1711,7 +1723,10 @@ def show(update: Update, context: CallbackContext) -> bool:
     if ans == "找不到该属性":
         return utils.errorHandler(update, "找不到该属性")
 
-    update.message.reply_text(update, rttext+ans)
+    if ans == "":
+        update.message.reply_text(rttext+"无")
+    else:
+        update.message.reply_text(rttext+ans)
     return True
 
 
@@ -1896,7 +1911,7 @@ def showids(update: Update, context: CallbackContext) -> bool:
     if utils.isgroupmsg(update):
         gp = dicebot.forcegetgroup(update)
 
-        out = len(context.args) == 0 or context.args[0] != "game"
+        out = bool(len(context.args) == 0) or bool(context.args[0] != "game")
 
         if not out and gp.game is None and gp.pausedgame is None:
             return utils.errorHandler(update, "没有进行中的游戏")
@@ -2078,8 +2093,8 @@ def changeid(update: Update, context: CallbackContext) -> bool:
 
 def cardtransfer(update: Update, context: CallbackContext) -> bool:
     """转移卡片所有者。格式为
-    `/cardtransfer --cardid --playerid`将卡转移给playerid。
-    (回复某人)`/cardtransfer --cardid`将卡转移给被回复的人。
+    `/cardtransfer --cardid --playerid`：将卡转移给playerid。
+    回复某人`/cardtransfer --cardid`：将卡转移给被回复的人。
     只有卡片拥有者或者KP有权使用该指令。
     如果对方不是KP且对方已经在本群有卡，则无法转移。"""
     if utils.ischannel(update):
@@ -2122,13 +2137,14 @@ def cardtransfer(update: Update, context: CallbackContext) -> bool:
         dicebot.addgamecard(gamecard)
 
     card = dicebot.popcard(cdid)
-    card.player.id = tpl.id
+    card.playerid = tpl.id
     dicebot.addcard(card)
 
     rttext = "卡id"+str(cdid)+"拥有者从"+str(opl.id)+"修改为"+str(tpl.id)+"。"
     if gamecard is not None:
         rttext += "游戏内数据也被同步修改了。"
 
+    update.message.reply_text(rttext)
     return True
 
 
@@ -2241,7 +2257,7 @@ def copygroup(update: Update, context: CallbackContext) -> bool:
     return True
 
 
-def randombackground(update: Update, context: CallbackContext) -> bool:
+def randombkg(update: Update, context: CallbackContext) -> bool:
     """生成随机的背景故事。
 
     获得当前发送者选中的卡，生成随机的背景故事并写入。"""
@@ -2286,17 +2302,16 @@ def setsex(update: Update, context: CallbackContext) -> bool:
     utils.cardsetsex(update, card, context.args[0])
     return True
 
-# setbkground --bkgroundname --bkgroundinfo...: Need at least 2 args
+# setbkg --bkgroundname --bkgroundinfo...: Need at least 2 args
 
 
-def setbkground(update: Update, context: CallbackContext) -> bool:
+def setbkg(update: Update, context: CallbackContext) -> bool:
     """设置背景信息。
 
     指令格式如下：
-    `/setbkground bkgroundname bkgroudinfo...`
+    `/setbkg --bkgroundname --bkgroudinfo...`
 
     其中第一个参数是背景的名称，只能是下面几项之一：
-
     `description`故事、
     `faith`信仰、
     `vip`重要之人、
@@ -2576,7 +2591,7 @@ def addcard(update: Update, context: CallbackContext) -> bool:
         update.message.reply_text("输入了已被占用的id，或id未设置，或id无效。自动获取id")
         card1.id = utils.getoneid()
     # 生成衍生数值
-    utils.generateOtherAttributes(card1)
+    card1.generateOtherAttributes()
     # 卡检查
     rttext = card1.check()
     if rttext != "":
@@ -2598,9 +2613,31 @@ def textHandler(update: Update, context: CallbackContext) -> bool:
     if update.message.migrate_from_chat_id is not None:
         # 触发migrate
         oldid = update.message.migrate_from_chat_id
+        if dicebot.migrateto is not None:
+            newid = dicebot.migrateto
+            dicebot.migrateto = None
+            dicebot.groupmigrate(oldid, newid)
+            dicebot.sendtoAdmin(f"群{str(oldid)}迁移了，新的id：{str(newid)}")
+            dicebot.sendto(newid, "本群迁移了，原id"+str(oldid)+"新的id"+str(newid))
+            return True
+
+        # 等待获取migrateto
+        dicebot.migratefrom = oldid
+        return True
+
+    if update.message.migrate_to_chat_id is not None:
+        # 触发migrate
         newid = update.message.migrate_to_chat_id
-        dicebot.groupmigrate(oldid, newid)
-        dicebot.sendtoAdmin(f"群{str(oldid)}迁移了，新的id：{str(newid)}")
+        if dicebot.migratefrom is not None:
+            oldid = dicebot.migratefrom
+            dicebot.migratefrom = None
+            dicebot.groupmigrate(oldid, newid)
+            dicebot.sendtoAdmin(f"群{str(oldid)}迁移了，新的id：{str(newid)}")
+            dicebot.sendto(newid, "本群迁移了，原id"+str(oldid)+"新的id"+str(newid))
+            return True
+
+        # 等待获取migratefrom
+        dicebot.migrateto = newid
         return True
 
     if update.message.text == "cancel":

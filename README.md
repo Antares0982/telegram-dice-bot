@@ -35,7 +35,7 @@ pip3 install pysocks
 
 ## 指令
 
-建议KP熟读以下指令信息。PL只需要了解`/newcard`，`/setage`，`/setstrdec `，`/setcondec `，`/setjob`，`/addskill`，`/setname`，`/setsex`，`/setbkground`，`/randombackground`，`/roll`，`/sancheck`。
+建议KP熟读以下指令信息。PL只需要了解`/newcard`，`/setage`，`/setstrdec `，`/setcondec `，`/setjob`，`/addskill`，`/setname`，`/setsex`，`/setbkg`，`/randombkg`，`/roll`，`/sancheck`。
 
 KP进行游戏引导时，可以在指令前输入文字+空格（使该指令无效，但可以让指令成为可点击状态），并提示PL长按指令将指令加入输入框中。例如：
 
@@ -71,21 +71,21 @@ KP进行游戏引导时，可以在指令前输入文字+空格（使该指令�
 
 * `/setname --name:List[str]` 设定角色姓名，中间可以有空格。多个空格、制表符与换行会被替换为单个空格。如果已经设定过，则会被替换为新设定的内容。
 
-* `/randombackground` 随机生成角色背景。如果已经设定过，则会被替换为新设定的内容。建议结合`/show background`来查看并修改背景。
+* `/randombkg` 随机生成角色背景。如果已经设定过，则会被替换为新设定的内容。建议结合`/show background`来查看并修改背景。
 
-* `/setbkground --bkgroundname <bkgroudinfo:List[str]>` 例如：
+* `/setbkg --bkgroundname <bkgroudinfo:List[str]>` 例如：
 
-  * `/setbkground description 李华是一个不会写英语作文的高中生。` 
+  * `/setbkg description 李华是一个不会写英语作文的高中生。` 
 
-  * `/setbkground vip 父亲 母亲 前妻`
+  * `/setbkg vip 父亲 母亲 前妻`
 
   * ```
-    /setbkground faith 坚信外星人存在。
+    /setbkg faith 坚信外星人存在。
     狂热地想被外星人绑架。
     经常和友人说自己和外星人握过手。
     ```
 
-  多个空格、制表符与换行会被替换为单个空格。建议在游戏开始前使用`/setbkground description --bkgroundinfo` 详细填写背景故事。如果已经设定过，则会被替换为新设定的内容。建议结合`/show background`来查看并修改背景。backgroundname的快速参考：
+  多个空格、制表符与换行会被替换为单个空格。建议在游戏开始前使用`/setbkg description --bkgroundinfo` 详细填写背景故事。如果已经设定过，则会被替换为新设定的内容。建议结合`/show background`来查看并修改背景。backgroundname的快速参考：
 
   * description：描述。即背景故事。
   * faith：信仰。

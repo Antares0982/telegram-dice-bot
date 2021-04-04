@@ -5,7 +5,7 @@ import time
 from typing import overload
 
 from telegram import Update
-from telegram.error import BadRequest
+from telegram.error import BadRequest, ChatMigrated
 from telegram.ext import Updater
 from telegram.message import Message
 
@@ -36,7 +36,8 @@ class DiceBot:
         self.operation: Dict[int, str] = {}
         self.addjobrequest: Dict[int, Tuple[str, list]] = {}
         self.addskillrequest: Dict[int, Tuple[str, int]] = {}
-        # self.readhandlers()
+        self.migratefrom: Optional[int] = None
+        self.migrateto: Optional[int] = None
 
     def readall(self) -> None:
         # 初始化
@@ -102,8 +103,8 @@ class DiceBot:
         for card in self.gamecards.values():
             card.isgamecard = True
 
-            assert(self.getplayer(card.id) is not None)
-            card.player = self.getplayer(card.id)  # 添加gamecard.player
+            assert(self.getplayer(card.playerid) is not None)
+            card.player = self.getplayer(card.playerid)  # 添加gamecard.player
             card.player.gamecards[card.id] = card  # 添加player.gamecards
 
             assert(self.getgp(card.groupid) is not None)
@@ -120,7 +121,7 @@ class DiceBot:
                 gp.kp = kp if kp is not None else self.createplayer(gp.kp)
                 gp.kp.kpgroups[gp.id] = gp
 
-            if gp.chat is None:
+            if gp.chat is None and gp.id != -1:
                 try:
                     gp.chat = self.updater.bot.get_chat(chat_id=gp.id)
                     gp.name = gp.chat.title
@@ -139,7 +140,7 @@ class DiceBot:
 
         # player
         for pl in self.players.values():
-            if pl.chat is None:
+            if pl.chat is None and pl.id != 0:
                 try:
                     pl.chat = self.updater.bot.get_chat(chat_id=pl.id)
                     pl.getname()
@@ -165,10 +166,6 @@ class DiceBot:
         self.updater.bot.send_message(chat_id=ADMIN_ID, text=msg)
 
     def checkconsistency(self):
-        # TODO 检查群名称是否有变化
-        # TODO 检查allids是否正确
-        # TODO 检查kp对是否完整
-        # kp对如果出现不一致，用assert抛出AssertionError
         for card in self.cards.values():
             if card.player is None or card.player.id != card.playerid:
                 card.player = self.forcegetplayer(card.playerid)
@@ -218,11 +215,6 @@ class DiceBot:
                 if game.group.id not in game.kp.kpgames:
                     game.kp.kpgames[game.group.id] = game
                     self.sendtoAdmin("kp.kpgames出现不一致")
-
-    def checkconsistency2(update: Update):
-        # TODO 检查是否是新群、新玩家
-        # 每隔几分钟，做一次该操作
-        pass
 
     def writegroup(self) -> None:
         for gp in self.groups.values():
@@ -336,6 +328,8 @@ class DiceBot:
             self.sendtoAdmin("无法获取玩家"+str(pl.id)+" chat信息")
 
         pl.write()
+
+        return pl
 
     @overload
     def forcegetplayer(self, plid: int) -> Player:
@@ -504,7 +498,9 @@ class DiceBot:
         kp.write()
 
     def groupmigrate(self, oldid: int, newid: int) -> None:
+
         gp = self.getgp(oldid)
+        gp.delete()
         assert(gp is not None)
         # 维护dicebot
         self.groups[newid] = self.groups.pop(oldid)
@@ -542,10 +538,15 @@ class DiceBot:
             if rpmarkup is not None:
                 if isinstance(pl, Player):
                     return self.updater.bot.send_message(chat_id=pl.id, text=msg, reply_markup=rpmarkup)
-                return self.updater.bot.send_message(chat_id=pl, text=msg, reply_markup=rpmarkup)
+                if pl >= 0:
+                    return self.updater.bot.send_message(chat_id=pl, text=msg, reply_markup=rpmarkup)
+                self.sendtoAdmin("群聊不发送按钮")
+                return self.updater.bot.send_message(chat_id=pl, text=msg)
             if isinstance(pl, Player):
                 return self.updater.bot.send_message(chat_id=pl.id, text=msg)
             return self.updater.bot.send_message(chat_id=pl, text=msg)
+        except ChatMigrated as e:
+            raise e
         except:
             if isinstance(pl, Player):
                 return self.sendtoAdmin(f"无法向用户{self.forcegetplayer(pl.id).getname()}发送消息："+msg)
@@ -558,149 +559,8 @@ class DiceBot:
         if not isinstance(o, DiceBot):
             return False
         return self.IDENTIFIER == o.IDENTIFIER
-    """
-    def writekpinfo(self) -> None:
-        with open(PATH_GROUP_KP, "w", encoding="utf-8") as f:
-            json.dump(self.kpinfo, f, indent=4, ensure_ascii=False)
-    """
-    """
-    def writecards(self) -> None:
-        listofdict: Dict[str, Dict[str, dict]] = {}
-        for gpid in listofgamecard:
-            if len(listofgamecard[gpid]) == 0:
-                listofgamecard.pop(gpid)
-                continue
-            listofdict[str(gpid)] = {}
-            for cdids in listofgamecard[gpid]:
-                listofdict[str(gpid)][str(cdids)
-                                    ] = listofgamecard[gpid][cdids].__dict__
-        with open(PATH_CARDSLIST, "w", encoding="utf-8") as f:
-            json.dump(listofdict, f, indent=4, ensure_ascii=False)
-
-
-    def writegameinfo(listofobj: List[GroupGame]) -> None:
-        
-        savelist: List[dict] = []
-        for i in range(len(listofobj)):
-            savelist.append(copy.deepcopy(listofobj[i].__dict__))
-            tpcards: List[GameCard] = savelist[-1]["cards"]
-            savelist[-1]["cards"] = []
-            savelist[-1].pop("kpcards")
-            for i in tpcards:
-                savelist[-1]["cards"].append(i.__dict__)
-        with open(PATH_ONGAME, "w", encoding="utf-8") as f:
-            json.dump(savelist, f, indent=4, ensure_ascii=False)
-    """
-
-
-"""
-def writeholdgameinfo(listofobj: List[GroupGame]) -> None:
-    savelist: List[dict] = []
-    for i in range(len(listofobj)):
-        savelist.append(copy.deepcopy(listofobj[i].__dict__))
-        tpcards: List[GameCard] = savelist[-1]["cards"]
-        savelist[-1]["cards"] = []
-        savelist[-1].pop("kpcards")
-        for i in tpcards:
-            savelist[-1]["cards"].append(i.__dict__)
-    with open(PATH_HOLDGAME, "w", encoding="utf-8") as f:
-        json.dump(savelist, f, indent=4, ensure_ascii=False)
-
-
-def readinfo() -> Tuple[Dict[int, int], Dict[int, Dict[int, GameCard]], List[GroupGame], List[GroupGame]]:
-    # 如果文件不存在，则创建新文件
-    # group-kp
-    try:
-        f = open(PATH_GROUP_KP, "r", encoding="utf-8")
-        f.close()
-    except FileNotFoundError:
-        with open(PATH_GROUP_KP, "w", encoding="utf-8") as f:
-            json.dump({}, f, indent=4, ensure_ascii=False)
-        print("File does not exist, create new file")
-        gpkpdict: Dict[int, int] = {}
-    else:
-        with open(PATH_GROUP_KP, "r", encoding="utf-8") as f:
-            gpkpstrdict: Dict[str, int] = json.load(f)
-        gpkpdict: Dict[int, int] = {}
-        for keys in gpkpstrdict:
-            gpkpdict[int(keys)] = gpkpstrdict[keys]
-    print("kp info: passed")
-    # cards
-    try:
-        f = open(PATH_CARDSLIST, "r", encoding="utf-8")
-        f.close()
-    except FileNotFoundError:
-        with open(PATH_CARDSLIST, "w", encoding="utf-8") as f:
-            json.dump({}, f, indent=4, ensure_ascii=False)
-        print("File does not exist, create new file")
-        cardslist = {}
-    else:
-        with open(PATH_CARDSLIST, "r", encoding="utf-8") as f:
-            cardslist = json.load(f)
-    gamecardlist: Dict[int, dict] = {}
-    for groupkeys in cardslist:
-        gamecardlist[int(groupkeys)] = {}
-        for keys in cardslist[groupkeys]:
-            gamecardlist[int(groupkeys)][int(keys)] = GameCard(
-                cardslist[groupkeys][keys])
-    print("card info: passed")
-    # games
-    try:
-        f = open(PATH_ONGAME, "r", encoding="utf-8")
-        f.close()
-    except FileNotFoundError:
-        with open(PATH_ONGAME, "w", encoding="utf-8") as f:
-            json.dump([], f, indent=4, ensure_ascii=False)
-        print("File does not exist, create new file")
-        ongamelistdict = []
-    else:
-        with open(PATH_ONGAME, "r", encoding="utf-8") as f:
-            ongamelistdict = json.load(f)
-    ongamelist: List[GroupGame] = []
-    for i in range(len(ongamelistdict)):
-        ongamelist.append(GroupGame(ongamelistdict[i]))
-    print("game info: passed")
-    # games are holding
-    try:
-        f = open(PATH_HOLDGAME, "r", encoding="utf-8")
-        f.close()
-    except FileNotFoundError:
-        with open(PATH_HOLDGAME, "w", encoding="utf-8") as f:
-            json.dump([], f, indent=4, ensure_ascii=False)
-        print("File does not exist, create new file")
-        holdgamelistdict = []
-    else:
-        with open(PATH_HOLDGAME, "r", encoding="utf-8") as f:
-            holdgamelistdict = json.load(f)
-    holdgamelist: List[GroupGame] = []
-    for i in range(len(holdgamelistdict)):
-        holdgamelist.append(GroupGame(holdgamelistdict[i]))
-    return gpkpdict, gamecardlist, ongamelist, holdgamelist
-"""
-
-
-"""
-def readrules() -> Dict[int, GroupRule]:
-    d: Dict[str, dict]
-    try:
-        f = open(PATH_RULES, "r", encoding='utf-8')
-        f.close()
-    except FileNotFoundError:
-        with open(PATH_RULES, "w", encoding="utf-8") as f:
-            json.dump({}, f, indent=4, ensure_ascii=False)
-        d = {}
-    else:
-        with open(PATH_RULES, 'r', encoding='utf-8') as f:
-            d = json.load(f)
-    d1: Dict[int, GroupRule] = {}
-    for key in d:
-        d1[int(key)] = GroupRule(d[key])
-    return d1
-"""
-
 
 dicebot = DiceBot()
-
 # try:
 #     dicebot = DiceBot()
 # except:

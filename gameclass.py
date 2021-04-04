@@ -18,10 +18,10 @@ from dicefunc import *
 PLTYPE = "PL"
 NPCTYPE = "NPC"
 
-__skd: List[str]
+skl: Dict[str, int]
 
 with open(PATH_SKILLDICT, 'r', encoding='utf-8') as f:
-    __skd = list(json.load(f).keys())
+    skl = json.load(f)
 
 
 def istrueconsttype(val) -> bool:
@@ -42,6 +42,7 @@ def isconsttype(val) -> bool:
             v = val[k]
             if not isconsttype(v) or not isconsttype(k):
                 return False
+        return True
     return False
 
 
@@ -61,6 +62,14 @@ def turnkeyint(d: dict) -> Dict[int, Any]:
 # 基类
 
 
+def tobool(x: str) -> bool:
+    if x in ["F", "false", "False", "假"]:
+        return False
+    elif x in ["T", "true", "True", "真"]:
+        return True
+    raise TypeError("不是可识别的bool")
+
+
 class datatype:
     def read_json(self, d: dict, jumpkeys: List[str] = []) -> None:
         """把除了jumpkeys以外的key全部读入self.__dict__"""
@@ -77,7 +86,7 @@ class datatype:
                 continue
             if isconsttype(val):
                 if isinstance(val, dict) and isallkeyint(val):
-                    d[key] = turnkeyint(d)
+                    d[key] = turnkeyint(val)
                 else:
                     d[key] = val
             elif isinstance(val, datatype):
@@ -106,8 +115,41 @@ class datatype:
     def modify(self, attr: str, val: str, jumpkey: List[str] = []) -> Tuple[str, bool]:
         """向下查找成员attr并修改其值为val，忽略jumpkey中的成员。如果val类型和原本类型（不是None）不相同，则抛出TypeError"""
         if hasattr(self, attr):
-            if not istrueconsttype(self.__dict__[attr]):
+            if not istrueconsttype(self.__dict__[attr]) and not isinstance(self.__dict__[attr], list):
                 raise TypeError("成员"+attr+"类型是无法修改的类型")
+
+            if isinstance(self.__dict__[attr], list) and any(not istrueconsttype(x) for x in self.__dict__[attr]):
+                raise TypeError("成员"+attr+"类型是无法修改的类型")
+
+            if isinstance(self.__dict__[attr], list):
+                # 默认list内所有元素都是相同type
+                # 如果list长度为0，不可修改
+                if len(self.__dict__[attr]) == 0:
+                    raise TypeError("空列表不可以直接修改")
+
+                # 预处理
+                a = val.find('[')
+                b = val.find(']')
+                if a < 0 or b < 0:
+                    raise TypeError("输入不是一个合法列表")
+
+                val = val[a+1:b]
+                val = ''.join(val.split())
+                things = val.split(',')
+
+                if isinstance(self.__dict__[attr][0], int):
+                    if any(isint(x) for x in things):
+                        raise TypeError("输入的列表中存在非int型")
+                    things = map(int, things)
+
+                elif isinstance(self.__dict__[attr][0], bool):
+                    if any(x not in ["F", "false", "False", "假", "T", "true", "True", "真"] for x in things):
+                        raise TypeError("输入的列表中存在非bool型，或输入不能识别")
+                    things = map(tobool, things)
+
+                ans = str(self.__dict__[attr])
+                self.__dict__[attr] = list(things)
+                return ans, True
 
             if attr in jumpkey:
                 raise TypeError("该属性不支持修改")
@@ -121,12 +163,10 @@ class datatype:
 
             elif isinstance(self.__dict__[attr], bool):
                 rttext = str(self.__dict__[attr])
-                if val in ["F", "false", "False", "假"]:
-                    self.__dict__[attr] = False
-                elif val in ["T", "true", "True", "真"]:
-                    self.__dict__[attr] = True
-                else:
-                    raise TypeError("给定参数无法识别为bool")
+                try:
+                    self.__dict__[attr] = tobool(val)
+                except TypeError as e:
+                    raise e
 
             else:
                 # str
@@ -150,6 +190,9 @@ class datatype:
                         self.write()
                     return rttext, True
         return "", False  # 支持重载，返回False不一定代表找不到
+
+    def write(self): ...
+    def delete(self): ...
 
 
 class GameCard(datatype):
@@ -215,7 +258,7 @@ class GameCard(datatype):
             self.skill = Skill(d=d["skill"])
         if "interest" in d:
             self.interest = Skill(d=d["interest"])
-            self.type = "兴趣"
+            self.interest.type = "兴趣"
         if "suggestskill" in d:
             self.suggestskill = SgSkill(d=d["suggestskill"])
         if "attr" in d:
@@ -235,10 +278,109 @@ class GameCard(datatype):
         if attr == "points":
             return "需指明为mainpoints或intpoints", False
         if attr == "mainpoints":
-            return self.skill.modify("points", val)
+            ans = self.skill.modify("points", val)
+            self.write()
+            return ans
         if attr == "intpoints":
-            return self.interest.modify("points", val)
-        return super().modify(attr, val, jumpkey=jumpkey)
+            ans = self.interest.modify("points", val)
+            self.write()
+            return ans
+        ans = super().modify(attr, val, jumpkey=jumpkey)
+        self.write()
+        return ans
+
+    def generateAgeAttributes(self) -> str:
+        if self.info.age < 17 or self.info.age > 99:
+            return "年龄尚未设定"
+
+        AGE = self.info.age
+
+        luck = 5*sum(dicemdn(3, 6))
+
+        rttext = ""
+
+        if AGE < 20:
+            luck2 = 5*sum(dicemdn(3, 6))
+            if luck < luck2:
+                self.data.LUCK = luck2
+            else:
+                self.data.LUCK = luck
+            rttext += "年龄低于20，幸运得到奖励骰。结果分别为" + \
+                str(luck)+", "+str(luck2)+"。教育减5，力量体型合计减5。"
+            self.data.datadec = ("STR_SIZ", -5)
+            self.data.EDU -= 5
+
+        elif AGE < 40:
+            # self.cardcheck["check2"] = True  # No STR decrease, check2 passes
+            rttext += "年龄20-39，得到一次教育增强。"
+            rttext += self.EDUenhance(1)
+            rttext += "现在教育：" + str(self.data.EDU)+"。"
+
+        elif AGE < 50:
+            rttext += "年龄40-49，得到两次教育增强。\n"
+            rttext += self.EDUenhance(2)
+            rttext += "现在教育："+str(self.data.EDU)+"。\n"
+            self.data.datadec = ("STR_CON", -5)
+            self.data.APP -= 5
+            rttext += "力量体质合计减5，外貌减5。\n"
+
+        elif AGE < 60:
+            rttext += "年龄50-59，得到三次教育增强。\n"
+            rttext += self.EDUenhance(3)
+            rttext += "现在教育："+str(self.data.EDU)+"。\n"
+            self.data.datadec = ("STR_CON_DEX", -10)
+            self.data.APP -= 10
+            rttext += "力量体质敏捷合计减10，外貌减10。\n"
+
+        elif AGE < 70:
+            rttext += "年龄60-69，得到四次教育增强。\n"
+            rttext += self.EDUenhance(4)
+            rttext += "现在教育："+str(self.data.EDU)+"。\n"
+            self.data.datadec = ("STR_CON_DEX", -20)
+            self.data.APP -= 15
+            rttext += "力量体质敏捷合计减20，外貌减15。\n"
+
+        elif AGE < 80:
+            rttext += "年龄70-79，得到四次教育增强。\n"
+            rttext += self.EDUenhance(4)
+            rttext += "现在教育："+str(self.data.EDU)+"。\n"
+            self.data.datadec = ("STR_CON_DEX", -40)
+            self.data.APP -= 20
+            rttext += "力量体质敏捷合计减40，外貌减20。\n"
+
+        else:
+            rttext += "年龄80以上，得到四次教育增强。\n"
+            rttext += self.EDUenhance(4)
+            rttext += "现在教育："+str(self.data.EDU)+"。\n"
+            self.data.datadec = ("STR_CON_DEX", -80)
+            self.data.APP -= 25
+            rttext += "力量体质敏捷合计减80，外貌减25。\n"
+
+        if AGE >= 20:
+            self.data.LUCK = luck
+            rttext += "幸运："+str(luck)+"\n"
+
+        if self.data.datadec is not None:
+            rttext += "使用' /setstrdec STRDEC '来设置因为年龄设定导致的STR减少值，根据所设定的年龄可能还需要设置CON减少值。根据上面的提示减少的数值进行设置。\n"
+
+        rttext += "使用 /setjob 进行职业设定。完成职业设定之后，用'/addskill 技能名 技能点数' 来分配技能点，用空格分隔。"
+        return rttext
+
+    def EDUenhance(self, times: int) -> str:
+        if times > 4:
+            return ""
+        rttext = ""
+        timelist = ["一", "二", "三", "四"]
+        for j in range(times):
+            a = dicemdn(1, 100)[0]
+            if a > self.data.EDU:
+                rttext += "第"+timelist[j]+"次检定增强："+str(a)+"成功，获得"
+                a = min(99-self.data.EDU, np.random.randint(1, 11))
+                rttext += str(a)+"点提升。\n"
+                self.data.EDU += a
+            else:
+                rttext += "第"+timelist[j]+"次检定增强："+str(a)+"失败。\n"
+        return rttext
 
     def basicinfo(self) -> str:
         rttext: str = ""
@@ -262,7 +404,7 @@ class GameCard(datatype):
 
         rttext += "角色卡id: "+str(self.id)+"\n"
         rttext += "playerid: "+str(self.playerid)+"\n"
-        rttext += "groupid: "+str(self.groupid)+"\n"
+        rttext += "groupid: "+str(self.groupid)+"\n\n"
 
         rttext += "基础数值: "+"\n"
         rttext += str(self.data)+"\n"
@@ -284,7 +426,7 @@ class GameCard(datatype):
         rttext += "其他属性: "+"\n"
         rttext += str(self.attr)+"\n"
 
-        rttext += "背景故事: "+"\n"
+        rttext += "背景: "+"\n"
         rttext += str(self.background)+"\n"
 
         rttext += "临时检定加成: "+"\n"
@@ -330,8 +472,65 @@ class GameCard(datatype):
         return self.tempstatus.getstatus(attr)
 
     def cardConstruct(self):
+        self.skill.card = self
+        self.interest.card = self
         self.data.card = self
         self.background.card = self
+
+    def generateOtherAttributes(self) -> None:
+        """获取到年龄之后，通过年龄计算一些衍生数据。"""
+        if self.data.datadec is not None:
+            return
+
+        if self.attr.SAN == 0:
+            self.attr.SAN = self.data.POW
+
+        if self.attr.MAGIC == 0:
+            self.attr.MAGIC = self.data.POW//5
+
+        if self.attr.MAXLP == 0:
+            self.attr.MAXLP = (self.data.SIZ+self.data.CON)//10
+            self.attr.LP = self.attr.MAXLP
+
+        if self.attr.build < -2:
+            if self.data.STR+self.data.SIZ < 65:
+                self.attr.build = -2
+            elif self.data.STR+self.data.SIZ < 85:
+                self.attr.build = -1
+            elif self.data.STR+self.data.SIZ < 125:
+                self.attr.build = 0
+            elif self.data.STR+self.data.SIZ < 165:
+                self.attr.build = 1
+            elif self.data.STR+self.data.SIZ < 205:
+                self.attr.build = 2
+            else:
+                self.attr.build = 2 + \
+                    (self.data.STR+self.data.SIZ-125)//80
+
+        if self.attr.MOV == 0:
+            if self.data.DEX < self.data.SIZ and self.data.STR < self.data.SIZ:
+                mov = 7
+            elif self.data.DEX > self.data.SIZ and self.data.STR > self.data.SIZ:
+                mov = 9
+            else:
+                mov = 8
+
+            if self.info.age < 40:
+                self.attr.MOV = mov
+            elif self.info.age >= 80:
+                self.attr.MOV = mov-5
+            else:
+                self.attr.MOV = mov - (self.info.age - 30)//10
+
+        if self.attr.DB == "":
+            if self.attr.build <= 0:
+                self.attr.DB = str(self.attr.build)
+            elif self.attr.build == 1:
+                self.attr.DB = "1d4"
+            else:
+                self.attr.DB = str(self.attr.build-1)+"d6"
+
+        self.write()
 
     def check(self) -> str:
         """如果卡片可以开始游戏，则返回空字符串，否则返回原因"""
@@ -346,9 +545,12 @@ class GameCard(datatype):
             rttext += t+"\n"
 
         t = self.skill.check()
-        rttext += "主要"+t+"\n" if t != "" else ""
+        if t != "":
+            rttext += "主要"+t+"\n"
+
         t = self.interest.check()
-        rttext += "兴趣"+t if t != "" else ""
+        if t != "":
+            rttext += "兴趣"+t+"\n"
 
         t = self.attr.check()
         if t != "":
@@ -544,7 +746,8 @@ class GroupGame(datatype):  # If defined, game is started.
 
     def to_json(self, jumpkey: List[str] = ["group", "cards", "kp", "kpctrl"]) -> dict:
         d = super().to_json(jumpkey=jumpkey)
-        d["kpctrl"] = self.kpctrl.id
+        if self.kpctrl is not None:
+            d["kpctrl"] = self.kpctrl.id
         return d
 
     def show(self, attr: str, jumpkey: List[str] = []) -> str:
@@ -847,6 +1050,11 @@ class Group(datatype):
         with open(PATH_GROUPS+str(self.id)+".json", 'w', encoding='utf-8') as f:
             json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
 
+    def delete(self):
+        if not isinstance(self.id, int):
+            raise ValueError("删除文件时，Group实例没有id")
+        os.remove(PATH_GROUPS+str(self.id)+".json")
+
     def __str__(self) -> str:
         rttext = "群id："+str(self.id)+"\n"
         rttext += "相关卡片id："+', '.join(map(str, self.cards.keys()))+"\n"
@@ -883,10 +1091,10 @@ class CardData(datatype):
         self.LUCK: int = 0
         self.TOTAL: int = 0
         self.datainfo: str = ""
-        self.__datanames: List[str] = ["STR", "SIZ", "CON",
-                                       "DEX", "POW", "APP", "INT", "EDU"]
+        self.datanames: List[str] = ["STR", "SIZ", "CON",
+                                     "DEX", "POW", "APP", "INT", "EDU"]
         self.alldatanames: List[str] = copy.copy(
-            self.__datanames)
+            self.datanames)
         self.alldatanames.append("LUCK")
         self.datadec: Optional[Tuple[str, int]] = None
         self.card: GameCard = None  # 用cardConstruct()赋值
@@ -900,13 +1108,16 @@ class CardData(datatype):
         if "datadec" in d:
             self.datadec = (d["datadec"][0], d["datadec"][1])
 
-    def to_json(self, jumpkey: List[str] = ["card", "__datanames", "alldatanames"]) -> dict:
-        return super().to_json(jumpkey=jumpkey)
+    def to_json(self, jumpkey: List[str] = ["card", "datanames", "alldatanames", "datadec"]) -> dict:
+        d = super().to_json(jumpkey=jumpkey)
+        if self.datadec is not None:
+            d["datadec"] = [self.datadec[0], self.datadec[1]]
+        return d
 
     def show(self, attr: str, jumpkey: List[str] = ["card"]) -> str:
         return super().show(attr, jumpkey=jumpkey)
 
-    def modify(self, attr: str, val, jumpkey: List[str] = ["card", "TOTAL", "datainfo", "__datanames", "alldatanames", "datadec"]) -> Tuple[str, bool]:
+    def modify(self, attr: str, val, jumpkey: List[str] = ["card", "TOTAL", "datainfo", "datanames", "alldatanames", "datadec"]) -> Tuple[str, bool]:
         ans = super().modify(attr, val, jumpkey=jumpkey)
         self.total()
         return ans
@@ -925,7 +1136,7 @@ class CardData(datatype):
         self.write()
         return self.TOTAL
 
-    def randdata(self) -> None:
+    def randdata(self, write: bool = True) -> None:
         text = ""
         a, b, c = dicemdn(3, 6)
         self.STR = 5*(a+b+c)
@@ -952,25 +1163,28 @@ class CardData(datatype):
         self.EDU = 5*(a+b+6)
         text += get2d6_6str("EDU", a, b)
         self.datainfo = text
-        self.write()
+        if write:
+            self.write()
 
     def countless50discard(self) -> bool:
         countless50 = 0
-        for key in self.__datanames:
+        for key in self.datanames:
             if self.__dict__[key] < 50:
                 countless50 += 1
         return countless50 >= 3
 
     def __str__(self) -> str:
-        rttext = "\n".join([self.__dict__[x] for x in self.alldatanames])
-        rttext += self.datadec[0]+"下降值" + \
-            self.datadec[1] if self.datadec is not None else ""
-        rttext += "\n总和："+self.total()
+        rttext = "\n".join([x+"："+str(self.__dict__[x])
+                            for x in self.alldatanames])
+        if self.datadec is not None:
+            rttext += "\n"+self.datadec[0]+"下降值" + str(self.datadec[1])
+        rttext += "\n总和："+str(self.total())+"\n"
+        return rttext
 
     def check(self) -> str:
         rttext: str = ""
 
-        if any(self.__dict__[x] == 0 for x in self.__datanames):
+        if any(self.__dict__[x] == 0 for x in self.datanames):
             rttext += "基础7项属性为默认值"
         elif self.LUCK == 0:
             rttext += "幸运未设置，请先设置年龄"
@@ -1031,7 +1245,7 @@ class CardInfo(datatype):
     def __str__(self) -> str:
         rttext: str = ""
         rttext += "姓名："+self.name+"\n"
-        rttext += "年龄："+self.age+"\n"
+        rttext += "年龄："+str(self.age)+"\n"
         rttext += "性别："+self.sex+"\n"
         rttext += "职业："+self.job+"\n"
         return rttext
@@ -1054,6 +1268,7 @@ class CardInfo(datatype):
 class skilltype(datatype):  # skill的基类，只包含一个属性skills
     def __init__(self):
         self.skills: Dict[str, int] = {}
+        
 
     def get(self, skillname: str) -> int:
         if skillname in self.skills:
@@ -1063,8 +1278,8 @@ class skilltype(datatype):  # skill的基类，只包含一个属性skills
     def set(self, skillname: str, val: int) -> None:
         self.skills[skillname] = val
 
-    def modify(self, attr: str, val: str, jumpkey: List[str] = []) -> Tuple[str, bool]:
-        if attr in __skd:
+    def modify(self, attr: str, val: str, jumpkey: List[str] = ["card"]) -> Tuple[str, bool]:
+        if attr in skl:
             if not isint(val):
                 raise TypeError("技能值不是int")
             ans = (str(self.skills[attr]),
@@ -1081,19 +1296,28 @@ class skilltype(datatype):  # skill的基类，只包含一个属性skills
 class Skill(skilltype):
     def __init__(self, d: dict = {}):
         super().__init__()
+        self.card:GameCard = None # cardconstruct()赋值
         self.points: int = -1
         self.type: str = "主要"
         if len(d) > 0:
             self.read_json(d=d)
 
-    def show(self, attr: str, jumpkey: List[str] = []) -> str:
+    def to_json(self, jumpkey: List[str]={"card"}) -> dict:
+        return super().to_json(jumpkey=jumpkey)
+
+    def set(self, skillname: str, val: int, costpt:int = 0) -> None:
+        super().set(skillname, val)
+        self.points -=costpt
+        self.write()
+
+    def show(self, attr: str, jumpkey: List[str] = ["card"]) -> str:
         if attr == "points":
             return str(self.points)
         if attr in self.skills:
             return str(self.skills[attr])
         return "找不到该属性"
 
-    def modify(self, attr: str, val: str, jumpkey: List[str] = []) -> Tuple[str, bool]:
+    def modify(self, attr: str, val: str, jumpkey: List[str] = ["card"]) -> Tuple[str, bool]:
         if attr == "points":
             ans = (str(self.points), True)
             if not isint(val):
@@ -1103,11 +1327,30 @@ class Skill(skilltype):
 
         return super().modify(attr, val, jumpkey=jumpkey)
 
+    def write(self):
+        if self.card is not None:
+            self.card.write()
+
     def check(self) -> str:
         if self.points < 0:
             return "技能未开始设置"
+
+        pops = []
+        for sk in self.allskills():
+            if sk not in skl:
+                continue
+            if self.get(sk) == skl[sk]:
+                pops.append(sk)
+
+        for sk in pops:
+            self.skills.pop(sk)
+
+        if len(pops):
+            self.write()
+
         if self.points > 0:
             return "技能点有剩余"
+        return ""
 
     def __str__(self) -> str:
         if self.points == -1:
@@ -1135,7 +1378,7 @@ class SgSkill(skilltype):
         return self.skills.pop(skillname)
 
     def __str__(self) -> str:
-        rttext: str = "建议技能：\n"
+        rttext: str = "\n"
         for key in self.allskills():
             rttext += f"{key}：{self.get(key)}"
 
@@ -1144,9 +1387,10 @@ class SgSkill(skilltype):
 
 class CardAttr(datatype):
     def __init__(self, d: dict = {}):
+        self.sandown: str = "0/0"
         self.DB: str = ""
-        self.MOV: str = ""
-        self.atktimes: str = ""
+        self.MOV: int = 0
+        self.atktimes: int = 1
         self.build: int = -10
         self.SAN: int = 0
         self.MAXSAN: int = 99
@@ -1159,17 +1403,20 @@ class CardAttr(datatype):
     def __str__(self) -> str:
         rttext: str = ""
         rttext += "伤害加深："+self.DB
-        rttext += "移动速度："+self.MOV
-        rttext += "攻击次数："+self.atktimes
-        rttext += "体格："+str(self.build)
-        rttext += "SAN："+str(self.SAN)
-        rttext += "SAN上限："+str(self.MAXSAN)
-        rttext += "生命值："+str(self.LP)
-        rttext += "生命值上限："+str(self.MAXLP)
-        rttext += "魔法值："+str(self.MAGIC)
+        rttext += "\n移动速度："+str(self.MOV)
+        rttext += "\n攻击次数："+str(self.atktimes)
+        rttext += "\n体格："+str(self.build)
+        rttext += "\nSAN："+str(self.SAN)
+        rttext += "\nSAN上限："+str(self.MAXSAN)
+        rttext += "\n生命值："+str(self.LP)
+        rttext += "\n生命值上限："+str(self.MAXLP)
+        rttext += "\n魔法值："+str(self.MAGIC)
+        if self.sandown != "0/0":
+            rttext += "\n目击时，san值下降"+self.sandown
+        return rttext+"\n"
 
     def check(self) -> str:
-        return "衍生属性未计算" if any(self.__dict__[key] == "" for key in ("DB", "MOV")) or self.build == -10 or self.MAXLP == 0 else ""
+        return "衍生属性未计算" if self.DB == "" or self.MOV == 0 or self.build < -2 or self.MAXLP == 0 else ""
 
 
 class CardBackground(datatype):
@@ -1201,17 +1448,17 @@ class CardBackground(datatype):
         rttext = ""
 
         if self.description == "":
-            rttext += "未设置背景故事"
+            rttext += "未设置背景故事\n"
         if self.vip == "":
-            rttext += "未设置重要之人"
+            rttext += "未设置重要之人\n"
         if self.viplace == "":
-            rttext += "未设置重要之地"
+            rttext += "未设置重要之地\n"
         if self.faith == "":
-            rttext += "未设置信仰"
+            rttext += "未设置信仰\n"
         if self.preciousthing == "":
-            rttext += "未设置珍视之物"
+            rttext += "未设置珍视之物\n"
         if self.speciality == "":
-            rttext += "未设置性格特点"
+            rttext += "未设置性格特点\n"
 
         return rttext
 

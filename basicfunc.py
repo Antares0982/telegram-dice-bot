@@ -144,16 +144,9 @@ def plainNewCard() -> dict:
         "suggestskill": {
 
         },
-        # "cardcheck": {
-        #     "check1": False,  # 年龄是否设定
-        #     "check2": False,  # str, con, dex等设定是否完成
-        #     "check3": False,  # job是否设定完成
-        #     "check4": False,  # skill是否设定完成
-        #     "check5": False  # 名字等是否设定完成
-        # },
         "attr": {
             "build": -10,
-            "DB": "-100",
+            "DB": "",
             "MOV": 0,
             "atktimes": 1,
             "sandown": "0/0",
@@ -174,7 +167,7 @@ def plainNewCard() -> dict:
         "tempstatus": {
             "GLOBAL": 0
         },
-        "item": "",
+        "item": [],
         "assets": "",
         "type": "PL",
         "discard": False,
@@ -215,13 +208,6 @@ def templateNewCard() -> dict:
         "suggestskill": {
 
         },
-        # "cardcheck": {
-        #     "check1": False,  # 年龄是否设定
-        #     "check2": False,  # str, con, dex等设定是否完成
-        #     "check3": False,  # job是否设定完成
-        #     "check4": False,  # skill是否设定完成
-        #     "check5": False  # 名字等是否设定完成
-        # },
         "attr": {
             "SAN": 0,
             "MAXSAN": 99,
@@ -229,7 +215,7 @@ def templateNewCard() -> dict:
             "MAXLP": 0,
             "LP": 0,
             "build": -10,
-            "DB": "-100",
+            "DB": "",
             "MOV": 0,
             "atktimes": 1,
             "sandown": "1/1d6",
@@ -250,7 +236,7 @@ def templateNewCard() -> dict:
         "tempstatus": {
             "GLOBAL": 0
         },
-        "item": "",
+        "item": [],
         "assets": "",
         "type": "PL",
         "discard": False,

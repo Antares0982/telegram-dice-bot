@@ -35,8 +35,8 @@ def botexec(s: str, needreturn: bool = False):
         try:
             exec(s)
         except Exception as e:
-            dicebot.sendtoAdmin("执行失败"+str(e))
-        return
+            return "执行失败"+str(e)
+        return "执行成功"
 
     try:
         exec("t="+s)
@@ -138,10 +138,10 @@ def main() -> None:
     dispatcher.add_handler(CallbackQueryHandler(dicehandlers.button))
     dispatcher.add_handler(MessageHandler(
         Filters.command, dicehandlers.unknown))
-    dispatcher.add_handler(MessageHandler(Filters.text & (
+    dispatcher.add_handler(MessageHandler((Filters.text | Filters.status_update.migrate) & (
         ~Filters.command) & (~Filters.audio) & (~Filters.video) & (~Filters.photo) & (~Filters.sticker), dicehandlers.textHandler))
 
-    dicebot.updater.start_polling(clean=True)
+    dicebot.updater.start_polling(drop_pending_updates=True)
     dicebot.updater.idle()
 
 

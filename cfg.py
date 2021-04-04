@@ -104,7 +104,7 @@ CREATE_CARD_HELP = """建卡流程如下：
 4 设置职业。不同职业有不同的主要技能和信用范围、技能点计算方法。
 5 添加技能。使用 /addskill 添加主要技能、兴趣技能。
 6 用 /setname 设置姓名， /setsex 设置性别。
-7 用 /setbkground 设置背景信息，或 /randombackground 设置随机的背景信息。"""
+7 用 /setbkg 设置背景信息，或 /randombkg 设置随机的背景信息。"""
 
 HELP_TEXT = "欢迎使用COC dice bot，目前版本：v"+VERSION+"""
 作者：@AntaresChr
