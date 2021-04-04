@@ -561,10 +561,9 @@ class DiceBot:
         return self.IDENTIFIER == o.IDENTIFIER
 
 
-dicebot = DiceBot()
-# try:
-#     dicebot = DiceBot()
-# except:
-#     updater.bot.send_message(chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
-#     print("出现问题")
-#     exit()
+try:
+    dicebot = DiceBot()
+except:
+    updater.bot.send_message(chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
+    print("出现问题")
+    exit()
