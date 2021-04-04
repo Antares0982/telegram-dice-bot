@@ -8,12 +8,10 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 from telegram import Chat
 from telegram.ext.updater import Updater
 from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
-from telegram.inline.inlinekeyboardmarkup import InlineKeyboardMarkup
 
 from cfg import (PATH_CARDS, PATH_GAME_CARDS, PATH_GROUPS, PATH_PLAYERS,
                  PATH_SKILLDICT)
 from dicefunc import *
-
 
 PLTYPE = "PL"
 NPCTYPE = "NPC"
@@ -1268,7 +1266,6 @@ class CardInfo(datatype):
 class skilltype(datatype):  # skill的基类，只包含一个属性skills
     def __init__(self):
         self.skills: Dict[str, int] = {}
-        
 
     def get(self, skillname: str) -> int:
         if skillname in self.skills:
@@ -1296,18 +1293,18 @@ class skilltype(datatype):  # skill的基类，只包含一个属性skills
 class Skill(skilltype):
     def __init__(self, d: dict = {}):
         super().__init__()
-        self.card:GameCard = None # cardconstruct()赋值
+        self.card: GameCard = None  # cardconstruct()赋值
         self.points: int = -1
         self.type: str = "主要"
         if len(d) > 0:
             self.read_json(d=d)
 
-    def to_json(self, jumpkey: List[str]={"card"}) -> dict:
+    def to_json(self, jumpkey: List[str] = {"card"}) -> dict:
         return super().to_json(jumpkey=jumpkey)
 
-    def set(self, skillname: str, val: int, costpt:int = 0) -> None:
+    def set(self, skillname: str, val: int, costpt: int = 0) -> None:
         super().set(skillname, val)
-        self.points -=costpt
+        self.points -= costpt
         self.write()
 
     def show(self, attr: str, jumpkey: List[str] = ["card"]) -> str:

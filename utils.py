@@ -2,8 +2,8 @@
 
 import json
 from typing import (Dict, Iterable, Iterator, KeysView, List, Optional, Tuple,
-                    TypeVar, Union)
-from typing import overload
+                    TypeVar, Union, overload)
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext
@@ -998,8 +998,10 @@ def buttonaddintskill(query: CallbackQuery,  card1: Optional[GameCard], args: Li
         if card1.skill.points or card1.interest.points:
             addskill0(card1)
         else:
-            dicebot.sendto(card1.player, "接下来，如果没有设置过的话，请使用 /setname 设置姓名、 /setsex 设置性别、 /setbkg 设置背景信息。")
-            dicebot.updater.bot.send_message(card1.player.id, "背景设定中必要的部分有：故事、信仰、重要之人、意义非凡之地、珍视之物、性格特质。如果需要帮助，请点击`/help setbkg`并发送给我。", parse_mode="MarkdownV2")
+            dicebot.sendto(
+                card1.player, "接下来，如果没有设置过的话，请使用 /setname 设置姓名、 /setsex 设置性别、 /setbkg 设置背景信息。")
+            dicebot.updater.bot.send_message(
+                card1.player.id, "背景设定中必要的部分有：故事、信仰、重要之人、意义非凡之地、珍视之物、性格特质。如果需要帮助，请点击`/help setbkg`并发送给我。", parse_mode="MarkdownV2")
         return True
 
     m = getskilllevelfromdict(card1, args[1])
@@ -1094,7 +1096,8 @@ def buttonsetdec(query: CallbackQuery, card1: Optional[GameCard], args: List[str
 
         card1.generateOtherAttributes()
 
-        query.edit_message_text(f"属性下降设置完成，现在基础属性：\n{str(card1.data)}\n请点击 /setjob 设置职业。")
+        query.edit_message_text(
+            f"属性下降设置完成，现在基础属性：\n{str(card1.data)}\n请点击 /setjob 设置职业。")
         return True
 
     if len(decnames) == 3:
@@ -1252,7 +1255,8 @@ def addskill0(card1: GameCard) -> bool:
     # If card1.skill.points is 0, turn to interest.
     # Then it must be main skill. After all main skills are added, add interest skills.
     if card1.skill.points > 0:
-        if len(list(card1.suggestskill.allskills()))==0:  # Increase skills already added, because sgskill is empty
+        # Increase skills already added, because sgskill is empty
+        if len(list(card1.suggestskill.allskills())) == 0:
             # GOOD TRAP: cgmainskill
             for keys in card1.skill.allskills():
                 if keys == "points":
@@ -1621,9 +1625,6 @@ def generateNewCard(userid, groupid) -> Tuple[GameCard, str]:
     text = card.data.datainfo
     card.interest.points = card.data.INT*2
     return card, text
-
-
-
 
 
 def generatePoints(card: GameCard) -> bool:

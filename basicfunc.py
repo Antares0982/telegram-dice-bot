@@ -54,7 +54,6 @@ def isingroup(gp: Group, pl: Player) -> bool:
     return True
 
 
-
 def isadmin(update: Update, userid: int) -> bool:
     """检测发消息的人是不是群管理员"""
     if isprivatemsg(update):
@@ -81,7 +80,6 @@ def recallmsg(update: Update) -> bool:
         return False
     update.message.delete()
     return True
-
 
 
 def errorHandler(update: Update,  message: str, needrecall: bool = False) -> False:
@@ -111,6 +109,7 @@ def errorHandler(update: Update,  message: str, needrecall: bool = False) -> Fal
             msg.edit_reply_markup(reply_markup=rp_markup)
 
     return False
+
 
 def errorHandlerQ(query: CallbackQuery,  message: str) -> False:
     if message == "找不到卡。":

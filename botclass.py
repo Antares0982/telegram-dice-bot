@@ -560,6 +560,7 @@ class DiceBot:
             return False
         return self.IDENTIFIER == o.IDENTIFIER
 
+
 dicebot = DiceBot()
 # try:
 #     dicebot = DiceBot()

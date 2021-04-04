@@ -1241,6 +1241,8 @@ def continuegame(update: Update, context: CallbackContext) -> bool:
             gp.pausedgame.cards[card.id] = ngcard
             dicebot.gamecards[card.id] = gp.pausedgame.cards[card.id]
 
+    gp.game = gp.pausedgame
+    gp.pausedgame = None
     gp.write()
     update.message.reply_text("游戏继续！")
     return True
@@ -1624,6 +1626,10 @@ def roll(update: Update, context: CallbackContext):
         test += gamecard.getstatus(dicename)
     test += tpcheck
 
+    if test > 99:
+        test = 99
+    elif test < 1:
+        test = 1
     testval = utils.dicemdn(1, 100)[0]
     rttext = dicename+" 检定/出目："+str(test)+"/"+str(testval)+" "
 
@@ -2387,10 +2393,10 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
         if card1 is None:
             return utils.errorHandler(update, "找不到卡。")
 
-    rttext = "检定：理智 "
+    rttext = "理智：检定/出目 "
     sanity = card1.attr.SAN
     check = utils.dicemdn(1, 100)[0]
-    rttext += str(check)+"/"+str(sanity)+" "
+    rttext += str(sanity)+"/"+str(check)+" "
     greatfailrule = gp.rule.greatfail
     if (sanity < 50 and check >= greatfailrule[2] and check <= greatfailrule[3]) or (sanity >= 50 and check >= greatfailrule[0] and check <= greatfailrule[1]):  # 大失败
         rttext += "大失败"
@@ -2399,6 +2405,7 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
         rttext += "失败"
         anstype = "失败"
     else:
+        rttext += "成功"
         anstype = ""
 
     rttext += "\n损失理智："
@@ -2444,6 +2451,7 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
     elif sanloss >= 5:
         rttext += "一次损失5点或以上理智，可能需要进行智力（灵感）检定。\n"
 
+    update.message.reply_text(rttext)
     card1.write()
     return True
 

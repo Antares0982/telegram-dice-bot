@@ -1,5 +1,4 @@
 # -*- coding:utf-8 -*-
-# version: 1.0.9
 
 import json
 import logging
