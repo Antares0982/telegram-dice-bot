@@ -886,7 +886,8 @@ class CardData(datatype):
         self.__datanames: List[str] = ["STR", "SIZ", "CON",
                                        "DEX", "POW", "APP", "INT", "EDU"]
         self.alldatanames: List[str] = copy.copy(
-            self.__datanames).append("LUCK")
+            self.__datanames)
+        self.alldatanames.append("LUCK")
         self.datadec: Optional[Tuple[str, int]] = None
         self.card: GameCard = None  # 用cardConstruct()赋值
         if len(d) == 0:
