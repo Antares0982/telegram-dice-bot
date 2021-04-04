@@ -218,7 +218,7 @@ def templateNewCard() -> dict:
             "MOV": 0,
             "atktimes": 1,
             "sandown": "1/1d6",
-            "Armor": ""
+            "armor": ""
         },
         "background": {
             "description": "",

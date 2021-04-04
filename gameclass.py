@@ -1394,6 +1394,7 @@ class CardAttr(datatype):
         self.LP: int = 0
         self.MAXLP: int = 0
         self.MAGIC: int = 0
+        self.armor:str = ""
         if len(d) > 0:
             self.read_json(d=d)
 
