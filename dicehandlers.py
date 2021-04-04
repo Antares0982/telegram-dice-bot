@@ -240,10 +240,10 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
     delnum = 1
     chatid = utils.getchatid(update)
 
-    if utils.isgroupmsg(update) and not utils.isadmin(update, utils.BOT_ID):
+    if utils.isgroupmsg(update) and not utils.isadmin(update, BOT_ID):
         return utils.errorHandler(update, "Bot没有管理权限")
 
-    if utils.isgroupmsg(update) and utils.checkaccess(dicebot.forcegetplayer(update), dicebot.forcegetgroup(update)) & (GROUPKP | GROUPADMIN) != 0:
+    if utils.isgroupmsg(update) and utils.checkaccess(dicebot.forcegetplayer(update), dicebot.forcegetgroup(update)) & (GROUPKP | GROUPADMIN) == 0:
         return utils.errorHandler(update, "没有权限", True)
 
     if len(context.args) >= 1:
