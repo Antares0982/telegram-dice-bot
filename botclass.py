@@ -549,7 +549,7 @@ class DiceBot:
             raise e
         except:
             if isinstance(pl, Player):
-                return self.sendtoAdmin(f"无法向用户{self.forcegetplayer(pl.id).getname()}发送消息："+msg)
+                return self.sendtoAdmin(f"无法向用户{pl.getname()}发送消息："+msg)
             return self.sendtoAdmin(f"无法向用户{self.forcegetplayer(pl).getname()}发送消息："+msg)
 
     def autoswitchhint(self, plid: int) -> None:
