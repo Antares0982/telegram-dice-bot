@@ -1673,7 +1673,7 @@ def checkaccess(pl: Player, thing) -> int:
             f |= CANDISCARD
 
         if (card.group.kp is not None and card.group.kp == pl) or pl.id == ADMIN_ID:
-            f |= CANMODIFY
+            f |= CANMODIFY | CANREAD
 
         return f
 

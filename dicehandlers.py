@@ -1863,7 +1863,7 @@ def showcard(update: Update, context: CallbackContext) -> bool:
             return utils.errorHandler(update, "找不到这张卡")
 
     if rttext == "":
-        rttext = "显示游戏内的卡片\n"
+        rttext = "显示游戏外的卡片\n"
 
     # 检查是否有权限
     if utils.isprivatemsg(update):
