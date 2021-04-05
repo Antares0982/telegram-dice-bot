@@ -2031,8 +2031,14 @@ def modify(update: Update, context: CallbackContext) -> bool:
 
     if not utils.checkaccess(pl, card) & CANMODIFY:
         return utils.errorHandler(update, "没有权限", True)
+
     try:
-        ans, ok = card.modify(context.args[1], context.args[2])
+        if context.args[1] == "mainpoints":
+            ans, ok = card.skill.modify("points", context.args[2])
+        elif context.args[1] == "intpoints":
+            ans, ok = card.interest.modify("points", context.args[2])
+        else:
+            ans, ok = card.modify(context.args[1], context.args[2])
     except TypeError as e:
         return utils.errorHandler(update, str(e))
 
