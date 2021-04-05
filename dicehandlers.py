@@ -1371,7 +1371,7 @@ def switch(update: Update, context: CallbackContext):
 def switchgamecard(update: Update, context: CallbackContext):
     """用于KP切换游戏中进行对抗时使用的NPC卡片。
 
-    （仅限私聊时）`/swtichkp --groupid`：创建按钮，让KP选择要用的卡。
+    （仅限私聊时）`/switchgamecard --groupid`：创建按钮，让KP选择要用的卡。
     （私聊群聊皆可）`/switchgamecard --cardid`：切换到id为cardid的卡并控制。"""
     if utils.ischannel(update):
         return False
