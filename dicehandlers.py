@@ -7,13 +7,12 @@ from typing import Dict, List, Optional, Tuple
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.callbackquery import CallbackQuery
-from telegram.error import ChatMigrated
 from telegram.ext import CallbackContext
 
 import utils
 from cfg import *
-from gameclass import (PLTYPE, CardBackground, GameCard, Group, GroupGame,
-                       Player)
+from gameclass import (PLTYPE, CardBackground, GameCard,
+                       Group, GroupGame, Player)
 from utils import dicebot
 
 # FLAGS
@@ -2222,7 +2221,7 @@ def changegroup(update: Update, context: CallbackContext) -> bool:
 
     # 开始执行
     card = dicebot.popcard(cdid)
-    utils.cardadd(card, newgpid)
+    utils.addcardoverride(card, newgpid)
     cardname = card.getname()
     update.message.reply_text(
         "操作成功，已经将卡片"+cardname+"从群："+str(oldgp.id)+"移动到群："+str(newgpid))

@@ -2,7 +2,7 @@
 import json
 import os
 import time
-from typing import overload
+from typing import Union, overload
 
 from telegram import Update
 from telegram.error import BadRequest, ChatMigrated
@@ -13,6 +13,7 @@ from basicfunc import *
 from cfg import *
 from gameclass import *
 
+#初始化updater
 if PROXY:
     updater = Updater(token=TOKEN, request_kwargs={
         'proxy_url': PROXY_URL}, use_context=True)
@@ -38,6 +39,7 @@ class DiceBot:
         self.addskillrequest: Dict[int, Tuple[str, int]] = {}
         self.migratefrom: Optional[int] = None
         self.migrateto: Optional[int] = None
+        self.skillpages: List[List[str]]
 
     def readall(self) -> None:
         # 初始化
@@ -80,6 +82,8 @@ class DiceBot:
         # skilldict
         with open(PATH_SKILLDICT, 'r', encoding='utf-8') as f:
             self.skilllist = json.load(f)
+
+        self.skillpages = self.createSkillPages()
 
     def construct(self) -> None:
         """创建变量之间的引用"""
@@ -154,6 +158,18 @@ class DiceBot:
 
         # ids
         self.allids.sort()
+
+    def createSkillPages(self) -> List[List[str]]:
+        """创建技能的分页列表，用于添加兴趣技能"""
+        # 一页16个
+        skillPaged: List[List[str]] = [["母语", "闪避"]]
+        for key in self.skilllist:
+            if key == "克苏鲁神话":
+                continue
+            if len(skillPaged[len(skillPaged)-1]) == 16:
+                skillPaged.append([])
+            skillPaged[len(skillPaged)-1].append(key)
+        return skillPaged
 
     def readhandlers(self) -> List[str]:
         """读取全部handlers。
@@ -240,7 +256,7 @@ class DiceBot:
     def getgp(self, update: Update) -> Optional[Group]:
         ...
 
-    def getgp(self, update):
+    def getgp(self, update: Union[int, Update]):
         if isinstance(update, Update):
             assert(isgroupmsg(update))
             return None if getchatid(update) not in self.groups else self.groups[getchatid(update)]
@@ -256,7 +272,7 @@ class DiceBot:
     def creategp(self, update: Update) -> Group:
         ...
 
-    def creategp(self, update) -> Group:
+    def creategp(self, update: Union[int, Update]) -> Group:
         if isinstance(update, Update):
             assert(isgroupmsg(update))
             return self.creategp(getchatid(update))
@@ -282,7 +298,7 @@ class DiceBot:
     def forcegetgroup(self, update: Update) -> Group:
         ...
 
-    def forcegetgroup(self, update) -> Group:
+    def forcegetgroup(self, update: Union[int, Update]) -> Group:
         if isinstance(update, Update):
             assert(isgroupmsg(update))
             return self.forcegetgroup(getchatid(update))
@@ -297,7 +313,7 @@ class DiceBot:
     def getplayer(self, update: Update) -> Optional[Player]:
         ...
 
-    def getplayer(self, update) -> Optional[Player]:
+    def getplayer(self, update: Union[int, Update]) -> Optional[Player]:
         if isinstance(update, Update):
             return None if getmsgfromid(update) not in self.players else self.players[getmsgfromid(update)]
         if isinstance(update, int):
@@ -312,7 +328,7 @@ class DiceBot:
     def createplayer(self, update: Update) -> Player:
         ...
 
-    def createplayer(self, update) -> Player:
+    def createplayer(self, update: Union[int, Update]) -> Player:
         if isinstance(update, Update):
             return self.createplayer(getmsgfromid(update))
         plid: int = update
@@ -339,7 +355,7 @@ class DiceBot:
     def forcegetplayer(self, update: Update) -> Player:
         ...
 
-    def forcegetplayer(self, update) -> Player:
+    def forcegetplayer(self, update: Union[int, Update]) -> Player:
         if isinstance(update, Update):
             return self.forcegetplayer(getmsgfromid(update))
         plid: int = update
@@ -351,7 +367,7 @@ class DiceBot:
     def getgamecard(self, cdid: int) -> Optional[GameCard]:
         return self.gamecards[cdid] if cdid in self.gamecards else None
 
-    def addcard(self, card: GameCard) -> bool:
+    def addcard(self, card: GameCard, dontautoswitch:bool = False) -> bool:
         """添加一张游戏外的卡，当卡id重复时返回False"""
         assert(not card.isgamecard)
 
@@ -373,12 +389,16 @@ class DiceBot:
         pl.cards[card.id] = card
         card.player = pl
 
-        if pl.controlling:
-            self.autoswitchhint(pl.id)
-        pl.controlling = card
+        if not dontautoswitch:
+            if pl.controlling is not None:
+                self.autoswitchhint(pl.id)
+            pl.controlling = card
 
         pl.write()
         card.write()
+        if card.group.kp is not None:
+            self.sendto(
+                card.group.kp, f"您的群 {card.group.getname()} 新增了一张卡片，玩家是 {card.player.getname()} ，卡id：{str(card.id)}")
         return True
 
     def popcard(self, cdid: int) -> GameCard:
@@ -533,7 +553,7 @@ class DiceBot:
     def sendto(self, plid: int, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Message:
         ...
 
-    def sendto(self, pl, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Message:
+    def sendto(self, pl: Union[Player, int], msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Message:
         try:
             if rpmarkup is not None:
                 if isinstance(pl, Player):

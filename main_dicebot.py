@@ -11,13 +11,14 @@ from typing import List
 from telegram import Update
 from telegram.ext import (CallbackContext, CallbackQueryHandler,
                           CommandHandler, Filters, MessageHandler)
+from telegram.ext.dispatcher import Dispatcher
 
 import dicehandlers
 from cfg import *
 from dicehandlers import dicebot
 from utils import chatinit, errorHandler, ischannel
 
-dispatcher = dicebot.updater.dispatcher
+dispatcher:Dispatcher = dicebot.updater.dispatcher
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)

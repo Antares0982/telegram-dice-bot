@@ -7,7 +7,6 @@ from typing import (Dict, Iterable, Iterator, KeysView, List, Optional, Tuple,
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext
-from telegram.message import Message
 
 from basicfunc import *
 from botclass import GameCard, Group, GroupGame, Player, dicebot
@@ -29,11 +28,11 @@ GROUPKP = 2
 GROUPADMIN = 4
 BOTADMIN = 8
 
-SKILL_PAGES: List[List[str]]
-
 
 # 读取完成
 dicebot.sendtoAdmin("Bot is live!")
+
+# dicebot 动作
 
 
 def __getgp(gpid: Union[int, Update]) -> Optional[Group]:
@@ -101,7 +100,7 @@ def cardpop(id: int) -> Optional[GameCard]:
     ...
 
 
-def cardpop(id) -> Optional[GameCard]:
+def cardpop(id: Union[GameCard, int]) -> Optional[GameCard]:
     """删除一张卡并返回其数据。返回None则删除失败"""
     if isinstance(id, int):
         return dicebot.popcard(id) if dicebot.getcard(id) is not None else None
@@ -111,28 +110,14 @@ def cardpop(id) -> Optional[GameCard]:
     return dicebot.popcard(card.id)
 
 
-def cardadd(card: GameCard, gpid: int) -> bool:
-    """添加一张游戏外的卡，当卡id重复时返回False。该函数忽略原本card.groupid"""
-    if card.id in dicebot.allids:
-        return False
-    # 增加id
-    dicebot.allids.append(card.id)
-    dicebot.allids.sort()
-    # 增加群索引
-    gp = __forcegetgroup(gpid)
-    card.group = gp
-    card.groupid = gpid
-    gp.cards[card.id] = card
-    gp.write()
-    # 增加pl索引
-    pl = __forcegetplayer(card.playerid)
-    pl.cards[card.id] = card
-    card.player = pl
-    if pl.controlling:
-        dicebot.autoswitchhint(pl.id)
-    pl.controlling = card
-    pl.write()
-    return True
+def addcardoverride(card: GameCard, id: int, dontautoswitch: bool = False) -> bool:
+    """添加一张游戏外的卡，当卡id重复时返回False。该函数忽略原本card.groupid或者card.playerid"""
+    if id < 0:
+        card.groupid = id
+    else:
+        card.playerid = id
+
+    return dicebot.addcard(card, dontautoswitch)
 
 
 # operation 查增删
@@ -152,20 +137,6 @@ def getOP(chatid) -> str:
     return dicebot.operation[chatid]
 
 
-def createSkillPages() -> List[List[str]]:
-    """创建技能的分页列表，用于添加兴趣技能"""
-    # 一页16个
-    skillPaged: List[List[str]] = [["母语", "闪避"]]
-    for key in dicebot.skilllist:
-        if key == "克苏鲁神话":
-            continue
-        if len(skillPaged[len(skillPaged)-1]) == 16:
-            skillPaged.append([])
-        skillPaged[len(skillPaged)-1].append(key)
-    return skillPaged
-
-
-SKILL_PAGES = createSkillPages()
 # id相关
 
 
@@ -800,7 +771,7 @@ def cgcredit(update: Update, card1: GameCard) -> bool:
 
 def showskillpages(page: int, card1: GameCard) -> Tuple[str, List[List[InlineKeyboardButton]]]:
     IDENTIFIER = dicebot.IDENTIFIER
-    thispageskilllist = SKILL_PAGES[page]
+    thispageskilllist = dicebot.skillpages[page]
     rttext = f"添加/修改兴趣技能，剩余点数：{str(card1.interest.points)}。目前的数值/基础值如下："
     rtbuttons = [[]]
     for key in thispageskilllist:
@@ -819,7 +790,7 @@ def showskillpages(page: int, card1: GameCard) -> Tuple[str, List[List[InlineKey
     if page == 0:
         rtbuttons.append([InlineKeyboardButton(
             text="下一页", callback_data=IDENTIFIER+" addintskill page 1")])
-    elif page == len(SKILL_PAGES)-1:
+    elif page == len(dicebot.skillpages)-1:
         rtbuttons.append([InlineKeyboardButton(
             text="上一页", callback_data=IDENTIFIER+" addintskill page "+str(page-1))])
     else:
@@ -1188,7 +1159,7 @@ def changecardgpid(oldgpid: int, newgpid: int) -> bool:
     oldcdidlst = list(__forcegetgroup(oldgpid).cards.keys())
     for cdid in oldcdidlst:
         card = cardpop(oldgpid, cdid)
-        cardadd(card, newgpid)
+        addcardoverride(card, newgpid)
     __getgp(oldgpid).write()
     __getgp(newgpid).write()
 
@@ -1216,7 +1187,7 @@ def groupcopy(oldgpid: int, newgpid: int, copyall: bool) -> bool:
         dstlist[i].id = newids[i]
 
     for card in dstlist:
-        cardadd(card, newgpid)
+        addcardoverride(card, newgpid)
 
     __getgp(newgpid).write()
     oldgp.write()
@@ -1641,7 +1612,7 @@ def checkaccess(pl: Player, gp: Group) -> int:
     ...
 
 
-def checkaccess(pl: Player, thing) -> int:
+def checkaccess(pl: Player, thing: Union[GameCard, Group]) -> int:
     """用FLAG给出玩家对角色卡或群聊的权限。
     卡片：
     CANREAD = 1

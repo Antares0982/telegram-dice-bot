@@ -2,14 +2,7 @@
 from typing import List
 
 import numpy as np
-
-
-def isint(a: str) -> bool:
-    try:
-        int(a)
-    except:
-        return False
-    return True
+from basicfunc import isint
 
 
 def dicemdn(m: int, n: int) -> List[int]:

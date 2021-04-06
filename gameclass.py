@@ -9,10 +9,9 @@ from telegram import Chat
 from telegram.ext.updater import Updater
 from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
 
-from cfg import (PATH_CARDS, PATH_GAME_CARDS, PATH_GROUPS, PATH_PLAYERS,
-                 PATH_SKILLDICT)
+from cfg import *
 from dicefunc import *
-
+from basicfunc import *
 PLTYPE = "PL"
 NPCTYPE = "NPC"
 
@@ -21,54 +20,8 @@ skl: Dict[str, int]
 with open(PATH_SKILLDICT, 'r', encoding='utf-8') as f:
     skl = json.load(f)
 
-
-def istrueconsttype(val) -> bool:
-    """如果val是int, str, bool才返回True"""
-    return isinstance(val, int) or isinstance(val, str) or isinstance(val, bool)
-
-
-def isconsttype(val) -> bool:
-    if istrueconsttype(val):
-        return True
-    if isinstance(val, list):
-        for e in val:
-            if not isconsttype(e):
-                return False
-        return True
-    if isinstance(val, dict):
-        for k in val:
-            v = val[k]
-            if not isconsttype(v) or not isconsttype(k):
-                return False
-        return True
-    return False
-
-
-def isallkeyint(d: dict) -> bool:
-    for key in d:
-        if not isint(key):
-            return False
-    return True
-
-
-def turnkeyint(d: dict) -> Dict[int, Any]:
-    dd: Dict[int, Any] = {}
-    for key in d:
-        dd[int(key)] = d[key]
-    return dd
-
-# 基类
-
-
-def tobool(x: str) -> bool:
-    if x in ["F", "false", "False", "假"]:
-        return False
-    elif x in ["T", "true", "True", "真"]:
-        return True
-    raise TypeError("不是可识别的bool")
-
-
 class datatype:
+    """基类"""
     def read_json(self, d: dict, jumpkeys: List[str] = []) -> None:
         """把除了jumpkeys以外的key全部读入self.__dict__"""
         for key in iter(self.__dict__):
@@ -1394,7 +1347,7 @@ class CardAttr(datatype):
         self.LP: int = 0
         self.MAXLP: int = 0
         self.MAGIC: int = 0
-        self.armor:str = ""
+        self.armor: str = ""
         if len(d) > 0:
             self.read_json(d=d)
 

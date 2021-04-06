@@ -11,6 +11,14 @@ from gameclass import Group, Player
 # Update相关
 
 
+def isint(a: str) -> bool:
+    try:
+        int(a)
+    except:
+        return False
+    return True
+
+
 def getchatid(update: Update) -> int:
     """返回effective_chat.id"""
     return update.effective_chat.id
@@ -123,6 +131,50 @@ def errorHandlerQ(query: CallbackQuery,  message: str) -> False:
         query.edit_message_text(message)
 
     return False
+
+
+def istrueconsttype(val) -> bool:
+    """如果val是int, str, bool才返回True"""
+    return isinstance(val, int) or isinstance(val, str) or isinstance(val, bool)
+
+
+def isconsttype(val) -> bool:
+    if istrueconsttype(val):
+        return True
+    if isinstance(val, list):
+        for e in val:
+            if not isconsttype(e):
+                return False
+        return True
+    if isinstance(val, dict):
+        for k in val:
+            v = val[k]
+            if not isconsttype(v) or not isconsttype(k):
+                return False
+        return True
+    return False
+
+
+def isallkeyint(d: dict) -> bool:
+    for key in d:
+        if not isint(key):
+            return False
+    return True
+
+
+def turnkeyint(d: dict) -> Dict[int, Any]:
+    dd: Dict[int, Any] = {}
+    for key in d:
+        dd[int(key)] = d[key]
+    return dd
+
+
+def tobool(x: str) -> bool:
+    if x in ["F", "false", "False", "假"]:
+        return False
+    elif x in ["T", "true", "True", "真"]:
+        return True
+    raise TypeError("不是可识别的bool")
 
 
 def plainNewCard() -> dict:
