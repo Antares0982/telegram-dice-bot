@@ -18,7 +18,7 @@ from cfg import *
 from dicehandlers import dicebot
 from utils import chatinit, errorHandler, ischannel
 
-dispatcher:Dispatcher = dicebot.updater.dispatcher
+dispatcher: Dispatcher = dicebot.updater.dispatcher
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -123,10 +123,9 @@ def makehandlerlist() -> List[str]:
     return ans
 
 
-def main() -> None:
-    dispatcher.add_handler(CommandHandler('bot', bot))
-
+def addhandlers() -> None:
     handlerlist = makehandlerlist()
+    
     for key in handlerlist:
         if key == "helper":
             cmdname = "help"
@@ -138,8 +137,19 @@ def main() -> None:
     dispatcher.add_handler(CallbackQueryHandler(dicehandlers.button))
     dispatcher.add_handler(MessageHandler(
         Filters.command, dicehandlers.unknown))
-    dispatcher.add_handler(MessageHandler((Filters.text | Filters.status_update.migrate) & (
-        ~Filters.command) & (~Filters.audio) & (~Filters.video) & (~Filters.photo) & (~Filters.sticker), dicehandlers.textHandler))
+    dispatcher.add_handler(MessageHandler(
+        (Filters.text | Filters.status_update.migrate)
+        & (~Filters.command)
+        & (~Filters.audio)
+        & (~Filters.video)
+        & (~Filters.photo)
+        & (~Filters.sticker), dicehandlers.textHandler))
+
+
+def main() -> None:
+    dispatcher.add_handler(CommandHandler('bot', bot))
+
+    addhandlers()
 
     dicebot.updater.start_polling(drop_pending_updates=True)
     dicebot.updater.idle()
