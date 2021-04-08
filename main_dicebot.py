@@ -5,7 +5,6 @@ import logging
 import signal
 from inspect import isfunction
 from os import getpid, kill
-from sys import platform
 from typing import List
 
 from telegram import Update
@@ -16,7 +15,7 @@ from telegram.ext.dispatcher import Dispatcher
 import dicehandlers
 from cfg import *
 from dicehandlers import dicebot
-from utils import chatinit, errorHandler, ischannel
+from utils import *
 
 dispatcher: Dispatcher = dicebot.updater.dispatcher
 
@@ -74,18 +73,18 @@ def bot(update: Update, context: CallbackContext) -> bool:
 
     if inst == "stop":
 
-        dicebot.sendtoAdmin("进程被指令终止。")
-
         # 结束进程，先写入所有数据
         dicebot.writegroup()
         dicebot.writeplayer()
         dicebot.writecard()
 
+        dicebot.sendtoAdmin("进程被指令终止。")
         pid = getpid()
-        if platform == "win32":  # windows
-            kill(pid, signal.SIGBREAK)
-        else:  # Other
-            kill(pid, signal.SIGKILL)
+        kill(pid, signal.SIGINT)
+        # if platform == "win32":  # windows
+        #     kill(pid, signal.SIGBREAK)
+        # else:  # Other
+        #     kill(pid, signal.SIGKILL)
 
         return errorHandler(update, "关闭失败！")
 
@@ -107,7 +106,7 @@ def bot(update: Update, context: CallbackContext) -> bool:
 
 
 def makehandlerlist() -> List[str]:
-    """获得全部handlers同时，写入文件"""
+    """获得全部handlers同时，写入文件。忽略几个特殊的handlers"""
     ans: List[str] = []
 
     for key in dicehandlers.ALL_HANDLER:
@@ -124,8 +123,9 @@ def makehandlerlist() -> List[str]:
 
 
 def addhandlers() -> None:
+    """自动地读取dicehandlers.py中的所有函数作为handlers，忽略几个特殊用途的handlers"""
     handlerlist = makehandlerlist()
-    
+
     for key in handlerlist:
         if key == "helper":
             cmdname = "help"

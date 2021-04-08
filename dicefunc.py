@@ -2,7 +2,6 @@
 from typing import List
 
 import numpy as np
-from basicfunc import isint
 
 
 def dicemdn(m: int, n: int) -> List[int]:
@@ -13,6 +12,14 @@ def dicemdn(m: int, n: int) -> List[int]:
     ans = np.random.randint(1, n+1, size=m)
     ans = list(map(int, ans))
     return ans
+
+
+def isint(a: str) -> bool:
+    try:
+        int(a)
+    except:
+        return False
+    return True
 
 
 def get3d6str(dtname: str, a: int, b: int, c: int) -> str:

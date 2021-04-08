@@ -9,9 +9,9 @@ from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext
 
 from basicfunc import *
-from botclass import GameCard, Group, GroupGame, Player, dicebot
+from botclass import dicebot
 from cfg import *
-from dicefunc import *
+from gameclass import *
 
 _T = TypeVar("_T")
 
@@ -172,6 +172,26 @@ def isfromkp(update: Update) -> bool:
     # 如果是群消息，判断该指令是否来自本群kp
     gp = __forcegetgroup(update)
     return gp.kp is not None and gp.kp == __forcegetplayer(update)
+
+
+def isingroup(gp: Group, pl: Player) -> bool:
+    """查询某个pl是否在群里"""
+    if gp.chat is None:
+        return False
+    try:
+        gp.chat.get_member(user_id=pl.id)
+    except:
+        return False
+    return True
+
+
+def ispladmin(gp: Group, pl: Player) -> bool:
+    """检测pl是不是gp的管理员"""
+    admins = gp.chat.get_administrators()
+    for admin in admins:
+        if admin.user.id == pl.id:
+            return True
+    return False
 
 
 def findcard(plid: int) -> Optional[GameCard]:

@@ -11,8 +11,8 @@ from telegram.ext import CallbackContext
 
 import utils
 from cfg import *
-from gameclass import (PLTYPE, CardBackground, GameCard,
-                       Group, GroupGame, Player)
+from gameclass import (PLTYPE, CardBackground, GameCard, Group, GroupGame,
+                       Player)
 from utils import dicebot
 
 # FLAGS

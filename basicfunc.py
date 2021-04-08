@@ -1,17 +1,15 @@
 # -*- coding:utf-8 -*-
 
 from typing import Any, Dict
-from typing import overload
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.callbackquery import CallbackQuery
 
 from cfg import *
-from gameclass import Group, Player
 
 # Update相关
 
 
-def isint(a: str) -> bool:
+def __isint(a: str) -> bool:
     try:
         int(a)
     except:
@@ -51,17 +49,6 @@ def popallempties(d: Dict[Any, dict]) -> bool:
     return ans
 
 
-def isingroup(gp: Group, pl: Player) -> bool:
-    """查询某个pl是否在群里"""
-    if gp.chat is None:
-        return False
-    try:
-        gp.chat.get_member(user_id=pl.id)
-    except:
-        return False
-    return True
-
-
 def isadmin(update: Update, userid: int) -> bool:
     """检测发消息的人是不是群管理员"""
     if isprivatemsg(update):
@@ -69,15 +56,6 @@ def isadmin(update: Update, userid: int) -> bool:
     admins = update.effective_chat.get_administrators()
     for admin in admins:
         if admin.user.id == userid:
-            return True
-    return False
-
-
-def ispladmin(gp: Group, pl: Player) -> bool:
-    """检测pl是不是gp的管理员"""
-    admins = gp.chat.get_administrators()
-    for admin in admins:
-        if admin.user.id == pl.id:
             return True
     return False
 
@@ -157,7 +135,7 @@ def isconsttype(val) -> bool:
 
 def isallkeyint(d: dict) -> bool:
     for key in d:
-        if not isint(key):
+        if not __isint(key):
             return False
     return True
 

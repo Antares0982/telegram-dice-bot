@@ -2,7 +2,7 @@
 import json
 import os
 import time
-from typing import Union, overload
+from typing import List, Optional, Tuple, Union, overload
 
 from telegram import Update
 from telegram.error import BadRequest, ChatMigrated
@@ -13,7 +13,7 @@ from basicfunc import *
 from cfg import *
 from gameclass import *
 
-#初始化updater
+# 初始化updater
 if PROXY:
     updater = Updater(token=TOKEN, request_kwargs={
         'proxy_url': PROXY_URL}, use_context=True)
@@ -367,7 +367,7 @@ class DiceBot:
     def getgamecard(self, cdid: int) -> Optional[GameCard]:
         return self.gamecards[cdid] if cdid in self.gamecards else None
 
-    def addcard(self, card: GameCard, dontautoswitch:bool = False) -> bool:
+    def addcard(self, card: GameCard, dontautoswitch: bool = False) -> bool:
         """添加一张游戏外的卡，当卡id重复时返回False"""
         assert(not card.isgamecard)
 

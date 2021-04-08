@@ -7,11 +7,11 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from telegram import Chat
 from telegram.ext.updater import Updater
-from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
 
+from basicfunc import *
 from cfg import *
 from dicefunc import *
-from basicfunc import *
+
 PLTYPE = "PL"
 NPCTYPE = "NPC"
 
@@ -20,8 +20,10 @@ skl: Dict[str, int]
 with open(PATH_SKILLDICT, 'r', encoding='utf-8') as f:
     skl = json.load(f)
 
+
 class datatype:
     """基类"""
+
     def read_json(self, d: dict, jumpkeys: List[str] = []) -> None:
         """把除了jumpkeys以外的key全部读入self.__dict__"""
         for key in iter(self.__dict__):
@@ -1529,15 +1531,15 @@ class CardBackground(datatype):
             self.card.write()
 
 
-class buttonpage:
-    def __init__(self, rtbuttons: List[List[InlineKeyboardButton]], page: int) -> None:
-        self.pagenum = page
-        self.nextpage: Optional[buttonpage] = None
-        if len(rtbuttons) > 4:
-            self.rtbuttons = rtbuttons[:4]
-            self.newnextpage(page+1, rtbuttons[4:])
-        else:
-            self.rtbuttons = rtbuttons
+# class buttonpage:
+#     def __init__(self, rtbuttons: List[List[InlineKeyboardButton]], page: int) -> None:
+#         self.pagenum = page
+#         self.nextpage: Optional[buttonpage] = None
+#         if len(rtbuttons) > 4:
+#             self.rtbuttons = rtbuttons[:4]
+#             self.newnextpage(page+1, rtbuttons[4:])
+#         else:
+#             self.rtbuttons = rtbuttons
 
-    def newnextpage(self, rtbuttons: List[List[InlineKeyboardButton]], page: int):
-        self.nextpage = buttonpage(page, rtbuttons)
+#     def newnextpage(self, rtbuttons: List[List[InlineKeyboardButton]], page: int):
+#         self.nextpage = buttonpage(page, rtbuttons)
