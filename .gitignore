@@ -5,7 +5,7 @@ data/cards/*.json
 data/cards/game/*.json
 data/players/*
 data/groups/*
-.vscode/
+.vscode/*
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
