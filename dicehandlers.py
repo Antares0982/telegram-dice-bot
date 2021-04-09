@@ -5,7 +5,7 @@ import copy
 import time
 from typing import Dict, List, Optional, Tuple
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, message
 from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext
 
@@ -1290,17 +1290,7 @@ def endgame(update: Update, context: CallbackContext) -> bool:
     if game is None:
         return utils.errorHandler(update, "没找到进行中的游戏。")
 
-    idl = list(game.cards.keys())  # 在迭代过程中改变键会抛出错误，复制键
-    for x in idl:
-        dicebot.popcard(x)
-        nocard = dicebot.popgamecard(x)
-        nocard.isgamecard = False
-        nocard.playerid = kp.id
-        dicebot.addcard(nocard)
-
-    gp.game = None
-    gp.pausedgame = None
-    gp.kp.kpgames.pop(gp.id)
+    utils.atgameending(game)
 
     update.message.reply_text("游戏结束！")
     return True
@@ -2085,20 +2075,8 @@ def changeid(update: Update, context: CallbackContext) -> bool:
     if not utils.checkaccess(pl, card) & (OWNCARD | CANMODIFY):
         return utils.errorHandler(update, "没有权限")
 
-    gamecard = dicebot.getgamecard(oldid)
-    if gamecard is not None:
-        gamecard = dicebot.popgamecard(oldid)
-        gamecard.id = newid
-        dicebot.addgamecard(gamecard)
-
-    card = dicebot.popcard(oldid)
-    card.id = newid
-    dicebot.addcard(card)
-    rttext = "修改卡片的id：从"+str(oldid)+"修改为"+str(newid)
-    if gamecard is not None:
-        rttext += "\n游戏内卡片id同步修改完成。"
-
-    update.message.reply_text(rttext)
+    # 开始处理
+    utils.atidchanging(update.message, oldid, newid)
     return True
 
 
@@ -2141,21 +2119,7 @@ def cardtransfer(update: Update, context: CallbackContext) -> bool:
                 return utils.errorHandler(update, "目标玩家已经在对应群有一张卡了")
 
     # 开始处理
-    gamecard = dicebot.getgamecard(cdid)
-    if gamecard is not None:
-        gamecard = dicebot.popgamecard(cdid)
-        gamecard.playerid = tpl.id
-        dicebot.addgamecard(gamecard)
-
-    card = dicebot.popcard(cdid)
-    card.playerid = tpl.id
-    dicebot.addcard(card)
-
-    rttext = "卡id"+str(cdid)+"拥有者从"+str(opl.id)+"修改为"+str(tpl.id)+"。"
-    if gamecard is not None:
-        rttext += "游戏内数据也被同步修改了。"
-
-    update.message.reply_text(rttext)
+    utils.atcardtransfer(update.message, cdid, opl, tpl)
     return True
 
 

@@ -72,7 +72,7 @@ class datatype:
                 raise TypeError("成员"+attr+"类型是无法修改的类型")
 
             if isinstance(self.__dict__[attr], list) and any(not istrueconsttype(x) for x in self.__dict__[attr]):
-                raise TypeError("成员"+attr+"类型是无法修改的类型")
+                raise TypeError("成员"+attr+"类型是无法修改的列表")
 
             if isinstance(self.__dict__[attr], list):
                 # 默认list内所有元素都是相同type
@@ -648,7 +648,7 @@ class Player(datatype):
         if self.controlling is not None:
             rttext += "当前正在操作的卡片id："+str(self.controlling.id)+"\n"
         rttext += "所有卡片id："+' '.join(map(str, self.cards.keys()))+"\n"
-        rttext += "所有游戏中卡片的id："+' '.join(self.gamecards.keys())+"\n"
+        rttext += "所有游戏中卡片的id："+' '.join(map(str, self.gamecards.keys()))+"\n"
         rttext += "作为kp的群id："+' '.join(map(str, self.kpgroups.keys()))+"\n"
         rttext += "正在进行游戏的群id："+' '.join(map(str, self.kpgames.keys()))+"\n"
         return rttext
@@ -718,11 +718,11 @@ class GroupGame(datatype):  # If defined, game is started.
     def __str__(self):
         rttext = ""
         for keys in self.__dict__:
-            if keys == "cards" or keys == "kpcards":
+            if keys in ["cards", "group", "kp", "kpctrl"]:
                 continue
             rttext += keys+": "+str(self.__dict__[keys])+"\n"
         rttext += "游戏中卡共有"+str(len(self.cards)) + \
-            "张，其中kp所持卡共有"+str(len(self.kpcards))+"张"
+            "张"
         return rttext
 
     def write(self):

@@ -367,7 +367,7 @@ class DiceBot:
     def getgamecard(self, cdid: int) -> Optional[GameCard]:
         return self.gamecards[cdid] if cdid in self.gamecards else None
 
-    def addcard(self, card: GameCard, dontautoswitch: bool = False) -> bool:
+    def addcard(self, card: GameCard, dontautoswitch: bool = False, givekphint:bool = True) -> bool:
         """添加一张游戏外的卡，当卡id重复时返回False"""
         assert(not card.isgamecard)
 
@@ -396,7 +396,7 @@ class DiceBot:
 
         pl.write()
         card.write()
-        if card.group.kp is not None:
+        if card.group.kp is not None and givekphint:
             self.sendto(
                 card.group.kp, f"您的群 {card.group.getname()} 新增了一张卡片，玩家是 {card.player.getname()} ，卡id：{str(card.id)}")
         return True

@@ -7,6 +7,7 @@ from typing import (Dict, Iterable, Iterator, KeysView, List, Optional, Tuple,
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.callbackquery import CallbackQuery
 from telegram.ext import CallbackContext
+from telegram.message import Message
 
 from basicfunc import *
 from botclass import dicebot
@@ -1326,6 +1327,59 @@ def gamepop(gp: Group) -> Optional[GroupGame]:
             dicebot.popgamecard(cdid)
         ans.kp.kpgames.pop(ans.group.id)
     return ans
+
+
+def atcardtransfer(msg: Message, cdid: int, opl: Player, tpl: Player) -> None:
+    gamecard = dicebot.getgamecard(cdid)
+    if gamecard is not None:
+        gamecard = dicebot.popgamecard(cdid)
+        gamecard.playerid = tpl.id
+        dicebot.addgamecard(gamecard)
+
+    card = dicebot.popcard(cdid)
+    card.playerid = tpl.id
+    dicebot.addcard(card)
+
+    rttext = "卡id"+str(cdid)+"拥有者从"+str(opl.id)+"修改为"+str(tpl.id)+"。"
+    if gamecard is not None:
+        rttext += "游戏内数据也被同步修改了。"
+
+    msg.reply_text(rttext)
+
+
+def atgameending(game: GroupGame) -> None:
+    kp = game.kp
+    gp = game.group
+
+    idl = list(game.cards.keys())  # 在迭代过程中改变键会抛出错误，复制键
+
+    for x in idl:
+        dicebot.popcard(x)
+        nocard = dicebot.popgamecard(x)
+        nocard.isgamecard = False
+        nocard.playerid = kp.id
+        dicebot.addcard(nocard, dontautoswitch=True, givekphint=False)
+
+    gp.game = None
+    gp.pausedgame = None
+    gp.kp.kpgames.pop(gp.id)
+
+
+def atidchanging(msg: Message, oldid: int, newid: int) -> None:
+    gamecard = dicebot.getgamecard(oldid)
+    if gamecard is not None:
+        gamecard = dicebot.popgamecard(oldid)
+        gamecard.id = newid
+        dicebot.addgamecard(gamecard)
+
+    card = dicebot.popcard(oldid)
+    card.id = newid
+    dicebot.addcard(card, dontautoswitch=True, givekphint=False)
+    rttext = "修改卡片的id：从"+str(oldid)+"修改为"+str(newid)
+    if gamecard is not None:
+        rttext += "\n游戏内卡片id同步修改完成。"
+
+    msg.reply_text(rttext)
 
 
 def holdinggamecontinue(gpid: int) -> GroupGame:

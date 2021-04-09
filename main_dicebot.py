@@ -78,15 +78,10 @@ def bot(update: Update, context: CallbackContext) -> bool:
         dicebot.writeplayer()
         dicebot.writecard()
 
-        dicebot.sendtoAdmin("进程被指令终止。")
         pid = getpid()
-        kill(pid, signal.SIGINT)
-        # if platform == "win32":  # windows
-        #     kill(pid, signal.SIGBREAK)
-        # else:  # Other
-        #     kill(pid, signal.SIGKILL)
-
-        return errorHandler(update, "关闭失败！")
+        dicebot.sendtoAdmin("进程被指令终止。")
+        kill(pid, signal.SIGINT)  # 发送SIGINT，由updater.idle()接收信号结束bot。
+        return True
 
     if inst == "restart":
         return dicehandlers.reload(update, context)
