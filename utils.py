@@ -1317,15 +1317,20 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
 def gamepop(gp: Group) -> Optional[GroupGame]:
     """终止一场游戏。`/abortgame`的具体实现。"""
     ans = gp.game if gp.game is not None else gp.pausedgame
-    gp.game = None
-    gp.pausedgame = None
+
     if ans is not None:
-        gp.write()
-        cdl = list(ans.cards.keys())
+        cdl = list(ans.cards.keys())  # 迭代过程中不能改变字典，复制键
         for cdid in cdl:
             dicebot.getgamecard(cdid).delete()
             dicebot.popgamecard(cdid)
-        ans.kp.kpgames.pop(ans.group.id)
+
+        if ans.kp is not None:
+            ans.kp.kpgames.pop(ans.group.id)
+
+        gp.game = None
+        gp.pausedgame = None
+        gp.write()
+
     return ans
 
 
