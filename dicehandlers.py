@@ -863,7 +863,7 @@ def getid(update: Update, context: CallbackContext) -> None:
     if rppl is not None:
         update.message.reply_text("<code>"+str(rppl.id) +
                                   "</code> \n点击即可复制", parse_mode='HTML')
-        return
+        return None
 
     chatid = utils.getchatid(update)
     pl = dicebot.forcegetplayer(update)
