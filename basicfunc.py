@@ -83,16 +83,17 @@ def errorHandler(update: Update,  message: str, needrecall: bool = False) -> Fal
         elif message.find("参数") != -1:
             message += "\n如果不会使用这个指令，请使用帮助： `/help --command`"
 
-        try:
-            msg = update.message.reply_text(message, parse_mode="MarkdownV2")
-        except:
-            msg = update.message.reply_text(message)
-
+        rp_markup = None
         if message.find("私聊") != -1:
             rtbutton = [[InlineKeyboardButton(
                 "跳转到私聊", callback_data="None", url="t.me/"+BOTUSERNAME)]]
             rp_markup = InlineKeyboardMarkup(rtbutton)
-            msg.edit_reply_markup(reply_markup=rp_markup)
+
+        try:
+            update.message.reply_text(
+                message, parse_mode="MarkdownV2", reply_markup=rp_markup)
+        except:
+            update.message.reply_text(message, reply_markup=rp_markup)
 
     return False
 
