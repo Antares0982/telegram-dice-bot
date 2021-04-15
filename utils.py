@@ -174,7 +174,7 @@ def isfromkp(update: Update) -> bool:
     gp = __forcegetgroup(update)
     return gp.kp is not None and gp.kp == __forcegetplayer(update)
 
-
+# 查询pl gp关系
 def isingroup(gp: Group, pl: Player) -> bool:
     """查询某个pl是否在群里"""
     if gp.chat is None:
@@ -194,7 +194,7 @@ def ispladmin(gp: Group, pl: Player) -> bool:
             return True
     return False
 
-
+# 查 卡片
 def findcard(plid: int) -> Optional[GameCard]:
     """输入一个player的id，返回该player当前选择中的卡"""
     pl = __getplayer(plid)

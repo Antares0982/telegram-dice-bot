@@ -1287,7 +1287,8 @@ def roll(update: Update, context: CallbackContext):
         return utils.errorHandler(update, "找不到游戏中的卡。")
     # 找卡完成，开始检定
     test = 0
-
+    if dicename == "侦察":
+        dicename = "侦查"
     if dicename in gamecard.skill.allskills():
         test = gamecard.skill.get(dicename)
     elif dicename in gamecard.interest.allskills():
