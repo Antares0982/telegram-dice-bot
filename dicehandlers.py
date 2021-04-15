@@ -368,7 +368,7 @@ def addskill(update: Update, context: CallbackContext) -> bool:
 def cardtransfer(update: Update, context: CallbackContext) -> bool:
     """转移卡片所有者。格式为
     `/cardtransfer --cardid --playerid`：将卡转移给playerid。
-    回复某人`/cardtransfer --cardid`：将卡转移给被回复的人。
+    回复某人`/cardtransfer --cardid`：将卡转移给被回复的人。要求参数有且仅有一个。
     只有卡片拥有者或者KP有权使用该指令。
     如果对方不是KP且对方已经在本群有卡，则无法转移。"""
     if utils.ischannel(update):
@@ -441,7 +441,7 @@ def changegroup(update: Update, context: CallbackContext) -> bool:
 
         newgp = dicebot.forcegetgroup(newgpid)
         kp = dicebot.forcegetgroup(update)
-        if (kp != oldgp.kp or kp != newgp.kp) and kp.id != ADMIN_ID:
+        if ((kp != oldgp.kp and oldgp.id != -1) or kp != newgp.kp) and kp.id != ADMIN_ID:
             return utils.errorHandler(update, "没有权限", True)
 
         if oldgp.getexistgame() is not None:
@@ -858,6 +858,12 @@ def getid(update: Update, context: CallbackContext) -> None:
     if utils.ischannel(update):
         return False
     utils.chatinit(update)
+
+    rppl = utils.getreplyplayer(update)
+    if rppl is not None:
+        update.message.reply_text("<code>"+str(rppl.id) +
+                                  "</code> \n点击即可复制", parse_mode='HTML')
+        return
 
     chatid = utils.getchatid(update)
     pl = dicebot.forcegetplayer(update)
@@ -1882,7 +1888,7 @@ def showcard(update: Update, context: CallbackContext) -> bool:
         if utils.checkaccess(pl, cardi) & CANREAD == 0:
             return utils.errorHandler(update, "没有权限")
     else:
-        if cardi.group != dicebot.forcegetgroup(update) or cardi.type != PLTYPE:
+        if (cardi.groupid != -1 and cardi.group != dicebot.forcegetgroup(update)) or cardi.type != PLTYPE:
             return utils.errorHandler(update, "没有权限", True)
 
     # 开始处理
@@ -2236,7 +2242,9 @@ def startgame(update: Update, context: CallbackContext) -> bool:
 
     这一指令将拷贝本群内所有卡，之后将用拷贝的卡片副本进行游戏，修改属性将不会影响到游戏外的原卡属性。
     如果要正常结束游戏，使用`/endgame`可以将游戏的角色卡数据覆写到原本的数据上。
-    如果要放弃这些游戏内进行的修改，使用`/abortgame`会直接删除这些副本副本"""
+    如果要放弃这些游戏内进行的修改，使用`/abortgame`会直接删除这些副本副本。
+    `/startgame`：正常地开始游戏，对所有玩家的卡片（type为PL）进行卡片检查。
+    `/startgame ignore`跳过开始游戏的检查，直接开始游戏。"""
     if utils.ischannel(update):
         return False
     utils.chatinit(update)
@@ -2255,21 +2263,21 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     if gp.pausedgame is not None:
         return continuegame(update, context)  # 检测到游戏暂停中，直接继续
 
-    if len(gp.cards) == 0:
-        return utils.errorHandler(update, "本群没有任何卡片，无法开始游戏")
+    if not(len(context.args) > 0 and context.args[0] == "ignore"):
+        if len(gp.cards) == 0:
+            return utils.errorHandler(update, "本群没有任何卡片，无法开始游戏")
+        canstart = True
+        for card in gp.cards.values():
+            card.generateOtherAttributes()
+            if card.type != PLTYPE:
+                continue
+            ck = card.check()
+            if ck != "":
+                canstart = False
+                update.message.reply_text(ck)
 
-    canstart = True
-    for card in gp.cards.values():
-        card.generateOtherAttributes()
-        if card.type != PLTYPE:
-            continue
-        ck = card.check()
-        if ck != "":
-            canstart = False
-            update.message.reply_text(ck)
-
-    if not canstart:
-        return False
+        if not canstart:
+            return False
 
     gp.game = GroupGame(gp.id, gp.cards)
     # 构建数据关联
@@ -2278,11 +2286,11 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     kp.kpgames[gp.id] = gp.game
     for card in gp.game.cards.values():
         dicebot.gamecards[card.id] = card
-        card.write()
         card.group = gp
         card.player = dicebot.getcard(card.id).player
         card.player.gamecards[card.id] = card
 
+    gp.game.write()
     update.message.reply_text("游戏开始！")
     return True
 

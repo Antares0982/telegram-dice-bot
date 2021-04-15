@@ -728,6 +728,8 @@ class GroupGame(datatype):  # If defined, game is started.
     def write(self):
         if self.group is not None:
             self.group.write()
+        for card in self.cards.values():
+            card.write()
 
     def __eq__(self, o: object) -> bool:
         assert(self.group is not None)

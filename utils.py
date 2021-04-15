@@ -175,6 +175,8 @@ def isfromkp(update: Update) -> bool:
     return gp.kp is not None and gp.kp == __forcegetplayer(update)
 
 # 查询pl gp关系
+
+
 def isingroup(gp: Group, pl: Player) -> bool:
     """查询某个pl是否在群里"""
     if gp.chat is None:
@@ -195,6 +197,8 @@ def ispladmin(gp: Group, pl: Player) -> bool:
     return False
 
 # 查 卡片
+
+
 def findcard(plid: int) -> Optional[GameCard]:
     """输入一个player的id，返回该player当前选择中的卡"""
     pl = __getplayer(plid)
@@ -1321,7 +1325,6 @@ def gamepop(gp: Group) -> Optional[GroupGame]:
     if ans is not None:
         cdl = list(ans.cards.keys())  # 迭代过程中不能改变字典，复制键
         for cdid in cdl:
-            dicebot.getgamecard(cdid).delete()
             dicebot.popgamecard(cdid)
 
         if ans.kp is not None:
@@ -1343,7 +1346,14 @@ def atcardtransfer(msg: Message, cdid: int, opl: Player, tpl: Player) -> None:
 
     card = dicebot.popcard(cdid)
     card.playerid = tpl.id
-    dicebot.addcard(card)
+    if card.group.kp is not None and msg.from_user.id == card.group.kp.id:
+        dicebot.addcard(card, dontautoswitch=False, givekphint=False)
+        dicebot.sendto(tpl, "玩家："+opl.getname() +
+                       "的一张卡"+card.getname()+"被KP转移给您")
+    else:
+        dicebot.addcard(card, dontautoswitch=False, givekphint=True)
+        dicebot.sendto(tpl, "玩家："+opl.getname() +
+                       "将自己的一张卡"+card.getname()+"转移给您")
 
     rttext = "卡id"+str(cdid)+"拥有者从"+str(opl.id)+"修改为"+str(tpl.id)+"。"
     if gamecard is not None:
@@ -1713,7 +1723,7 @@ def checkaccess(pl: Player, thing: Union[GameCard, Group]) -> int:
             f |= CANREAD | OWNCARD
 
         if not f & OWNCARD:
-            if card.type == "PL" and checkaccess(pl, card.group) & INGROUP:
+            if card.group.id == -1 or (card.type == "PL" and checkaccess(pl, card.group) & INGROUP):
                 f |= CANREAD
 
         if f & OWNCARD and not card.isgamecard:

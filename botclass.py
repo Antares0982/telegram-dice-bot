@@ -367,7 +367,7 @@ class DiceBot:
     def getgamecard(self, cdid: int) -> Optional[GameCard]:
         return self.gamecards[cdid] if cdid in self.gamecards else None
 
-    def addcard(self, card: GameCard, dontautoswitch: bool = False, givekphint:bool = True) -> bool:
+    def addcard(self, card: GameCard, dontautoswitch: bool = False, givekphint: bool = True) -> bool:
         """添加一张游戏外的卡，当卡id重复时返回False"""
         assert(not card.isgamecard)
 
