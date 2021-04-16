@@ -28,6 +28,7 @@ class DiceBot:
         self.players: Dict[int, Player] = {}  # readall()赋值
         self.cards: Dict[int, GameCard] = {}  # readall()赋值
         self.gamecards: Dict[int, GameCard] = {}  # readall()赋值
+        self.usernametopl: Dict[str, Player] = {}  # construct()赋值
         self.joblist: dict
         self.skilllist: Dict[str, int]
         self.allids: List[int] = []
@@ -87,6 +88,8 @@ class DiceBot:
 
     def construct(self) -> None:
         """创建变量之间的引用"""
+        self.allids = []
+        self.usernametopl = {}
         # card
         for card in self.cards.values():
             card.isgamecard = False
@@ -148,6 +151,8 @@ class DiceBot:
                 try:
                     pl.chat = self.updater.bot.get_chat(chat_id=pl.id)
                     pl.getname()
+                    if pl.username != "":
+                        self.usernametopl[pl.username] = pl
                 except BadRequest:
                     self.sendtoAdmin("用户："+str(pl.id)+" " +
                                      pl.name+"telegram chat无法获取")
@@ -313,12 +318,19 @@ class DiceBot:
     def getplayer(self, update: Update) -> Optional[Player]:
         ...
 
-    def getplayer(self, update: Union[int, Update]) -> Optional[Player]:
+    @overload
+    def getplayer(self, username: str) -> Optional[Player]:
+        ...
+
+    def getplayer(self, update: Union[int, Update, str]) -> Optional[Player]:
         if isinstance(update, Update):
             return None if getmsgfromid(update) not in self.players else self.players[getmsgfromid(update)]
         if isinstance(update, int):
             plid = update
             return None if plid not in self.players else self.players[plid]
+        if isinstance(update, str):
+            username = update
+            return self.usernametopl[username] if username in self.usernametopl else None
 
     @overload
     def createplayer(self, plid: int) -> Player:
@@ -340,6 +352,8 @@ class DiceBot:
         try:
             pl.chat = self.updater.bot.get_chat(chat_id=plid)
             pl.getname()
+            if pl.username != "":
+                self.usernametopl[pl.username] = pl
         except:
             self.sendtoAdmin("无法获取玩家"+str(pl.id)+" chat信息")
 
@@ -489,6 +503,17 @@ class DiceBot:
         newpl.cards[card.id] = card
 
         return True
+
+    def changeusername(self, ousn: str, nusn: str, pl: Player) -> None:
+        if ousn in self.usernametopl:
+            if nusn != "":
+                assert(pl == self.usernametopl[ousn])
+                self.usernametopl[nusn] = self.usernametopl.pop(ousn)
+            else:
+                self.usernametopl.pop(ousn)
+        else:
+            if nusn != "":
+                self.usernametopl[nusn] = pl
 
     def addkp(self, gp: Group, pl: Player) -> None:
         """如果要更新kp，需要先执行delkp"""

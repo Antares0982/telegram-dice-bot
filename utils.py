@@ -64,7 +64,13 @@ def __getplayer(plid: Union[int, Update]) -> Optional[Player]:
 def initplayer(plid: int) -> Optional[Player]:
     """若plid未存储过，创建Player对象并返回，否则返回None"""
     pl = __getplayer(plid)
-    return pl.renew(dicebot.updater) if pl else dicebot.createplayer(plid)
+    if pl is not None:
+        ousn = pl.username
+        pl.renew(dicebot.updater)
+        if ousn != pl.username:
+            dicebot.changeusername(ousn, pl.username, pl)
+    else:
+        return dicebot.createplayer(plid)
 
 
 def __forcegetplayer(plid: Union[int, Update]) -> Player:
@@ -78,15 +84,21 @@ def updateinitplayer(update: Update) -> Optional[Player]:
     return initplayer(plid)
 
 
-def chatinit(update: Update) -> Union[Player, Group, None]:
+def chatinit(update: Update, context: CallbackContext) -> Union[Player, Group, None]:
     """所有指令使用前调用该函数"""
     dicebot.checkconsistency()
+
+    for i in range(len(context.args)):
+        if context.args[i][0] == '@':
+            pl = dicebot.getplayer(context.args[i][1:])
+            if pl is not None:
+                context.args[i] = str(pl.id)
+
     if isprivatemsg(update):
         return updateinitplayer(update)
     if isgroupmsg(update):
         initplayer(getmsgfromid(update))
         return updateinitgroup(update)
-    return None
 
 
 # 卡片相关：查 增 删
@@ -1337,7 +1349,7 @@ def gamepop(gp: Group) -> Optional[GroupGame]:
     return ans
 
 
-def atcardtransfer(msg: Message, cdid: int, opl: Player, tpl: Player) -> None:
+def atcardtransfer(msg: Message, cdid: int, tpl: Player) -> None:
     gamecard = dicebot.getgamecard(cdid)
     if gamecard is not None:
         gamecard = dicebot.popgamecard(cdid)
@@ -1345,7 +1357,9 @@ def atcardtransfer(msg: Message, cdid: int, opl: Player, tpl: Player) -> None:
         dicebot.addgamecard(gamecard)
 
     card = dicebot.popcard(cdid)
+    opl = card.player
     card.playerid = tpl.id
+
     if card.group.kp is not None and msg.from_user.id == card.group.kp.id:
         dicebot.addcard(card, dontautoswitch=False, givekphint=False)
         dicebot.sendto(tpl, "玩家："+opl.getname() +

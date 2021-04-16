@@ -57,7 +57,7 @@ def bot(update: Update, context: CallbackContext) -> bool:
     `/bot exec --command`执行python代码，如果第一个参数是小写字母r，则计算后面的代码结果并返回"""
     if ischannel(update):
         return False
-    chatinit(update)
+    chatinit(update, context)
 
     if dicebot.forcegetplayer(update).id != ADMIN_ID:
         return errorHandler(update, "没有权限", True)

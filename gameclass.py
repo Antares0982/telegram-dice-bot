@@ -626,7 +626,7 @@ class Player(datatype):
             raise TypeError("Player实例没有id")
         if self.chat is None:
             return self.name
-        self.username = self.chat.username
+        self.username = self.chat.username if self.chat.username is not None else ""
         name = self.chat.full_name
         self.name = name if name is not None else str(self.id)
         return self.name
@@ -1532,16 +1532,3 @@ class CardBackground(datatype):
         if self.card is not None:
             self.card.write()
 
-
-# class buttonpage:
-#     def __init__(self, rtbuttons: List[List[InlineKeyboardButton]], page: int) -> None:
-#         self.pagenum = page
-#         self.nextpage: Optional[buttonpage] = None
-#         if len(rtbuttons) > 4:
-#             self.rtbuttons = rtbuttons[:4]
-#             self.newnextpage(page+1, rtbuttons[4:])
-#         else:
-#             self.rtbuttons = rtbuttons
-
-#     def newnextpage(self, rtbuttons: List[List[InlineKeyboardButton]], page: int):
-#         self.nextpage = buttonpage(page, rtbuttons)

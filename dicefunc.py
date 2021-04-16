@@ -7,7 +7,7 @@ import numpy as np
 def dicemdn(m: int, n: int) -> List[int]:
     if m == 0:
         return []
-    if m > 20:
+    if m > 50:
         return []
     ans = np.random.randint(1, n+1, size=m)
     ans = list(map(int, ans))
@@ -32,6 +32,16 @@ def get2d6_6str(dtname: str, a: int, b: int) -> str:
     """返回`dtname = 5*(2d6+6) = 5*(a+b+6) = ans`"""
     return dtname+" = 5*(2d6+6) = 5*(" + str(a) + "+" + \
         str(b) + "+6) = " + str(5*(a+b+6)) + "\n"
+
+
+def evaldice(dice:str)->List[int]:
+    """计算dice，输入mdn（可以相加）的形式，返回整数列表。每个mdn转化为一个int型。不会检查dice合法性"""
+    anss = ''.join(dice.split()).split('+')
+    ans:List[int] = []
+    for i in anss:
+        [m,n] = i.split('d',maxsplit=1)
+        ans.append(sum(dicemdn(int(m), int(n))))
+    return ans
 
 
 def commondice(dicename) -> str:

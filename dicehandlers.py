@@ -33,7 +33,7 @@ def abortgame(update: Update, context: CallbackContext) -> bool:
     """放弃游戏。只有KP能使用该指令。这还将导致放弃在游戏中做出的所有修改，包括hp，SAN等。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if not utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送群聊消息来中止游戏")
@@ -67,7 +67,7 @@ def addcard(update: Update, context: CallbackContext) -> bool:
     给定`id`属性的话，在指定的卡id已经被占用的时候，会重新自动选取。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "向我发送私聊消息来添加卡", True)
@@ -151,7 +151,7 @@ def additem(update: Update, context: CallbackContext) -> bool:
     `/additem --item1 --item2...`"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     card = dicebot.forcegetplayer(update).controlling
     if card is None:
@@ -170,7 +170,7 @@ def addkp(update: Update, context: CallbackContext) -> bool:
     如果原KP在群里，需要先发送`/delkp`来撤销自己的KP，或者管理员用`/transferkp`来强制转移KP权限。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, '发送群消息添加KP')
@@ -211,7 +211,7 @@ def addnewjob(update: Update, context: CallbackContext) -> bool:
     审核完成后结果会私聊回复给kp，请开启与bot的私聊。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     pl = dicebot.forcegetplayer(update)
     if pl.id in dicebot.addjobrequest:
@@ -280,7 +280,7 @@ def addnewskill(update: Update, context: CallbackContext) -> bool:
     审核完成后结果会私聊回复给kp，请开启与bot的私聊。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     pl = dicebot.forcegetplayer(update)
     if pl.id in dicebot.addskillrequest:
@@ -326,7 +326,7 @@ def addskill(update: Update, context: CallbackContext) -> bool:
     `/addskill 技能名`：修改某项技能的点数。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发私聊消息来增改技能", True)
@@ -373,7 +373,7 @@ def cardtransfer(update: Update, context: CallbackContext) -> bool:
     如果对方不是KP且对方已经在本群有卡，则无法转移。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if len(context.args) == 0:
         return utils.errorHandler(update, "需要参数", True)
@@ -389,13 +389,13 @@ def cardtransfer(update: Update, context: CallbackContext) -> bool:
     if card is None:
         return utils.errorHandler(update, "找不到这张卡")
 
-    opl = dicebot.forcegetplayer(update)
+    operationer = dicebot.forcegetplayer(update)
     if len(context.args) == 1:
         tpl: Player = utils.getreplyplayer(update)
     else:
         tpl = dicebot.forcegetplayer(int(context.args[1]))
 
-    if not utils.checkaccess(opl, card) & (OWNCARD | CANMODIFY):
+    if not utils.checkaccess(operationer, card) & (OWNCARD | CANMODIFY):
         return utils.errorHandler(update, "没有权限", True)
 
     if tpl != card.group.kp:
@@ -404,7 +404,7 @@ def cardtransfer(update: Update, context: CallbackContext) -> bool:
                 return utils.errorHandler(update, "目标玩家已经在对应群有一张卡了")
 
     # 开始处理
-    utils.atcardtransfer(update.message, cdid, opl, tpl)
+    utils.atcardtransfer(update.message, cdid, tpl)
     return True
 
 
@@ -421,7 +421,7 @@ def changegroup(update: Update, context: CallbackContext) -> bool:
     """
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if len(context.args) < 2:
         return utils.errorHandler(update, "至少需要2个参数", True)
@@ -487,7 +487,7 @@ def changeid(update: Update, context: CallbackContext) -> bool:
     这一行为将同时改变游戏内以及游戏外的卡id。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if len(context.args) < 2:
         return utils.errorHandler(update, "至少需要两个参数。")
@@ -521,7 +521,7 @@ def changeid(update: Update, context: CallbackContext) -> bool:
 def choosedec(update: Update, context: CallbackContext) -> bool:
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "私聊使用该指令")
@@ -546,7 +546,7 @@ def continuegame(update: Update, context: CallbackContext) -> bool:
     继续游戏后会覆盖游戏中的这些属性。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if not utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送群消息暂停游戏")
@@ -595,7 +595,7 @@ def copygroup(update: Update, context: CallbackContext) -> bool:
     任何一个群在进行游戏的时候，该指令都无法使用。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     try:
         oldgpid, newgpid = int(context.args[0]), int(context.args[1])
@@ -625,7 +625,7 @@ def copygroup(update: Update, context: CallbackContext) -> bool:
 def createcardhelp(update: Update, context: CallbackContext) -> None:
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     update.message.reply_text(utils.CREATE_CARD_HELP, parse_mode="MarkdownV2")
 
@@ -635,7 +635,7 @@ def delcard(update: Update, context: CallbackContext) -> bool:
     `/delcard --cardid`：删除id为cardid的卡。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if len(context.args) == 0:
         return utils.errorHandler(update, "需要卡id作为参数", True)
@@ -664,7 +664,7 @@ def delkp(update: Update, context: CallbackContext) -> bool:
     在撤销KP之后的新KP会自动获取原KP的所有NPC的卡片"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, '发群消息撤销自己的KP权限')
@@ -705,7 +705,7 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
     而不是继续用`/delmsg`删除。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     delnum = 1
     chatid = utils.getchatid(update)
@@ -729,6 +729,7 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
             break
         try:
             context.bot.delete_message(chat_id=chatid, message_id=lastmsgid)
+            print(lastmsgid)
         except:
             lastmsgid -= 1
         else:
@@ -757,7 +758,7 @@ def discard(update: Update, context: CallbackContext) -> bool:
     找不到参数对应的卡时，该参数会被忽略。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息删除卡。")
@@ -831,7 +832,7 @@ def endgame(update: Update, context: CallbackContext) -> bool:
     如果还没有准备好进行覆写，就不要使用这一指令。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if not utils.isgroupmsg(update):
         return utils.errorHandler(update, "群聊才能使用该指令")
@@ -857,7 +858,7 @@ def getid(update: Update, context: CallbackContext) -> None:
     在创建卡片等待群id时使用该指令，会自动创建卡。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     rppl = utils.getreplyplayer(update)
     if rppl is not None:
@@ -904,7 +905,7 @@ def link(update: Update, context: CallbackContext) -> bool:
     使用该指令必须要满足两个条件：指令发送者和bot都是该群管理员。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if not utils.isgroupmsg(update):
         return utils.errorHandler(update, "在群聊使用该指令。")
@@ -937,14 +938,16 @@ def link(update: Update, context: CallbackContext) -> bool:
 
 def lp(update: Update, context: CallbackContext) -> bool:
     """修改LP。KP通过回复某位PL消息并在回复消息中使用本指令即可修改对方卡片的LP。
-    回复自己的消息，则修改选中的游戏卡。
+    回复自己的消息，则修改kp当前选中的游戏卡。
+    或者，也可以使用@用户名以及用玩家id的方法选中某名PL，但请不要同时使用回复和用户名。
     使用范例：
     `/lp +3`恢复3点LP。
     `/lp -2`扣除2点LP。
-    `/lp 10`将LP设置为10。"""
+    `/lp 10`将LP设置为10。
+    `/lp @username 12`将用户名为username的玩家LP设为12。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "游戏中才可以修改lp。")
@@ -962,8 +965,16 @@ def lp(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "找不到进行中的游戏", True)
 
     rppl = utils.getreplyplayer(update)
+
     if rppl is None:
-        return utils.errorHandler(update, "请用回复的方式来选择玩家改变lp")
+        if len(context.args) < 2:
+            return utils.errorHandler(update, "请用回复或@用户名的方式来选择玩家改变lp")
+        if not utils.isint(context.args[0]) or int(context.args[0]) < 0:
+            return utils.errorHandler(update, "参数无效")
+        rppl = dicebot.getplayer(int(context.args[0]))
+        if rppl is None:
+            return utils.errorHandler(update, "用户无效")
+        clp = context.args[1]
 
     if rppl != kp:
         cardi = utils.findcardfromgame(game, rppl)
@@ -974,10 +985,15 @@ def lp(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "找不到这名玩家的卡。")
 
     if clp[0] == "+" or clp[0] == "-":
-        if not utils.isint(clp[1:]):
+        if utils.isadicename(clp[1:]):
+            clp = clp[0]+str(sum(utils.evaldice(clp[1:])))
+        if not utils.isint(clp[1:]) or int(clp[1:]) < 0:
             return utils.errorHandler(update, "参数无效", True)
-    elif not utils.isint(clp):
-        return utils.errorHandler(update, "参数无效", True)
+    else:
+        if utils.isadicename(clp):
+            clp = str(sum(utils.evaldice(clp)))
+        if not utils.isint(clp) or int(clp) > 100 or int(clp) < 0:
+            return utils.errorHandler(update, "参数无效", True)
 
     originlp = cardi.attr.LP
     if clp[0] == "+":
@@ -987,12 +1003,39 @@ def lp(update: Update, context: CallbackContext) -> bool:
     else:
         cardi.attr.LP = int(clp)
 
-    if cardi.attr.LP <= 0:
+    if cardi.attr.LP > cardi.attr.MAXLP:
+        cardi.attr.LP = cardi.attr.MAXLP
+    elif cardi.attr.LP <= 0:
         cardi.attr.LP = 0
         update.message.reply_to_message.reply_text("生命值归0，进入濒死状态")
 
+    cardi.write()
     update.message.reply_text("生命值从"+str(originlp)+"修改为"+str(cardi.attr.LP))
     return True
+
+
+def msgid(update: Update, context: CallbackContext) -> None:
+    """输出当前消息的msgid，如果有回复的消息还会返回回复的消息id。仅供调试用"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update, context)
+
+    if len(context.args) > 0:
+        update.message.reply_text(' '.join(context.args))
+
+    if update.message.reply_to_message is not None:
+        if update.message.reply_to_message.link is not None:
+            update.message.reply_text(update.message.reply_to_message.link)
+        else:
+            update.message.reply_text(
+                f"reply_to message: chat id: {str(utils.getchatid(update))} message id: {str(update.message.reply_to_message.message_id)}")
+
+    if update.message.link is not None:
+        update.message.reply_text(update.message.link)
+    else:
+        update.message.reply_text(
+            f"this message: chat id: {str(utils.getchatid(update))} message id: {str(update.message.message_id)}")
+    return
 
 
 def modify(update: Update, context: CallbackContext) -> bool:
@@ -1013,7 +1056,7 @@ def modify(update: Update, context: CallbackContext) -> bool:
     （参考`/help changegroup`）。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     pl = dicebot.forcegetplayer(update)
     if not utils.searchifkp(pl) and pl.id != ADMIN_ID:
@@ -1092,7 +1135,7 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     状态（存活，死亡，疯狂等）。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息创建角色卡。")
@@ -1149,7 +1192,7 @@ def pausegame(update: Update, context: CallbackContext) -> bool:
     继续游戏后会覆盖游戏中的这些属性。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if not utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送群消息暂停游戏")
@@ -1176,7 +1219,7 @@ def randombkg(update: Update, context: CallbackContext) -> bool:
     获得当前发送者选中的卡，生成随机的背景故事并写入。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     pl = dicebot.forcegetplayer(update)
     card = pl.controlling
@@ -1191,7 +1234,7 @@ def reload(update: Update, context: CallbackContext) -> bool:
     """重新读取所有文件，只有bot管理者可以使用"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.getmsgfromid(update) != utils.ADMIN_ID:
         return utils.errorHandler(update, "没有权限", True)
@@ -1210,7 +1253,7 @@ def renewcard(update: Update, context: CallbackContext) -> bool:
     """如果卡片是可以discard的状态，使用该指令可以将卡片重置。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     pl = dicebot.forcegetplayer(update)
     if pl.controlling is None:
@@ -1248,7 +1291,7 @@ def roll(update: Update, context: CallbackContext):
     `/roll 暗骰60`进行一次检定为60的暗骰。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if len(context.args) == 0:
         update.message.reply_text(utils.commondice("1d100"))  # 骰1d100
@@ -1392,7 +1435,7 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
     `/sancheck checkpass/checkfail`"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "在游戏中才能进行sancheck。")
@@ -1490,7 +1533,7 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
 def setage(update: Update, context: CallbackContext):
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息设置年龄。", True)
@@ -1520,7 +1563,7 @@ def setasset(update: Update, context: CallbackContext) -> bool:
     """设置你的角色卡的资金或财产，一段文字描述即可。`/setasset`"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     card = dicebot.forcegetplayer(update).controlling
     if card is None:
@@ -1555,7 +1598,7 @@ def setbkg(update: Update, context: CallbackContext) -> bool:
     第二至最后一个参数将被空格连接成为一段文字，填入背景故事中。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     pl = dicebot.forcegetplayer(update)
     if len(context.args) <= 1:
@@ -1593,7 +1636,7 @@ def setjob(update: Update, context: CallbackContext) -> bool:
     在力量、体质等属性减少值计算完成后才可以设置职业。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息设置职业。")
@@ -1645,7 +1688,7 @@ def setname(update: Update, context: CallbackContext) -> bool:
     设置的姓名可以带有空格等字符。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     card1 = dicebot.forcegetplayer(update).controlling
     if card1 is None:
@@ -1697,7 +1740,7 @@ def setrule(update: Update, context: CallbackContext) -> bool:
     greatfail：大失败范围。同上。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "请在群内用该指令设置规则")
@@ -1742,7 +1785,7 @@ def setsex(update: Update, context: CallbackContext) -> bool:
     `/setsex`：使用交互式的方法设置性别。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     pl = dicebot.forcegetplayer(update)
     if pl.controlling is None:
@@ -1780,7 +1823,7 @@ def show(update: Update, context: CallbackContext) -> bool:
     `STR`,`description`,`SAN`,`MAGIC`,`name`,`item`,`job`"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     pl = dicebot.forcegetplayer(update)
     rppl = utils.getreplyplayer(update)
@@ -1855,7 +1898,7 @@ def showcard(update: Update, context: CallbackContext) -> bool:
     私聊环境：显示没有查看权限的卡片。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if len(context.args) == 0:
         return utils.errorHandler(update, "需要参数")
@@ -1922,7 +1965,7 @@ def showids(update: Update, context: CallbackContext) -> bool:
     `showids kp`: 返回KP游戏中控制的所有卡片id"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):
         gp = dicebot.forcegetgroup(update)
@@ -2000,7 +2043,7 @@ def showjoblist(update: Update, context: CallbackContext) -> None:
     """显示职业列表"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if not utils.isprivatemsg(update):
         return utils.errorHandler(update, "请在私聊中使用该指令")
@@ -2038,7 +2081,7 @@ def showkp(update: Update, context: CallbackContext) -> bool:
     `/showkp group --groupid`: 显示发送者是KP的某个群内的所有卡"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "使用该指令请发送私聊消息", True)
@@ -2123,7 +2166,7 @@ def showmycards(update: Update, context: CallbackContext) -> bool:
     """显示自己所持的卡。群聊时发送所有在本群可显示的卡片。私聊时发送所有卡片。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     pl = dicebot.forcegetplayer(update)
     if len(pl.cards) == 0:
@@ -2160,7 +2203,7 @@ def showrule(update: Update, context: CallbackContext) -> bool:
     `/help setrule`"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "请在群内查看规则")
@@ -2176,7 +2219,7 @@ def showskilllist(update: Update, context: CallbackContext) -> None:
     """显示技能列表"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     rttext = "技能：基础值\n"
     rttext += "母语：等于EDU\n"
@@ -2195,7 +2238,7 @@ def showuserlist(update: Update, context: CallbackContext) -> bool:
     全部的卡信息、游戏信息。KP使用时，只会显示与TA相关的这些消息。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):  # Group msg: do nothing, even sender is USER or KP
         return utils.errorHandler(update, "没有这一指令", True)
@@ -2247,7 +2290,7 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     `/startgame ignore`跳过开始游戏的检查，直接开始游戏。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "游戏需要在群里进行")
@@ -2303,7 +2346,7 @@ def switch(update: Update, context: CallbackContext):
     `/switch --cdid`切换至id为`cdid`的卡。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "对bot私聊来切换卡。")
@@ -2363,7 +2406,7 @@ def switchgamecard(update: Update, context: CallbackContext):
     （私聊群聊皆可）`/switchgamecard --cardid`：切换到id为cardid的卡并控制。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if len(context.args) == 0:
         return utils.errorHandler(update, "需要参数")
@@ -2426,7 +2469,7 @@ def tempcheck(update: Update, context: CallbackContext):
     如果需要对这张卡全部检定都有修正，dicename参数请填大写单词`GLOBAL`。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if len(context.args) == 0:
         return utils.errorHandler(update, "没有参数", True)
@@ -2471,7 +2514,7 @@ def transferkp(update: Update, context: CallbackContext) -> bool:
 
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isprivatemsg(update):
         return utils.errorHandler(update, "发送群消息强制转移KP权限")
@@ -2515,7 +2558,7 @@ def trynewcard(update: Update, context: CallbackContext) -> bool:
     对建卡过程有疑问，见 `/createcardhelp`。"""
     if utils.ischannel(update):
         return False
-    utils.chatinit(update)
+    utils.chatinit(update, context)
 
     if utils.isgroupmsg(update):
         return utils.errorHandler(update, "发送私聊消息创建角色卡。")
