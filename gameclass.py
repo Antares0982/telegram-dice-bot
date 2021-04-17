@@ -441,9 +441,9 @@ class GameCard(datatype):
         if self.attr.MAGIC == 0:
             self.attr.MAGIC = self.data.POW//5
 
-        if self.attr.MAXLP == 0:
-            self.attr.MAXLP = (self.data.SIZ+self.data.CON)//10
-            self.attr.LP = self.attr.MAXLP
+        if self.attr.MAXHP == 0:
+            self.attr.MAXHP = (self.data.SIZ+self.data.CON)//10
+            self.attr.HP = self.attr.MAXHP
 
         if self.attr.build < -2:
             if self.data.STR+self.data.SIZ < 65:
@@ -1353,8 +1353,8 @@ class CardAttr(datatype):
         self.build: int = -10
         self.SAN: int = 0
         self.MAXSAN: int = 99
-        self.LP: int = 0
-        self.MAXLP: int = 0
+        self.HP: int = 0
+        self.MAXHP: int = 0
         self.MAGIC: int = 0
         self.armor: str = ""
         if len(d) > 0:
@@ -1368,15 +1368,15 @@ class CardAttr(datatype):
         rttext += "\n体格："+str(self.build)
         rttext += "\nSAN："+str(self.SAN)
         rttext += "\nSAN上限："+str(self.MAXSAN)
-        rttext += "\n生命值："+str(self.LP)
-        rttext += "\n生命值上限："+str(self.MAXLP)
+        rttext += "\n生命值："+str(self.HP)
+        rttext += "\n生命值上限："+str(self.MAXHP)
         rttext += "\n魔法值："+str(self.MAGIC)
         if self.sandown != "0/0":
             rttext += "\n目击时，san值下降"+self.sandown
         return rttext+"\n"
 
     def check(self) -> str:
-        return "衍生属性未计算" if self.DB == "" or self.MOV == 0 or self.build < -2 or self.MAXLP == 0 else ""
+        return "衍生属性未计算" if self.DB == "" or self.MOV == 0 or self.build < -2 or self.MAXHP == 0 else ""
 
 
 class CardBackground(datatype):

@@ -1655,7 +1655,7 @@ def botchat(update: Update) -> None:
         return
     text = update.message.text
     try:
-        rttext = text+" = "+str(calculator(text))
+        rttext = text+" = "+str(dicecalculator(text))
         update.message.reply_text(rttext)
         return
     except:
@@ -1770,3 +1770,6 @@ def checkaccess(pl: Player, thing: Union[GameCard, Group]) -> int:
         f |= BOTADMIN
 
     return f
+
+def cardstatus(card:GameCard)->str:
+    ...

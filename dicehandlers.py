@@ -28,6 +28,13 @@ GROUPKP = 2
 GROUPADMIN = 4
 BOTADMIN = 8
 
+STATUS_DEAD = "dead"
+STATUS_ALIVE = "alive"
+STATUS_SERIOUSLYWOUNDED = "seriously wounded"
+STATUS_NEARDEATH = "near-death"
+STATUS_TEMPSTABLE = "temporarily stable"
+STATUS_PERMANENTINSANE = "permanently insane"
+
 
 def abortgame(update: Update, context: CallbackContext) -> bool:
     """放弃游戏。只有KP能使用该指令。这还将导致放弃在游戏中做出的所有修改，包括hp，SAN等。"""
@@ -899,6 +906,169 @@ def getid(update: Update, context: CallbackContext) -> None:
                               "</code> \n点击即可复制", parse_mode='HTML')
 
 
+def hp(update: Update, context: CallbackContext) -> bool:
+    """修改HP。KP通过回复某位PL消息并在回复消息中使用本指令即可修改对方卡片的HP。
+    回复自己的消息，则修改kp当前选中的游戏卡。
+    或者，也可以使用@用户名以及用玩家id的方法选中某名PL，但请不要同时使用回复和用户名。
+    使用范例：
+    `/hp +1d3`：恢复1d3点HP。
+    `/hp -2`：扣除2点HP。
+    `/hp 10`：将HP设置为10。
+    `/hp @username 12`：将用户名为username的玩家HP设为12。
+    下面的例子是无效输入：
+    `/hp 1d3`：无法将HP设置为一个骰子的结果，恢复1d3生命请在参数前加上符号`+`，扣除同理。
+    在生命变动的情况下，角色状态也会同步地变动。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update, context)
+
+    if utils.isprivatemsg(update):
+        return utils.errorHandler(update, "游戏中才可以修改HP。")
+    gp = dicebot.forcegetgroup(update)
+    kp = dicebot.forcegetplayer(update)
+    if gp.kp != kp:
+        return utils.errorHandler(update, "没有权限", True)
+
+    if len(context.args) == 0:
+        return utils.errorHandler(update, "需要指定扣除的HP", True)
+
+    chp: str = context.args[0]
+    game = gp.game
+    if game is None:
+        return utils.errorHandler(update, "找不到进行中的游戏", True)
+
+    rppl = utils.getreplyplayer(update)
+
+    if rppl is None:
+        if len(context.args) < 2:
+            return utils.errorHandler(update, "请用回复或@用户名的方式来选择玩家改变HP")
+        if not utils.isint(context.args[0]) or int(context.args[0]) < 0:
+            return utils.errorHandler(update, "参数无效")
+        rppl = dicebot.getplayer(int(context.args[0]))
+        if rppl is None:
+            return utils.errorHandler(update, "指定的用户无效")
+        chp = context.args[1]
+
+    if rppl != kp:
+        cardi = utils.findcardfromgame(game, rppl)
+    else:
+        cardi = game.kpctrl
+
+    if cardi is None:
+        return utils.errorHandler(update, "找不到这名玩家的卡。")
+
+    if chp[0] == "+" or chp[0] == "-":
+        if len(chp) == 1:
+            return utils.errorHandler(update, "参数无效", True)
+
+        # 由dicecalculator()处理。减法时，检查可能的括号导致的输入错误
+        if chp[0] == '-' and chp[1] != '(' and (chp[1:].find('+') != -1 or chp[1:].find('-') != -1):
+            return utils.errorHandler(update, "当第一个减号的后面是可计算的骰子，且存在加减法时，请在第一个符号之后使用括号")
+
+        try:
+            diceans = utils.dicecalculator(chp[1:])
+        except:
+            return utils.errorHandler(update, "参数无效", True)
+
+        if diceans < 0:
+            return utils.errorHandler(update, "骰子的结果为0，生命值不修改")
+
+        chp = chp[0]+str(diceans)
+    else:
+        # 直接修改生命为目标值的情形。不支持dicecalculator()，仅支持整数
+        if not utils.isint(chp) or int(chp) > 100 or int(chp) < 0:
+            return utils.errorHandler(update, "参数无效", True)
+
+    if cardi.status == STATUS_DEAD:
+        return utils.errorHandler(update, "该角色已死亡")
+
+    originhp = cardi.attr.HP
+    if chp[0] == "+":
+        cardi.attr.HP += int(chp[1:])
+    elif chp[0] == "-":
+        cardi.attr.HP -= int(chp[1:])
+    else:
+        cardi.attr.HP = int(chp)
+
+    hpdiff = cardi.attr.HP - originhp
+    if hpdiff == 0:
+        return utils.errorHandler(update, "HP不变，目前HP："+str(cardi.attr.HP))
+
+    if hpdiff < 0:
+        # 承受伤害描述。分类为三种状态
+        takedmg = -hpdiff
+        if takedmg < cardi.attr.MAXHP//2:
+            # 轻伤，若生命不降到0，不做任何事
+            if takedmg >= originhp:
+                update.message.reply_to_message.reply_text("HP归0，角色昏迷")
+        elif takedmg > cardi.attr.MAXHP:
+            update.message.reply_to_message.reply_text("致死性伤害，角色死亡")
+            cardi.status = STATUS_DEAD
+        else:
+            update.message.reply_to_message.reply_text("角色受到重伤，请进行体质检定以维持清醒")
+            cardi.status = STATUS_SERIOUSLYWOUNDED
+            if originhp <= takedmg:
+                update.message.reply_to_message.reply_text("HP归0，进入濒死状态")
+                cardi.status = STATUS_NEARDEATH
+
+        if cardi.attr.HP < 0:
+            cardi.attr.HP = 0
+
+    else:
+        # 恢复生命，可能脱离某种状态
+        if cardi.attr.HP >= cardi.attr.MAXHP:
+            cardi.attr.HP = cardi.attr.MAXHP
+            update.message.reply_to_message.reply_text("HP达到最大值")
+
+        if hpdiff > 1 and originhp <= 1 and cardi.status == STATUS_NEARDEATH:
+            update.message.reply_text("脱离濒死状态")
+            cardi.status = STATUS_SERIOUSLYWOUNDED
+    cardi.write()
+
+    update.message.reply_text("生命值从"+str(originhp)+"修改为"+str(cardi.attr.HP))
+    return True
+
+
+def kill(update: Update, context: CallbackContext) -> bool:
+    """使角色死亡。使用回复或者`@username`作为参数来选择对象撕卡。
+    回复的优先级高于参数。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update, context)
+
+    kp = dicebot.forcegetplayer(update)
+    gp = dicebot.forcegetgroup(update)
+
+    if gp.game is None:
+        return utils.errorHandler(update, "没有进行中的游戏", True)
+
+    if kp != gp.kp:
+        return utils.errorHandler(update, "没有权限", True)
+
+    rppl = utils.getreplyplayer(update)
+    if rppl is None:
+        if len(context.args) == 0:
+            return utils.errorHandler(update, "使用回复或@username指定恢复者")
+        if not utils.isint(context.args[0]) or int(context.args[0]) < 0:
+            return utils.errorHandler(update, "参数无效", True)
+
+        rppl = dicebot.getplayer(int(context.args[0]))
+        if rppl is None:
+            return utils.errorHandler(update, "玩家无效")
+
+    card = utils.findcardfromgame(gp.game, rppl)
+    if card is None:
+        return utils.errorHandler(update, "找不到该玩家的卡。")
+
+    if card.status == STATUS_DEAD:
+        return utils.errorHandler(update, "角色已死亡")
+
+    card.status = STATUS_DEAD
+    update.message.reply_text("已撕卡")
+    card.write()
+    return True
+
+
 def link(update: Update, context: CallbackContext) -> bool:
     """获取群邀请链接，并私聊发送给用户。
 
@@ -936,81 +1106,46 @@ def link(update: Update, context: CallbackContext) -> bool:
     return True
 
 
-def lp(update: Update, context: CallbackContext) -> bool:
-    """修改LP。KP通过回复某位PL消息并在回复消息中使用本指令即可修改对方卡片的LP。
-    回复自己的消息，则修改kp当前选中的游戏卡。
-    或者，也可以使用@用户名以及用玩家id的方法选中某名PL，但请不要同时使用回复和用户名。
-    使用范例：
-    `/lp +3`恢复3点LP。
-    `/lp -2`扣除2点LP。
-    `/lp 10`将LP设置为10。
-    `/lp @username 12`将用户名为username的玩家LP设为12。"""
+def mad(update: Update, context: CallbackContext) -> bool:
+    """使角色陷入永久疯狂。使用回复或者`@username`作为参数来选择对象撕卡。
+    回复的优先级高于参数。"""
     if utils.ischannel(update):
         return False
     utils.chatinit(update, context)
 
-    if utils.isprivatemsg(update):
-        return utils.errorHandler(update, "游戏中才可以修改lp。")
-    gp = dicebot.forcegetgroup(update)
     kp = dicebot.forcegetplayer(update)
-    if gp.kp != kp:
+    gp = dicebot.forcegetgroup(update)
+
+    if gp.game is None:
+        return utils.errorHandler(update, "没有进行中的游戏", True)
+
+    if kp != gp.kp:
         return utils.errorHandler(update, "没有权限", True)
 
-    if len(context.args) == 0:
-        return utils.errorHandler(update, "需要指定扣除的生命值", True)
-
-    clp: str = context.args[0]
-    game = gp.game
-    if game is None:
-        return utils.errorHandler(update, "找不到进行中的游戏", True)
-
     rppl = utils.getreplyplayer(update)
-
     if rppl is None:
-        if len(context.args) < 2:
-            return utils.errorHandler(update, "请用回复或@用户名的方式来选择玩家改变lp")
+        if len(context.args) == 0:
+            return utils.errorHandler(update, "使用回复或@username指定恢复者")
         if not utils.isint(context.args[0]) or int(context.args[0]) < 0:
-            return utils.errorHandler(update, "参数无效")
+            return utils.errorHandler(update, "参数无效", True)
+
         rppl = dicebot.getplayer(int(context.args[0]))
         if rppl is None:
-            return utils.errorHandler(update, "用户无效")
-        clp = context.args[1]
+            return utils.errorHandler(update, "玩家无效")
 
-    if rppl != kp:
-        cardi = utils.findcardfromgame(game, rppl)
-    else:
-        cardi = game.kpctrl
+    card = utils.findcardfromgame(gp.game, rppl)
+    if card is None:
+        return utils.errorHandler(update, "找不到该玩家的卡。")
 
-    if cardi is None:
-        return utils.errorHandler(update, "找不到这名玩家的卡。")
+    if card.status == STATUS_DEAD:
+        return utils.errorHandler(update, "角色已死亡")
 
-    if clp[0] == "+" or clp[0] == "-":
-        if utils.isadicename(clp[1:]):
-            clp = clp[0]+str(sum(utils.evaldice(clp[1:])))
-        if not utils.isint(clp[1:]) or int(clp[1:]) < 0:
-            return utils.errorHandler(update, "参数无效", True)
-    else:
-        if utils.isadicename(clp):
-            clp = str(sum(utils.evaldice(clp)))
-        if not utils.isint(clp) or int(clp) > 100 or int(clp) < 0:
-            return utils.errorHandler(update, "参数无效", True)
+    if card.status == STATUS_PERMANENTINSANE:
+        return utils.errorHandler(update, "角色已永久疯狂")
 
-    originlp = cardi.attr.LP
-    if clp[0] == "+":
-        cardi.attr.LP += int(clp[1:])
-    elif clp[0] == "-":
-        cardi.attr.LP -= int(clp[1:])
-    else:
-        cardi.attr.LP = int(clp)
-
-    if cardi.attr.LP > cardi.attr.MAXLP:
-        cardi.attr.LP = cardi.attr.MAXLP
-    elif cardi.attr.LP <= 0:
-        cardi.attr.LP = 0
-        update.message.reply_to_message.reply_text("生命值归0，进入濒死状态")
-
-    cardi.write()
-    update.message.reply_text("生命值从"+str(originlp)+"修改为"+str(cardi.attr.LP))
+    card.status = STATUS_PERMANENTINSANE
+    card.write()
+    update.message.reply_text("已撕卡")
     return True
 
 
@@ -1230,6 +1365,46 @@ def randombkg(update: Update, context: CallbackContext) -> bool:
     return True
 
 
+def recover(update: Update, context: CallbackContext) -> bool:
+    """将重伤患者的状态恢复。使用回复或者`@username`作为参数来选择对象恢复。
+    回复的优先级高于参数。"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update, context)
+
+    kp = dicebot.forcegetplayer(update)
+    gp = dicebot.forcegetgroup(update)
+
+    if gp.game is None:
+        return utils.errorHandler(update, "没有进行中的游戏", True)
+
+    if kp != gp.kp:
+        return utils.errorHandler(update, "没有权限", True)
+
+    rppl = utils.getreplyplayer(update)
+    if rppl is None:
+        if len(context.args) == 0:
+            return utils.errorHandler(update, "使用回复或@username指定恢复者")
+        if not utils.isint(context.args[0]) or int(context.args[0]) < 0:
+            return utils.errorHandler(update, "参数无效", True)
+
+        rppl = dicebot.getplayer(int(context.args[0]))
+        if rppl is None:
+            return utils.errorHandler(update, "玩家无效")
+
+    card = utils.findcardfromgame(gp.game, rppl)
+    if card is None:
+        return utils.errorHandler(update, "找不到该玩家的卡。")
+
+    if card.status != STATUS_SERIOUSLYWOUNDED:
+        return utils.errorHandler(update, "该角色没有重伤")
+
+    card.status = STATUS_ALIVE
+    update.message.reply_text("角色已恢复")
+    card.write()
+    return True
+
+
 def reload(update: Update, context: CallbackContext) -> bool:
     """重新读取所有文件，只有bot管理者可以使用"""
     if utils.ischannel(update):
@@ -1334,6 +1509,11 @@ def roll(update: Update, context: CallbackContext):
             return utils.errorHandler(update, "请用 /switchgamecard 切换kp要用的卡")
     if not gamecard:
         return utils.errorHandler(update, "找不到游戏中的卡。")
+    if gamecard.status == STATUS_DEAD:
+        return utils.errorHandler(update, "角色已死亡")
+    if gamecard.status == STATUS_PERMANENTINSANE:
+        return utils.errorHandler(update, "角色已永久疯狂")
+
     # 找卡完成，开始检定
     test = 0
     if dicename == "侦察":
@@ -1517,11 +1697,12 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
     rttext += str(sanloss)+"\n"
     if card1.attr.SAN <= 0:
         card1.attr.SAN = 0
-        card1.status = "mad"
+        card1.status = STATUS_PERMANENTINSANE
         rttext += "陷入永久疯狂，快乐撕卡~\n"
 
     elif sanloss > (card1.attr.SAN+sanloss)//5:
         rttext += "一次损失五分之一以上理智，进入不定性疯狂状态。\n"
+        #TODO 处理角色的疯狂状态
     elif sanloss >= 5:
         rttext += "一次损失5点或以上理智，可能需要进行智力（灵感）检定。\n"
 

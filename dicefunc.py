@@ -47,6 +47,14 @@ def evaldice(dice: str) -> List[int]:
     return ans
 
 
+def evalsingledice(mdn: str) -> int:
+    if mdn.find('d') != -1:
+        [m, n] = mdn.split('d', maxsplit=1)
+        return sum(dicemdn(int(m), int(n)))
+    else:
+        return int(mdn)
+
+
 def commondice(dicename) -> str:
     """只能计算含d的表达式，返回完整的表达式以及结果"""
     if dicename.find('+') < 0:
@@ -126,18 +134,18 @@ def realdiv(a: int, b: int) -> int:
     return a//b
 
 
-def __multdiv(s: str) -> int:
+def __multdivdice(s: str) -> int:
     mu = s.rfind("*")
     di = s.rfind("/")
     if mu == -1 and di == -1:
-        return int(s)
+        return evalsingledice(s)
     if mu == -1:
-        return realdiv(__multdiv(s[:di]), int(s[di+1:]))
+        return realdiv(__multdivdice(s[:di]), evalsingledice(s[di+1:]))
     if di == -1:
-        return __multdiv(s[:mu])*int(s[mu+1:])
+        return __multdivdice(s[:mu])*evalsingledice(s[mu+1:])
     if mu > di:
-        return __multdiv(s[:mu])*int(s[mu+1:])
-    return realdiv(__multdiv(s[:di]), int(s[di+1:]))
+        return __multdivdice(s[:mu])*evalsingledice(s[mu+1:])
+    return realdiv(__multdivdice(s[:di]), evalsingledice(s[di+1:]))
 
 
 def __pre(s: str) -> str:
@@ -155,17 +163,27 @@ def __pre(s: str) -> str:
 
 def __calstr(s: str) -> str:
     if s.find("(") == -1:
-        return str(calculator(s, False))
+        return str(dicecalculator(s, False))
     i = s.rfind("(")
     j = s[i:].find(")")+i
-    return s[:i]+__calstr(s[i+1:j])+s[j+1:]
+    return s[:i]+str(dicecalculator(s[i+1:j], False))+s[j+1:]
 
 
-def calculator(s: str, haveSpace: bool = True) -> int:
-    """计算器。除法视为整除"""
+# def calculator(s: str, haveSpace: bool = True) -> int:
+#     """计算器。除法视为整除"""
+#     if haveSpace:
+#         s = "".join(s.split())
+#     while s.find("(") != -1:
+#         s = __calstr(s)
+#     s = __pre(s)
+#     return sum(map(__multdivdice, s.split('+')))
+
+
+def dicecalculator(s: str, haveSpace: bool = True) -> int:
+    """高级计算器，可以计算骰子结果。除法视为整除"""
     if haveSpace:
         s = "".join(s.split())
     while s.find("(") != -1:
         s = __calstr(s)
     s = __pre(s)
-    return sum(map(__multdiv, s.split('+')))
+    return sum(map(__multdivdice, s.split('+')))
