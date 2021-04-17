@@ -1,17 +1,16 @@
 # -*- coding:utf-8 -*-
 from configparser import ConfigParser, NoOptionError, NoSectionError
 from sys import platform
-from os import getcwd
+from os import getcwd, path, makedirs
 
 __all__ = [
-    "PROXY", "PROXY_URL", "BOTUSERNAME", "TOKEN", "DATA_PATH", "ADMIN_ID", "IGNORE_JOB_DICT", "VERSION", "BOT_ID",
+    "PROXY", "PROXY_URL", "TOKEN", "DATA_PATH", "ADMIN_ID", "IGNORE_JOB_DICT", "VERSION", "BOT_ID",
     "PATH_PLAYERS", "PATH_GROUPS", "GLOBAL_DATA_PATH", "PATH_SKILLDICT", "PATH_JOBDICT", "PATH_HANDLERS",
     "CREATE_CARD_HELP", "HELP_TEXT", "PATH_CARDS", "PATH_GAME_CARDS"
 ]
 
 PROXY: bool = False
 PROXY_URL: str = ""
-BOTUSERNAME: str = ""
 TOKEN: str = ""
 DATA_PATH: str = ""
 ADMIN_ID: int = 0
@@ -19,14 +18,13 @@ IGNORE_JOB_DICT: bool = False
 
 
 def __cfgparse():
-    global PROXY, PROXY_URL, BOTUSERNAME, TOKEN, DATA_PATH, ADMIN_ID, IGNORE_JOB_DICT
+    global PROXY, PROXY_URL, TOKEN, DATA_PATH, ADMIN_ID, IGNORE_JOB_DICT
     cfgparser = ConfigParser()
     cfgparser.read('config.ini')
 
     PROXY = cfgparser.getboolean("PROXY", "proxy")  # 大陆登录telegram需要设置代理，否则关闭
     PROXY_URL = cfgparser.get("PROXY", "proxy_url")  # 代理
 
-    BOTUSERNAME = cfgparser.get("BOT", "username")
     TOKEN = cfgparser.get("BOT", "token")  # BOT TOKEN
 
     DATA_PATH = cfgparser.get("PATH", "data_path")
@@ -44,7 +42,6 @@ def __defaultcfg():
     cfgparser["PROXY"]["proxy_url"] = "http://127.0.0.1:1080/"
 
     cfgparser["BOT"] = {}
-    cfgparser["BOT"]["username"] = "your_bot_user_name"
     cfgparser["BOT"]["token"] = "123456789:AABBCC-eeffgghh"
 
     cfgparser["PATH"] = {}
@@ -90,6 +87,16 @@ else:
     PATH_CARDS = DATA_PATH+"cards/"
     PATH_GAME_CARDS = DATA_PATH+"cards/game/"
     GLOBAL_DATA_PATH = DATA_PATH+"global/"
+
+if not path.exists(PATH_CARDS):
+    makedirs(PATH_CARDS)
+if not path.exists(PATH_GAME_CARDS):
+    makedirs(PATH_GAME_CARDS)
+if not path.exists(PATH_GROUPS):
+    makedirs(PATH_GROUPS)
+if not path.exists(PATH_PLAYERS):
+    makedirs(PATH_PLAYERS)
+
 
 PATH_SKILLDICT = GLOBAL_DATA_PATH+r'skilldict.json'
 PATH_JOBDICT = GLOBAL_DATA_PATH+r'jobdict.json'

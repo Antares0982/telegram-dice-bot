@@ -1,15 +1,7 @@
 # telegram-dice-bot
-tg跑团用骰子机器人，目前版本`v1.0.9`，开发中
+tg跑团用骰子机器人，目前版本`v1.2.0`
 
-## TODO
 
-* 将数据存储在对象中，并且建立变量的引用
-* 修复几个已知问题：
-    * 母语的最小值不是EDU，导致可以将母语技能点重分配给其他技能的问题
-    * addintskill看不到剩余点数
-* 增加几个功能：
-    * 三项小于50一键重roll
-    * addskill改为一步步引导，不需要重复点击addskill
 
 ## 使用说明
 
@@ -22,7 +14,7 @@ pip3 install logging
 pip3 install pysocks
 ```
 
-使用前先重命名`sample_config.ini`到`config.ini`，并填入相应参数（TOKEN, ADMIN_ID, DATA_PATH）。参数说明如下：
+（第一次使用前，如果不准备更改数据文件的位置，先执行一遍`cfg.py`，这时会执行失败并退出）重命名`sample_config.ini`为`config.ini`，并填入相应参数（`TOKEN`, `ADMIN_ID`）。如果有需要改变存储位置的话请手动修改参数说明如下：
 
 * 使用代理的话将`PROXY`参数设为`true`，不需要则设为`false`。使用代理时，填写相应的代理地址`PROXY_URL`。
 * `TOKEN`一项中填写你的tgbot token。

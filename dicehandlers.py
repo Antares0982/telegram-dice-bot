@@ -895,7 +895,7 @@ def getid(update: Update, context: CallbackContext) -> None:
                 utils.getnewcard(int(opers[1]), chatid, fromuser)
 
             rtbutton = [[InlineKeyboardButton(
-                text="跳转到私聊", callback_data="None", url="t.me/"+utils.BOTUSERNAME)]]
+                text="跳转到私聊", callback_data="None", url="t.me/"+dicebot.updater.bot.username)]]
             rp_markup = InlineKeyboardMarkup(rtbutton)
 
             update.message.reply_text("<code>"+str(chatid) +
@@ -1095,11 +1095,10 @@ def link(update: Update, context: CallbackContext) -> bool:
         context.bot.send_message(
             chat_id=adminid, text="群："+chat.title+"的邀请链接：\n"+ivlink)
     except:
-        update.message.reply_text("消息发送失败！请检查是否开启了和我的私聊！")
-        return False
+        return utils.errorHandler(update, "邀请链接发送失败！")
 
     rtbutton = [[InlineKeyboardButton(
-        text="跳转到私聊", callback_data="None", url="t.me/"+BOTUSERNAME)]]
+        text="跳转到私聊", callback_data="None", url="t.me/"+dicebot.updater.bot.username)]]
     rp_markup = InlineKeyboardMarkup(rtbutton)
 
     update.message.reply_text("群邀请链接已经私聊发送。", reply_markup=rp_markup)
@@ -1702,7 +1701,7 @@ def sancheck(update: Update, context: CallbackContext) -> bool:
 
     elif sanloss > (card1.attr.SAN+sanloss)//5:
         rttext += "一次损失五分之一以上理智，进入不定性疯狂状态。\n"
-        #TODO 处理角色的疯狂状态
+        # TODO 处理角色的疯狂状态
     elif sanloss >= 5:
         rttext += "一次损失5点或以上理智，可能需要进行智力（灵感）检定。\n"
 

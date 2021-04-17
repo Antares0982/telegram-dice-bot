@@ -68,50 +68,6 @@ def recallmsg(update: Update) -> bool:
     return True
 
 
-def errorHandler(update: Update,  message: str, needrecall: bool = False) -> False:
-    """指令无法执行时，调用的函数。
-    固定返回`False`，并回复错误信息。
-    如果`needrecall`为`True`，在Bot是对应群管理的情况下将删除那条消息。"""
-    if ischannel(update):
-        return False
-
-    if needrecall and isgroupmsg(update) and isadmin(update, BOT_ID):
-        recallmsg(update)
-    else:
-        if message == "找不到卡。":
-            message += "请使用 /switch 切换当前操控的卡再试。"
-        elif message.find("参数") != -1:
-            message += "\n如果不会使用这个指令，请使用帮助： `/help --command`"
-
-        rp_markup = None
-        if message.find("私聊") != -1:
-            rtbutton = [[InlineKeyboardButton(
-                "跳转到私聊", callback_data="None", url="t.me/"+BOTUSERNAME)]]
-            rp_markup = InlineKeyboardMarkup(rtbutton)
-
-        try:
-            update.message.reply_text(
-                message, parse_mode="MarkdownV2", reply_markup=rp_markup)
-        except:
-            update.message.reply_text(message, reply_markup=rp_markup)
-
-    return False
-
-
-def errorHandlerQ(query: CallbackQuery,  message: str) -> False:
-    if message == "找不到卡。":
-        message += "请使用 /switch 切换当前操控的卡再试。"
-    elif message.find("参数") != -1:
-        message += "\n如果不会使用这个指令，请使用帮助： `/help --command`"
-
-    try:
-        query.edit_message_text(message, parse_mode="MarkdownV2")
-    except:
-        query.edit_message_text(message)
-
-    return False
-
-
 def istrueconsttype(val) -> bool:
     """如果val是int, str, bool才返回True"""
     return isinstance(val, int) or isinstance(val, str) or isinstance(val, bool)

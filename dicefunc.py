@@ -138,6 +138,8 @@ def __multdivdice(s: str) -> int:
     mu = s.rfind("*")
     di = s.rfind("/")
     if mu == -1 and di == -1:
+        if s[0] == '-':
+            return -evalsingledice(s[1:])
         return evalsingledice(s)
     if mu == -1:
         return realdiv(__multdivdice(s[:di]), evalsingledice(s[di+1:]))
@@ -152,6 +154,9 @@ def __pre(s: str) -> str:
     i = len(s)-1
     while i > 0:
         if s[i] == '-':
+            if s[i-1] in ('*', '/'):
+                i -= 1
+                continue
             if s[i-1] == '-':
                 s = s[:i-1]+'+'+s[i+1:]
                 i -= 1
