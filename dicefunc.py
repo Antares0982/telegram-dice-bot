@@ -34,13 +34,16 @@ def get2d6_6str(dtname: str, a: int, b: int) -> str:
         str(b) + "+6) = " + str(5*(a+b+6)) + "\n"
 
 
-def evaldice(dice:str)->List[int]:
+def evaldice(dice: str) -> List[int]:
     """计算dice，输入mdn（可以相加）的形式，返回整数列表。每个mdn转化为一个int型。不会检查dice合法性"""
     anss = ''.join(dice.split()).split('+')
-    ans:List[int] = []
+    ans: List[int] = []
     for i in anss:
-        [m,n] = i.split('d',maxsplit=1)
-        ans.append(sum(dicemdn(int(m), int(n))))
+        if i.find('d') != -1:
+            [m, n] = i.split('d', maxsplit=1)
+            ans.append(sum(dicemdn(int(m), int(n))))
+        else:
+            ans.append(int(i))
     return ans
 
 
