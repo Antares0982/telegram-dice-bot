@@ -571,31 +571,51 @@ class DiceBot:
         gp.write()
 
     @overload
-    def sendto(self, pl: Player, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Message:
+    def sendto(self, pl: Player, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Optional[Message]:
         ...
 
     @overload
-    def sendto(self, plid: int, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Message:
+    def sendto(self, gp: Group, msg: str, rpmarkup: None) -> Optional[Message]:
         ...
 
-    def sendto(self, pl: Union[Player, int], msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Message:
+    @overload
+    def sendto(self, id: int, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Optional[Message]:
+        ...
+
+    def sendto(self, pl: Union[Player, Group, int], msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Optional[Message]:
+        if isinstance(pl, Player) or isinstance(pl, Group):
+            chatid = pl.id
+        else:
+            chatid = pl
         try:
-            if rpmarkup is not None:
-                if isinstance(pl, Player):
-                    return self.updater.bot.send_message(chat_id=pl.id, text=msg, reply_markup=rpmarkup)
-                if pl >= 0:
-                    return self.updater.bot.send_message(chat_id=pl, text=msg, reply_markup=rpmarkup)
-                self.sendtoAdmin("群聊不发送按钮")
-                return self.updater.bot.send_message(chat_id=pl, text=msg)
-            if isinstance(pl, Player):
-                return self.updater.bot.send_message(chat_id=pl.id, text=msg)
+            if pl >= 0:
+                return self.updater.bot.send_message(chat_id=pl, text=msg, reply_markup=rpmarkup)
             return self.updater.bot.send_message(chat_id=pl, text=msg)
         except ChatMigrated as e:
-            raise e
+            if chatid in self.groups:
+                self.groupmigrate(chatid, e.new_chat_id)
+                chatid = e.new_chat_id
+                self.sendto(chatid, msg)
+            else:
+                raise e
         except:
-            if isinstance(pl, Player):
-                return self.sendtoAdmin(f"无法向用户{pl.getname()}发送消息："+msg)
-            return self.sendtoAdmin(f"无法向用户{self.forcegetplayer(pl).getname()}发送消息："+msg)
+            if isinstance(pl, Player) or chatid >= 0:
+                if isinstance(pl, Player):
+                    name = pl.getname()
+                else:
+                    if self.getplayer(chatid) is not None:
+                        name = self.getplayer(chatid).getname()
+                    else:
+                        name = str(chatid)
+                return self.sendtoAdmin(f"无法向用户{name}发送消息："+msg)
+            if isinstance(pl, Group):
+                name = pl.getname()
+            else:
+                if self.getgp(chatid) is not None:
+                    name = self.getgp(chatid).getname()
+                else:
+                    name = str(chatid)
+            return self.sendtoAdmin(f"无法向群{name}发送消息："+msg)
 
     def autoswitchhint(self, plid: int) -> None:
         self.sendto(plid, "创建新卡时，控制自动切换到新卡")

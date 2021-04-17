@@ -548,11 +548,13 @@ class GameCard(datatype):
         """删除文件"""
         if self.id is None:
             raise ValueError("删除文件时，GameCard实例没有id")
-
-        if self.isgamecard:
-            os.remove(PATH_GAME_CARDS+str(self.id)+".json")
-        else:
-            os.remove(PATH_CARDS+str(self.id)+".json")
+        try:
+            if self.isgamecard:
+                os.remove(PATH_GAME_CARDS+str(self.id)+".json")
+            else:
+                os.remove(PATH_CARDS+str(self.id)+".json")
+        except:
+            ...
 
     def __eq__(self, o: object) -> bool:
         if not isinstance(o, GameCard):
@@ -568,7 +570,7 @@ class Player(datatype):
         self.gamecards: Dict[int, GameCard] = {}  # 需要在载入时赋值。存储时：存储卡id。读取时忽略
         # controlling 需要在载入时赋值。存储时：卡id。正确载入后类型为 GameCard | None
         self.controlling: Optional[GameCard] = None
-        self.id = plid
+        self.id: int = plid
         self.name: str = ""  # 读取时忽略
         self.username: str = ""  # 读取时忽略
         self.kpgroups: Dict[int, Group] = {}  # 需要在载入时赋值。存储时：存储int列表。读取时忽略
@@ -907,7 +909,7 @@ class Group(datatype):
     def __init__(self, gpid: Optional[int] = None, d: dict = {}):
         if len(d) == 0 and gpid is None:
             raise TypeError("Group的初始化需要gpid或d两个参数中的至少一个")
-        self.id: Optional[int] = gpid
+        self.id: int = gpid
         self.cards: Dict[int, GameCard] = {}  # 在construct()中赋值。读取时忽略
         self.game: Optional[GroupGame] = None
         self.pausedgame: Optional[GroupGame] = None
@@ -1008,7 +1010,10 @@ class Group(datatype):
     def delete(self):
         if not isinstance(self.id, int):
             raise ValueError("删除文件时，Group实例没有id")
-        os.remove(PATH_GROUPS+str(self.id)+".json")
+        try:
+            os.remove(PATH_GROUPS+str(self.id)+".json")
+        except:
+            ...
 
     def __str__(self) -> str:
         rttext = "群id："+str(self.id)+"\n"
@@ -1531,4 +1536,3 @@ class CardBackground(datatype):
     def write(self):
         if self.card is not None:
             self.card.write()
-
