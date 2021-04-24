@@ -1481,7 +1481,7 @@ def roll(update: Update, context: CallbackContext):
 
     # 检查输入参数是不是一个基础骰子，如果是则直接计算骰子
     if gp.game is None or dicename.find('d') >= 0 or utils.isint(dicename):
-        if utils.isint(dicename) and dicename > 0:
+        if utils.isint(dicename) and int(dicename) > 0:
             dicename = "1d"+dicename
         rttext = utils.commondice(dicename)
         if rttext == "Invalid input.":
