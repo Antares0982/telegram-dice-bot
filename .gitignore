@@ -1,11 +1,14 @@
 config.ini
-test.py
+test*
 .vscode/*
 tp/*
 data/cards/*.json
 data/cards/game/*.json
 data/players/*
 data/groups/*
+.*
+!.gitignore
+nohup*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
