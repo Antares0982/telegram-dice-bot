@@ -247,7 +247,12 @@ def isingroup(gp: Group, pl: Player) -> bool:
 
 def ispladmin(gp: Group, pl: Player) -> bool:
     """检测pl是不是gp的管理员"""
-    admins = gp.chat.get_administrators()
+    for i in range(5):
+        try:
+            admins = gp.chat.get_administrators()
+        except:
+            continue
+        break
     for admin in admins:
         if admin.user.id == pl.id:
             return True
@@ -388,7 +393,7 @@ def findDiscardCardsWithGpidCdid(pl: Player, cardslist: List[int]) -> List[GameC
                 if checkaccess(pl, card) & CANDISCARD:
                     ans.append(card.id)
         else:
-            card = gp.getcard(id)
+            card = dicebot.getcard(id)
             if card is None:
                 continue
             if checkaccess(pl, card) & CANDISCARD:
