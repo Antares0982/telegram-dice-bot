@@ -1513,6 +1513,9 @@ def roll(update: Update, context: CallbackContext):
     if gamecard.status == STATUS_PERMANENTINSANE:
         return utils.errorHandler(update, "角色已永久疯狂")
 
+    if dicename.encode('utf-8').isalpha():
+        dicename = dicename.upper()
+
     # 找卡完成，开始检定
     test = 0
     if dicename == "侦察":
@@ -1574,9 +1577,7 @@ def roll(update: Update, context: CallbackContext):
         test += gamecard.getstatus(dicename)
     test += tpcheck
 
-    if test > 99:
-        test = 99
-    elif test < 1:
+    if test < 1:
         test = 1
     testval = utils.dicemdn(1, 100)[0]
     rttext = dicename+" 检定/出目："+str(test)+"/"+str(testval)+" "
