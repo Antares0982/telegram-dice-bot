@@ -1,3 +1,5 @@
+/telegram-output-monitor-bot/
+
 config.ini
 test*
 .vscode/*
@@ -8,6 +10,7 @@ data/players/*
 data/groups/*
 .*
 !.gitignore
+
 nohup*
 
 # Byte-compiled / optimized / DLL files
