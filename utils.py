@@ -1863,7 +1863,7 @@ def checkaccess(pl: Player, thing: Union[GameCard, Group]) -> int:
 
 def readManual() -> List[str]:
     try:
-        with open(os.path.join(os.getcwd(), "README.md"), 'r', encoding='utf-8') as f:
+        with open(os.path.join(os.path.dirname(__file__), "README.md"), 'r', encoding='utf-8') as f:
             text = f.read()
     except:
         return []
