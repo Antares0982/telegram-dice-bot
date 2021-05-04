@@ -36,6 +36,7 @@ STATUS_TEMPSTABLE = "temporarily stable"
 STATUS_PERMANENTINSANE = "permanently insane"
 
 
+
 def abortgame(update: Update, context: CallbackContext) -> bool:
     """放弃游戏。只有KP能使用该指令。这还将导致放弃在游戏中做出的所有修改，包括hp，SAN等。"""
     if utils.ischannel(update):
@@ -1146,6 +1147,29 @@ def mad(update: Update, context: CallbackContext) -> bool:
     card.write()
     update.message.reply_text("已撕卡")
     return True
+
+
+def manual(update: Update, context: CallbackContext) -> bool:
+    """显示bot的使用指南"""
+    if utils.ischannel(update):
+        return False
+    utils.chatinit(update, context)
+
+    if not utils.isprivatemsg(update):
+        return utils.errorHandler(update, "请在私聊环境查看手册")
+
+    
+    if len(dicebot.MANUALTEXTS) == 0:
+        dicebot.MANUALTEXTS = utils.readManual()
+
+    if len(dicebot.MANUALTEXTS) == 0:
+        return utils.errorHandler(update, "README文件丢失，请联系bot管理者")
+
+    rtbuttons = [[InlineKeyboardButton(
+        text="下一页", callback_data=dicebot.IDENTIFIER+" manual 0 next")]]
+    rp_markup = InlineKeyboardMarkup(rtbuttons)
+    update.message.reply_text(dicebot.MANUALTEXTS[0], reply_markup=rp_markup)
+    return
 
 
 def msgid(update: Update, context: CallbackContext) -> None:
@@ -2803,6 +2827,8 @@ def button(update: Update, context: CallbackContext):
         return utils.buttonswitchgamecard(query, chatid, args)
     if args[0] == "setsex":
         return utils.buttonsetsex(query, chatid, args)
+    if args[0] == "manual":
+        return utils.buttonmanual(query, chatid, args)
     # HIT BAD TRAP
     return False
 

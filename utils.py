@@ -1234,6 +1234,45 @@ def buttonsetsex(query: CallbackQuery, plid: int,  args: List[str]) -> bool:
     return True
 
 
+def buttonmanual(query: CallbackQuery, plid: int, args: List[str]) -> bool:
+    pagereq = args[2]
+    thispage = int(args[1])
+
+    if pagereq == "pre":
+        page = thispage-1
+        if page == 0:
+            rtbuttons = [[InlineKeyboardButton(
+                text="下一页", callback_data=dicebot.IDENTIFIER+" manual 0 next")]]
+        else:
+            rtbuttons = [[
+                InlineKeyboardButton(
+                    text="上一页", callback_data=dicebot.IDENTIFIER+f" manual {page} pre"),
+                InlineKeyboardButton(
+                    text="下一页", callback_data=dicebot.IDENTIFIER+f" manual {page} next")
+            ]]
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        query.edit_message_text(
+            text=dicebot.MANUALTEXTS[page], parse_mode="MarkdownV2", reply_markup=rp_markup)
+
+    else:
+        page = thispage+1
+        if page == len(dicebot.MANUALTEXTS)-1 or (page == len(dicebot.MANUALTEXTS)-2 and plid != ADMIN_ID):
+            rtbuttons = [[InlineKeyboardButton(
+                text="上一页", callback_data=dicebot.IDENTIFIER+f" manual {page} next")]]
+        else:
+            rtbuttons = [[
+                InlineKeyboardButton(
+                    text="上一页", callback_data=dicebot.IDENTIFIER+f" manual {page} pre"),
+                InlineKeyboardButton(
+                    text="下一页", callback_data=dicebot.IDENTIFIER+f" manual {page} next")
+            ]]
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        query.edit_message_text(
+            text=dicebot.MANUALTEXTS[page], parse_mode="MarkdownV2", reply_markup=rp_markup)
+
+    return True
+
+
 def getkpctrl(game: GroupGame) -> Optional[GameCard]:
     for cardi in game.cards.values():
         if cardi.id == game.kpctrl and cardi.playerid == game.kpid:
@@ -1820,3 +1859,16 @@ def checkaccess(pl: Player, thing: Union[GameCard, Group]) -> int:
         f |= BOTADMIN
 
     return f
+
+
+def readManual() -> List[str]:
+    try:
+        with open(os.path.join(os.getcwd(), "README.md"), 'r', encoding='utf-8') as f:
+            text = f.read()
+    except:
+        return []
+
+    text = text[text.find("## 指南")+3:]
+    texts = text.split("\n### ")
+
+    return texts

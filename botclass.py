@@ -41,6 +41,7 @@ class DiceBot:
         self.migratefrom: Optional[int] = None
         self.migrateto: Optional[int] = None
         self.skillpages: List[List[str]]
+        self.MANUALTEXTS:List[str] = []
 
     def readall(self) -> None:
         # 初始化
