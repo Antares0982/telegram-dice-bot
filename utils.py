@@ -1714,15 +1714,15 @@ def textpassskill(update: Update, plid: int) -> bool:
     return True
 
 
-def getnewcard(msgid: int, gpid: int, plid: int, cdid: int = -1) -> bool:
+def getnewcard(msgid: Optional[int], gpid: int, plid: int, cdid: Optional[int] = None) -> bool:
     """指令`/newcard`的具体实现"""
     gp = __forcegetgroup(gpid)
     new_card, detailmsg = generateNewCard(plid, gpid)
     allids = dicebot.allids
-    if cdid >= 0 and cdid not in allids:
+    if cdid is not None and cdid not in allids:
         new_card.id = cdid
     else:
-        if cdid >= 0 and cdid in allids:
+        if cdid is not None and cdid in allids:
             dicebot.updater.bot.send_message(
                 chat_id=plid, reply_to_message_id=msgid, text="输入的ID已经被占用，自动获取ID。之后可以用 /changeid 更换喜欢的id。")
         new_card.id = getoneid()

@@ -36,7 +36,6 @@ STATUS_TEMPSTABLE = "temporarily stable"
 STATUS_PERMANENTINSANE = "permanently insane"
 
 
-
 def abortgame(update: Update, context: CallbackContext) -> bool:
     """放弃游戏。只有KP能使用该指令。这还将导致放弃在游戏中做出的所有修改，包括hp，SAN等。"""
     if utils.ischannel(update):
@@ -1158,7 +1157,6 @@ def manual(update: Update, context: CallbackContext) -> bool:
     if not utils.isprivatemsg(update):
         return utils.errorHandler(update, "请在私聊环境查看手册")
 
-    
     if len(dicebot.MANUALTEXTS) == 0:
         dicebot.MANUALTEXTS = utils.readManual()
 
@@ -1295,14 +1293,29 @@ def newcard(update: Update, context: CallbackContext) -> bool:
         return False
     utils.chatinit(update, context)
 
-    if utils.isgroupmsg(update):
-        return utils.errorHandler(update, "发送私聊消息创建角色卡。")
-
     gpid: int = None
     gp: Optional[Group] = None
     newcdid: Optional[int] = None
 
-    if len(context.args) > 0:
+    if utils.isgroupmsg(update):
+        # 先检查是否有该玩家信息
+        rtbutton = [[InlineKeyboardButton(
+            text="跳转到私聊", callback_data="None", url="t.me/"+dicebot.updater.bot.username)]]
+        rp_markup = InlineKeyboardMarkup(rtbutton)
+        if dicebot.getplayer(update) is None:
+            update.message.reply_text("请先开启与bot的私聊", reply_markup=rp_markup)
+            return True
+
+        if len(context.args) > 0:
+            if not utils.isint(context.args[0]) or int(context.args[0]) < 0:
+                return utils.errorHandler(update, "参数无效")
+
+        gpid = utils.getchatid(update)
+        gp = dicebot.forcegetgroup(gpid)
+        if len(context.args) > 0:
+            newcdid = int(context.args[0])
+
+    elif len(context.args) > 0:
         msg = context.args[0]
 
         if not utils.isint(msg):
@@ -1339,7 +1352,14 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     # gp is not None
     assert(gpid is not None)
 
-    return utils.getnewcard(update.message.message_id, gpid, plid, newcdid) if newcdid is not None else utils.getnewcard(update.message.message_id, gpid, plid)
+    remsgid = None
+    if utils.isprivatemsg(update):
+        remsgid = update.message.message_id
+    else:
+        assert(rp_markup)
+        update.message.reply_text("建卡信息已经私聊发送", reply_markup=rp_markup)
+        
+    return utils.getnewcard(remsgid, gpid, plid, newcdid)
 
 
 def pausegame(update: Update, context: CallbackContext) -> bool:
