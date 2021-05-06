@@ -41,7 +41,7 @@ class DiceBot:
         self.migratefrom: Optional[int] = None
         self.migrateto: Optional[int] = None
         self.skillpages: List[List[str]]
-        self.MANUALTEXTS:List[str] = []
+        self.MANUALTEXTS: List[str] = []
 
     def readall(self) -> None:
         # 初始化
@@ -589,9 +589,9 @@ class DiceBot:
         else:
             chatid = pl
         try:
-            if pl >= 0:
-                return self.updater.bot.send_message(chat_id=pl, text=msg, reply_markup=rpmarkup)
-            return self.updater.bot.send_message(chat_id=pl, text=msg)
+            if chatid >= 0:
+                return self.updater.bot.send_message(chat_id=chatid, text=msg, reply_markup=rpmarkup)
+            return self.updater.bot.send_message(chat_id=chatid, text=msg)
         except ChatMigrated as e:
             if chatid in self.groups:
                 self.groupmigrate(chatid, e.new_chat_id)
