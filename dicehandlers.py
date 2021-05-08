@@ -1166,7 +1166,7 @@ def manual(update: Update, context: CallbackContext) -> bool:
     rtbuttons = [[InlineKeyboardButton(
         text="下一页", callback_data=dicebot.IDENTIFIER+" manual 0 next")]]
     rp_markup = InlineKeyboardMarkup(rtbuttons)
-    update.message.reply_text(dicebot.MANUALTEXTS[0], reply_markup=rp_markup)
+    update.message.reply_text(dicebot.MANUALTEXTS[0], reply_markup=rp_markup, parse_mode="MarkdownV2")
     return
 
 

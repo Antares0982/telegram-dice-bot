@@ -1258,7 +1258,7 @@ def buttonmanual(query: CallbackQuery, plid: int, args: List[str]) -> bool:
         page = thispage+1
         if page == len(dicebot.MANUALTEXTS)-1 or (page == len(dicebot.MANUALTEXTS)-2 and plid != ADMIN_ID):
             rtbuttons = [[InlineKeyboardButton(
-                text="上一页", callback_data=dicebot.IDENTIFIER+f" manual {page} next")]]
+                text="上一页", callback_data=dicebot.IDENTIFIER+f" manual {page} pre")]]
         else:
             rtbuttons = [[
                 InlineKeyboardButton(
