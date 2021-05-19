@@ -2062,6 +2062,8 @@ def show(update: Update, context: CallbackContext) -> bool:
     if rppl is None:
         if utils.isint(context.args[0]):
             rppl = dicebot.getplayer(int(context.args[0]))
+        if rppl is not None:
+            context.args = context.args[1:]
 
     if rppl is not None:
         gp = dicebot.forcegetgroup(update)
