@@ -847,8 +847,10 @@ def cgcredit(update: Update, card1: GameCard) -> bool:
     if card1.info.job in dicebot.joblist:
         m = dicebot.joblist[card1.info.job][0]
         mm = dicebot.joblist[card1.info.job][1]
+        mm = min(mm, skillmaxval("信用", card1, True))
     else:
         mm = skillmaxval("信用", card1, True)
+
     rtbutton = makeIntButtons(m, mm, "cgmainskill", "信用")
     rp_markup = InlineKeyboardMarkup(rtbutton)
     update.message.reply_text(text="修改信用，现在还剩"+str(card1.skill.points)+"点，当前信用："+str(

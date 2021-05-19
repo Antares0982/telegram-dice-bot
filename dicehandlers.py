@@ -353,6 +353,9 @@ def addskill(update: Update, context: CallbackContext) -> bool:
     if card1.info.job == "":
         return utils.errorHandler(update, "请先设置职业")
 
+    if len(context.args) > 1:
+        return utils.errorHandler(update, "该指令只能接收一个参数：技能名")
+
     # 开始处理
     if "信用" not in card1.skill.allskills():
         return utils.addcredit(update, card1)
@@ -1166,7 +1169,8 @@ def manual(update: Update, context: CallbackContext) -> bool:
     rtbuttons = [[InlineKeyboardButton(
         text="下一页", callback_data=dicebot.IDENTIFIER+" manual 0 next")]]
     rp_markup = InlineKeyboardMarkup(rtbuttons)
-    update.message.reply_text(dicebot.MANUALTEXTS[0], reply_markup=rp_markup, parse_mode="MarkdownV2")
+    update.message.reply_text(
+        dicebot.MANUALTEXTS[0], reply_markup=rp_markup, parse_mode="MarkdownV2")
     return
 
 
@@ -1358,7 +1362,7 @@ def newcard(update: Update, context: CallbackContext) -> bool:
     else:
         assert(rp_markup)
         update.message.reply_text("建卡信息已经私聊发送", reply_markup=rp_markup)
-        
+
     return utils.getnewcard(remsgid, gpid, plid, newcdid)
 
 
@@ -2054,6 +2058,11 @@ def show(update: Update, context: CallbackContext) -> bool:
     pl = dicebot.forcegetplayer(update)
     rppl = utils.getreplyplayer(update)
     rpcard: Optional[GameCard] = None
+
+    if rppl is None:
+        if utils.isint(context.args[0]):
+            rppl = dicebot.getplayer(int(context.args[0]))
+
     if rppl is not None:
         gp = dicebot.forcegetgroup(update)
         rpcard = utils.findcardfromgroup(rppl, gp)
