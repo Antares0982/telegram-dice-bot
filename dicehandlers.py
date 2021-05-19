@@ -790,7 +790,7 @@ def discard(update: Update, context: CallbackContext) -> bool:
         if len(discards) == 1:
             card = discards[0]
             rttext = "删除卡："+str(card.getname())
-            rttext += "\n/details 显示删除的卡片信息。删除操作不可逆。"
+            rttext += "删除操作不可逆。"
             update.message.reply_text(rttext)
         else:
             update.message.reply_text(
@@ -2106,7 +2106,7 @@ def show(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "请用mainpoints或intpoints来显示")
     else:
         ans = card.show(context.args[0])
-        
+
     if ans == "找不到该属性":
         return utils.errorHandler(update, "找不到该属性")
 
