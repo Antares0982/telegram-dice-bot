@@ -2043,6 +2043,7 @@ def show(update: Update, context: CallbackContext) -> bool:
 
     例如，`/show skill`显示主要技能，
     `/show interest`显示兴趣技能。
+    如果要显示主要技能点和兴趣技能点，请使用`mainpoints`, `intpoints`作为`arg`，而不要使用points。
     如果当前卡中没有这个属性，则无法显示。
     可以显示的属性例子：
     `STR`,`description`,`SAN`,`MAGIC`,`name`,`item`,`job`"""
@@ -2097,7 +2098,15 @@ def show(update: Update, context: CallbackContext) -> bool:
         update.message.reply_text(str(card))
         return True
 
-    ans = card.show(context.args[0])
+    if context.args[0] == "mainpoints":
+        ans = card.skill.show("points")
+    elif context.args[0] == "intpoints":
+        ans = card.interest.show("points")
+    elif context.args[0] == "points":
+        return utils.errorHandler(update, "请用mainpoints或intpoints来显示")
+    else:
+        ans = card.show(context.args[0])
+        
     if ans == "找不到该属性":
         return utils.errorHandler(update, "找不到该属性")
 
