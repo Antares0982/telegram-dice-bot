@@ -1384,7 +1384,7 @@ def addskill1(update: Update, context: CallbackContext, card1: GameCard) -> bool
         rtbuttons = makeIntButtons(m, mm, "cgmainskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         update.message.reply_text(
-            "更改主要技能点数。剩余技能点："+str(card1.skill.points)+" 技能名称："+skillname+"，当前技能点："+str(card1.skill[skillname]), reply_markup=rp_markup)
+            "更改主要技能点数。剩余技能点："+str(card1.skill.points)+" 技能名称："+skillname+"，当前技能点："+str(card1.skill.get(skillname)), reply_markup=rp_markup)
         return True
 
     if skillname in card1.suggestskill.allskills():  # GOOD TRAP: addsgskill
