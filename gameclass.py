@@ -1371,6 +1371,7 @@ class CardAttr(datatype):
         rttext += "\n生命值："+str(self.HP)
         rttext += "\n生命值上限："+str(self.MAXHP)
         rttext += "\n魔法值："+str(self.MAGIC)
+        rttext += "\n护甲值："+self.armor
         if self.sandown != "0/0":
             rttext += "\n目击时，san值下降"+self.sandown
         return rttext+"\n"

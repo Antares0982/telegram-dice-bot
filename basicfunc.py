@@ -136,7 +136,7 @@ def plainNewCard() -> dict:
             "MOV": 0,
             "atktimes": 1,
             "sandown": "0/0",
-            "Armor": ""
+            "armor": ""
         },
         "background": {
             "description": "",

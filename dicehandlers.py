@@ -88,9 +88,19 @@ def addcard(update: Update, context: CallbackContext) -> bool:
     for i in range(0, len(context.args), 2):
         argname: str = context.args[i]
         argval = context.args[i+1]
+        if argname == "specialskill":
+            skillname, skillval = argval.split(":")
+            if not utils.isint(skillval) or int(skillval) <= 0:
+                return utils.errorHandler(update, "技能值应该是正整数")
+            t["skill"]["skills"][skillname] = int(skillval)
+            continue
+
         dt = utils.findattrindict(t, argname)
         if not dt:  # 可能是技能，否则返回
             if argname in dicebot.skilllist or argname == "母语" or argname == "闪避":
+                if not utils.isint(argval) or int(argval) <= 0:
+                    return utils.errorHandler(update, "技能值应该是正整数")
+
                 dt = t["skill"]["skills"]
                 dt[argname] = 0  # 这一行是为了防止之后判断类型报错
             else:
