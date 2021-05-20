@@ -61,11 +61,19 @@ def addcard(update: Update, context: CallbackContext) -> bool:
     """使用已有信息添加一张卡片，模板使用的是NPC/怪物模板。指令格式如下：
 
     `/addcard --attr_1 --val_1 --attr_2 --val_2 …… --attr_n -- val_n`，
-    其中`attr`是卡的直接属性，或卡的某个属性（字典）中的键。不可以直接添加tempstatus这个属性。
-    `name`和背景信息不支持空格，如果要设置这一项信息，需要之后用别的指令来修改。
+    其中`attr`是卡的直接属性或子属性。
 
-    卡的属性只有三种类型的值：`int`, `str`, `bool`，函数会自动判断对应的属性是什么类型，
-    其中`bool`类型`attr`对应的`val`只能是`true`, `True`, `false`, `False`之一。
+    卡的属性只有三种类型的值：`int`, `str`, `bool`，其他类型暂不支持用本指令。
+    函数会自动判断对应的属性是什么类型，其中`bool`类型`attr`对应的`val`只能是`true`, `True`, `false`, `False`之一。
+
+    不可以直接添加tempstatus这个属性。
+
+    如果需要添加主要技能点数，用mainpoints作为`attr`，兴趣技能点则用intpoints，清不要使用points。
+
+    如果要添加特殊技能，比如怪物的技能，请令`attr`为`specialskill`，`val`为`特殊技能名:技能值`。
+    技能值是正整数，技能名和技能值用英文冒号分开。
+
+    `name`和背景信息不支持空格，如果要设置这一项信息，需要之后用`/setbkg`来修改，所以尽量不要用该指令设置背景信息。
 
     如果遇到无法识别的属性，将无法创建卡片。
     参数中，必须的`attr`之一为`groupid`，如果找不到`groupid`将无法添加卡片。
@@ -85,15 +93,30 @@ def addcard(update: Update, context: CallbackContext) -> bool:
 
     t = utils.templateNewCard()
     # 遍历args获取attr和val
+    mem: List[str] = []
     for i in range(0, len(context.args), 2):
         argname: str = context.args[i]
+        if argname in mem:
+            return utils.errorHandler(update, argname+"属性重复赋值")
+        mem.append(argname)
         argval = context.args[i+1]
+
         if argname == "specialskill":
             skillname, skillval = argval.split(":")
             if not utils.isint(skillval) or int(skillval) <= 0:
                 return utils.errorHandler(update, "技能值应该是正整数")
             t["skill"]["skills"][skillname] = int(skillval)
             continue
+
+        if argname == "points":
+            return utils.errorHandler(update, "points应指明是mainpoints还是intpoints")
+
+        if argname == "mainpoints":
+            argname = "points"
+            dt = t["skill"]
+        elif argname == "intpoints":
+            argname = "points"
+            dt = t["interest"]
 
         dt = utils.findattrindict(t, argname)
         if not dt:  # 可能是技能，否则返回
