@@ -180,19 +180,21 @@ def templateNewCard() -> dict:
             "LUCK": 0
         },
         "info": {
-            "AGE": 0,
+            "age": 0,
             "job": "",
             "name": "",
             "sex": ""
         },
         "skill": {
-            "points": 0
+            "points": 0,
+            "skills":{}
         },
         "interest": {
-            "points": 0
+            "points": 0,
+            "skills":{}
         },
         "suggestskill": {
-
+            "skills":{}
         },
         "attr": {
             "SAN": 0,

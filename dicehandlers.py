@@ -91,7 +91,7 @@ def addcard(update: Update, context: CallbackContext) -> bool:
         dt = utils.findattrindict(t, argname)
         if not dt:  # 可能是技能，否则返回
             if argname in dicebot.skilllist or argname == "母语" or argname == "闪避":
-                dt = t["skill"]
+                dt = t["skill"]["skills"]
                 dt[argname] = 0  # 这一行是为了防止之后判断类型报错
             else:
                 return utils.errorHandler(update, "属性 "+argname+" 在角色卡模板中没有找到")
@@ -2059,7 +2059,7 @@ def show(update: Update, context: CallbackContext) -> bool:
     rppl = utils.getreplyplayer(update)
     rpcard: Optional[GameCard] = None
 
-    if rppl is None:
+    if rppl is None and len(context.args) > 0:
         if utils.isint(context.args[0]):
             rppl = dicebot.getplayer(int(context.args[0]))
         if rppl is not None:
