@@ -2604,11 +2604,26 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     gp.game.group = gp
     gp.game.kp = gp.kp
     kp.kpgames[gp.id] = gp.game
+
+    kpcardcount = 0
+    kpcardptr: GameCard = None
     for card in gp.game.cards.values():
         dicebot.gamecards[card.id] = card
         card.group = gp
         card.player = dicebot.getcard(card.id).player
         card.player.gamecards[card.id] = card
+
+        if card.player == gp.kp:
+            kpcardcount += 1
+            kpcardptr = card
+
+    if kpcardcount == 1:
+        gp.game.kpctrl = kpcardptr
+        dicebot.sendto(gp.kp, "在游戏中只有一张卡，操作的卡片自动切换到该卡：" +
+                       gp.game.kpctrl.getname())
+    elif kpcardcount > 1:
+        dicebot.sendto(
+            gp.kp, f"NPC卡片多于1张，在需要使用NPC卡片进行对抗前，请使用指令：\n`/switchgamecard {gp.id}`")
 
     gp.game.write()
     update.message.reply_text("游戏开始！")
