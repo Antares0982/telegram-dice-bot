@@ -592,8 +592,7 @@ def continuegame(update: Update, context: CallbackContext) -> bool:
         if card.id not in gp.pausedgame.cards:
             ngcard = GameCard(card.to_json())
             ngcard.isgamecard = True
-            gp.pausedgame.cards[card.id] = ngcard
-            dicebot.gamecards[card.id] = gp.pausedgame.cards[card.id]
+            dicebot.addgamecard(ngcard)
 
     gp.game = gp.pausedgame
     gp.pausedgame = None
