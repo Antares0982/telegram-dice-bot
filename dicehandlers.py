@@ -56,7 +56,7 @@ def abortgame(update: Update, context: CallbackContext) -> bool:
         if mempath != "":
             with open(PATH_MEM+mempath, 'rb') as f:
                 update.message.reply_document(
-                    f, filename=gp.getname(), timeout=120)
+                    f, filename=gp.getname()+".txt", timeout=120)
 
     if utils.gamepop(gp) is None:
         return utils.errorHandler(update, "没有找到游戏", True)
@@ -903,7 +903,7 @@ def endgame(update: Update, context: CallbackContext) -> bool:
     if mempath != "":
         with open(PATH_MEM+mempath, 'rb') as f:
             update.message.reply_document(
-                f, filename=gp.getname(), timeout=120)
+                f, filename=gp.getname()+".txt", timeout=120)
 
     update.message.reply_text("游戏结束！")
     return True
