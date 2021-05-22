@@ -1786,7 +1786,11 @@ def textmem(update: Update) -> bool:
         name = dicebot.getplayer(update).getname()
         txt = txt[1:]
     else:
-        name = findcardfromgame(gp.game, dicebot.getplayer(update)).getname()
+        card = findcardfromgame(gp.game, dicebot.getplayer(update))
+        if card is not None:
+            name = card.getname()
+        else:
+            name = dicebot.getplayer(update).getname()
 
     with open(PATH_MEM+gp.game.memfile, "a") as f:
         f.write(f"{name}:{txt}\n")

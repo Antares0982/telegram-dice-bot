@@ -779,7 +779,6 @@ def delmsg(update: Update, context: CallbackContext) -> bool:
             break
         try:
             context.bot.delete_message(chat_id=chatid, message_id=lastmsgid)
-            print(lastmsgid)
         except:
             lastmsgid -= 1
         else:
