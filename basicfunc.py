@@ -70,7 +70,7 @@ def recallmsg(update: Update) -> bool:
 
 def istrueconsttype(val) -> bool:
     """如果val是int, str, bool才返回True"""
-    return isinstance(val, int) or isinstance(val, str) or isinstance(val, bool)
+    return type(val) is int or type(val) is str or type(val) is bool
 
 
 def isconsttype(val) -> bool:

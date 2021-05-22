@@ -90,12 +90,12 @@ class datatype:
                 val = ''.join(val.split())
                 things = val.split(',')
 
-                if isinstance(self.__dict__[attr][0], int):
+                if type(self.__dict__[attr][0]) is int:
                     if any(isint(x) for x in things):
                         raise TypeError("输入的列表中存在非int型")
                     things = map(int, things)
 
-                elif isinstance(self.__dict__[attr][0], bool):
+                elif type(self.__dict__[attr][0]) is bool:
                     if any(x not in ["F", "false", "False", "假", "T", "true", "True", "真"] for x in things):
                         raise TypeError("输入的列表中存在非bool型，或输入不能识别")
                     things = map(tobool, things)
@@ -107,19 +107,19 @@ class datatype:
             if attr in jumpkey:
                 raise TypeError("该属性不支持修改")
 
-            if isinstance(self.__dict__[attr], int):
-                if not isint(val):
-                    raise TypeError("给定参数不是int")
-
-                rttext = str(self.__dict__[attr])
-                self.__dict__[attr] = int(val)
-
-            elif isinstance(self.__dict__[attr], bool):
+            if type(self.__dict__[attr]) is bool:
                 rttext = str(self.__dict__[attr])
                 try:
                     self.__dict__[attr] = tobool(val)
                 except TypeError as e:
                     raise e
+
+            elif type(self.__dict__[attr]) is int:
+                if not isint(val):
+                    raise TypeError("给定参数不是int")
+
+                rttext = str(self.__dict__[attr])
+                self.__dict__[attr] = int(val)
 
             else:
                 # str
@@ -595,9 +595,9 @@ class Player(datatype):
             idlist.append(card.id)
         d["gamecards"] = idlist
         # controlling
-        if self.controlling is not None and not isinstance(self.controlling, int):
+        if self.controlling is not None and not type(self.controlling) is int:
             d["controlling"] = self.controlling.id
-        elif isinstance(self.controlling, int):
+        elif type(self.controlling) is int:
             d["controlling"] = self.controlling
         # kpgroups
         idlist: List[int] = []
@@ -656,7 +656,7 @@ class Player(datatype):
         return rttext
 
     def write(self):
-        if not isinstance(self.id, int):
+        if not type(self.id) is int:
             raise ValueError("写入文件时，Player实例没有id")
         with open(PATH_PLAYERS+str(self.id)+".json", 'w', encoding='utf-8') as f:
             json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
@@ -1001,14 +1001,14 @@ class Group(datatype):
         return None
 
     def write(self):
-        if not isinstance(self.id, int):
+        if not type(self.id) is int:
             print(type(self.id))
             raise ValueError("写入文件时，Group实例没有id")
         with open(PATH_GROUPS+str(self.id)+".json", 'w', encoding='utf-8') as f:
             json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
 
     def delete(self):
-        if not isinstance(self.id, int):
+        if not type(self.id) is int:
             raise ValueError("删除文件时，Group实例没有id")
         try:
             os.remove(PATH_GROUPS+str(self.id)+".json")
@@ -1181,13 +1181,13 @@ class CardStatus(datatype):
         return "CardStatus实例不可以使用modify()修改一般成员", False
 
     def hasstatus(self, attr: str) -> bool:
-        return hasattr(self, attr) and isinstance(self.__dict__[attr], int)
+        return hasattr(self, attr) and type(self.__dict__[attr]) is int
 
     def getstatus(self, attr: str) -> int:
         return self.__dict__[attr]
 
     def setstatus(self, attr: str, val: int) -> bool:
-        if hasattr(self, attr) and not isinstance(self.__dict__[attr], int):
+        if hasattr(self, attr) and not type(self.__dict__[attr]) is int:
             raise TypeError(f"CardStatus属性：{attr}不是可修改的int类型")
         self.__dict__[attr] = val
         return True

@@ -161,7 +161,7 @@ def cardpop(id: int) -> Optional[GameCard]:
 
 def cardpop(id: Union[GameCard, int]) -> Optional[GameCard]:
     """删除一张卡并返回其数据。返回None则删除失败"""
-    if isinstance(id, int):
+    if type(id) is int:
         return dicebot.popcard(id) if dicebot.getcard(id) is not None else None
     card = id
     if card.isgamecard:
@@ -411,7 +411,7 @@ def showcardinfo(card1: GameCard) -> str:  # show full card
 
 
 def iskeyconstval(d: dict, keyname: str) -> bool:
-    if isinstance(d[keyname], bool) or isinstance(d[keyname], str) or isinstance(d[keyname], int):
+    if type(d[keyname], bool) or type(d[keyname]) is str or isinstance(d[keyname]) is int:
         return True
     return False
 
@@ -462,7 +462,7 @@ def modifythisdict(d: dict, attrname: str, val: str) -> Tuple[str, bool]:
     否则，返回True的同时返回修改前的值的格式化。"""
     if isinstance(d[attrname], dict):
         return "不能修改dict类型", False
-    if isinstance(d[attrname], bool):
+    if type(d[attrname]) is bool:
         rtmsg = "False"
         if d[attrname]:
             rtmsg = "True"
@@ -475,13 +475,13 @@ def modifythisdict(d: dict, attrname: str, val: str) -> Tuple[str, bool]:
         else:
             return "无效的值", False
         return rtmsg, True
-    if isinstance(d[attrname], int):
+    if type(d[attrname]) is int:
         if not isint(val):
             return "无效的值", False
         rtmsg = str(d[attrname])
         d[attrname] = int(val)
         return rtmsg, True
-    if isinstance(d[attrname], str):
+    if type(d[attrname]) is str:
         rtmsg: str = d[attrname]
         d[attrname] = val
         return rtmsg, True

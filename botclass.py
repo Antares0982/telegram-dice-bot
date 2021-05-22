@@ -124,7 +124,7 @@ class DiceBot:
 
         # group
         for gp in self.groups.values():
-            if isinstance(gp.kp, int):
+            if type(gp.kp) is int:
                 kp = self.getplayer(gp.kp)
                 gp.kp = kp if kp is not None else self.createplayer(gp.kp)
                 gp.kp.kpgroups[gp.id] = gp
@@ -143,7 +143,7 @@ class DiceBot:
                     game.kp = gp.kp
                     game.kp.kpgames[gp.id] = game
 
-                if isinstance(game.kpctrl, int):
+                if type(game.kpctrl) is int:
                     game.kpctrl = game.cards[game.kpctrl]
 
         # player
@@ -158,7 +158,7 @@ class DiceBot:
                     self.sendtoAdmin("用户："+str(pl.id)+" " +
                                      pl.name+"telegram chat无法获取")
 
-            if isinstance(pl.controlling, int):
+            if type(pl.controlling) is int:
                 assert(self.cards[pl.controlling].player == pl)
                 pl.controlling = self.cards[pl.controlling]
 
@@ -266,7 +266,7 @@ class DiceBot:
         if isinstance(update, Update):
             assert(isgroupmsg(update))
             return None if getchatid(update) not in self.groups else self.groups[getchatid(update)]
-        if isinstance(update, int):
+        if type(update) is int:
             gpid = update
             return None if gpid not in self.groups else self.groups[gpid]
 
@@ -326,10 +326,10 @@ class DiceBot:
     def getplayer(self, update: Union[int, Update, str]) -> Optional[Player]:
         if isinstance(update, Update):
             return None if getmsgfromid(update) not in self.players else self.players[getmsgfromid(update)]
-        if isinstance(update, int):
+        if type(update) is int:
             plid = update
             return None if plid not in self.players else self.players[plid]
-        if isinstance(update, str):
+        if type(update) is str:
             username = update
             return self.usernametopl[username] if username in self.usernametopl else None
 

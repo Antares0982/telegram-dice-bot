@@ -140,16 +140,16 @@ def addcard(update: Update, context: CallbackContext) -> bool:
         if isinstance(dt[argname], dict):
             return utils.errorHandler(update, argname+"是dict类型，不可直接赋值")
 
-        if isinstance(dt[argname], bool):
+        if type(dt[argname]) is bool:
             if argval == "false" or argval == "False":
                 argval = False
             elif argval == "true" or argval == "True":
                 argval = True
-            if not isinstance(argval, bool):
+            if not type(argval) is bool:
                 return utils.errorHandler(update, argname+"应该为bool类型")
             dt[argname] = argval
 
-        elif isinstance(dt[argname], int):
+        elif type(dt[argname]) is int:
             if not utils.isint(argval):
                 return utils.errorHandler(update, argname+"应该为int类型")
             dt[argname] = int(argval)
@@ -1883,10 +1883,10 @@ def setbkg(update: Update, context: CallbackContext) -> bool:
     if card is None:
         return utils.errorHandler(update, "找不到卡。", True)
 
-    if context.args[0] not in card.background.__dict__ or not isinstance(card.background.__dict__[context.args[0]], str):
+    if context.args[0] not in card.background.__dict__ or not type(card.background.__dict__[context.args[0]]) is str:
         rttext = "找不到这项背景属性，背景属性只支持以下参数：\n"
         for keys in card.background.__dict__:
-            if not isinstance(card.background.__dict__[keys], str):
+            if not type(card.background.__dict__[keys]) is str:
                 continue
             rttext += keys+"\n"
         return utils.errorHandler(update, rttext)
