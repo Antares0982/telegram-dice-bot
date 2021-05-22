@@ -1792,7 +1792,7 @@ def textmem(update: Update) -> bool:
         else:
             name = dicebot.getplayer(update).getname()
 
-    with open(PATH_MEM+gp.game.memfile, "a") as f:
+    with open(PATH_MEM+gp.game.memfile, "a", encoding='utf-8') as f:
         f.write(f"{name}:{txt}\n")
 
     return True

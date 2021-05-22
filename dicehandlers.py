@@ -54,7 +54,7 @@ def abortgame(update: Update, context: CallbackContext) -> bool:
     if game is not None:
         mempath = game.memfile
         if mempath != "":
-            with open(PATH_MEM+mempath, 'rb') as f:
+            with open(PATH_MEM+mempath, 'r', encoding='utf-8') as f:
                 update.message.reply_document(
                     f, filename=gp.getname()+".txt", timeout=120)
 
@@ -900,7 +900,7 @@ def endgame(update: Update, context: CallbackContext) -> bool:
     utils.atgameending(game)
 
     if mempath != "":
-        with open(PATH_MEM+mempath, 'rb') as f:
+        with open(PATH_MEM+mempath, 'r', encoding='utf-8') as f:
             update.message.reply_document(
                 f, filename=gp.getname()+".txt", timeout=120)
 
