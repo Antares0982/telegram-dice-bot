@@ -1924,6 +1924,8 @@ def setjob(update: Update, context: CallbackContext) -> bool:
         return utils.errorHandler(update, "年龄未设置")
     if card.data.datadec is not None:
         return utils.errorHandler(update, "属性下降未设置完成")
+    if card.info.job != "":
+        return utils.errorHandler(update, "职业已经设置过了")
 
     if len(context.args) == 0:
         rtbuttons = utils.makejobbutton()
