@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 
 import json
+import time
 from typing import (Dict, Iterable, Iterator, KeysView, List, Optional, Tuple,
                     TypeVar, Union, overload)
 
@@ -1467,6 +1468,38 @@ def atcardtransfer(msg: Message, cdid: int, tpl: Player) -> None:
     msg.reply_text(rttext)
 
 
+def atgamestart(gp: Group) -> None:
+    # 开始执行
+    kp = gp.kp
+    gp.game = GroupGame(gp.id, gp.cards)
+    # 构建数据关联
+    gp.game.group = gp
+    gp.game.kp = gp.kp
+    kp.kpgames[gp.id] = gp.game
+
+    kpcardcount = 0
+    kpcardptr: GameCard = None
+    for card in gp.game.cards.values():
+        dicebot.gamecards[card.id] = card
+        card.group = gp
+        card.player = dicebot.getcard(card.id).player
+        card.player.gamecards[card.id] = card
+
+        if card.player == kp:
+            kpcardcount += 1
+            kpcardptr = card
+
+    if kpcardcount == 1:
+        gp.game.kpctrl = kpcardptr
+        dicebot.sendto(kp, "在游戏中只有一张卡，操作的卡片自动切换到该卡：" +
+                       gp.game.kpctrl.getname())
+    elif kpcardcount > 1:
+        dicebot.sendto(
+            kp, f"NPC卡片多于1张，在需要使用NPC卡片进行对抗前，请使用指令：\n`/switchgamecard {gp.id}`")
+
+    gp.game.write()
+
+
 def atgameending(game: GroupGame) -> None:
     kp = game.kp
     gp = game.group
@@ -1712,6 +1745,51 @@ def textpassskill(update: Update, plid: int) -> bool:
 
     else:
         dicebot.sendto(plid, "您的新增技能申请没有通过。")
+
+    return True
+
+
+def textstartgame(update: Update) -> bool:
+    gp = dicebot.getgp(update)
+    if dicebot.getplayer(update) != gp.kp:
+        return True
+
+    if update.message.text == "记录":
+        update.message.reply_text(
+            "开启记录模式。记录时若开头有中英文左小括号，该条消息记录用户的名字；否则记录角色卡的名字。撤回的消息也会被记录，非文本不会被记录。")
+        atgamestart(gp)
+        update.message.reply_text("游戏开始！")
+        gp.game.memfile = str(time.time())+".txt"
+        gp.game.write()
+        popOP(gp.id)
+        addOP(gp.id, "textmem")
+        return True
+
+    atgamestart(gp)
+    update.message.reply_text("游戏开始！")
+    popOP(gp.id)
+    return True
+
+
+def textmem(update: Update) -> bool:
+    gp = dicebot.getgp(update)
+
+    txt = update.message.text
+    if txt == "":
+        return True
+
+    if dicebot.getplayer(update) == gp.kp:
+        name = f"(KP){gp.kp.getname()}"
+        if txt[0] in ["(", "（"]:
+            txt = txt[1:]
+    elif txt[0] in ["(", "（"]:
+        name = dicebot.getplayer(update).getname()
+        txt = txt[1:]
+    else:
+        name = findcardfromgame(gp.game, dicebot.getplayer(update)).getname()
+
+    with open(PATH_MEM+gp.game.memfile, "a") as f:
+        f.write(f"{name}:{txt}\n")
 
     return True
 

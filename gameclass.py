@@ -682,7 +682,7 @@ class GroupGame(datatype):  # If defined, game is started.
         self.cards: Dict[int, GameCard] = {}  # 不需要存储，读取时通过construct()赋值
         self.kpctrl: GameCard = None  # 存储时：int，读取时通过construct()赋值
         self.tpcheck: int = 0
-
+        self.memfile: str = ""
         if len(d) > 0:
             self.read_json(d)
             assert(self.groupid is not None)

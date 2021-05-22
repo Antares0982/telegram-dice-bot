@@ -50,6 +50,14 @@ def abortgame(update: Update, context: CallbackContext) -> bool:
     if gp.kp != kp:
         return utils.errorHandler(update, "只有KP可以中止游戏", True)
 
+    game = gp.game if gp.game is not None else gp.pausedgame
+    if game is not None:
+        mempath = game.memfile
+        if mempath != "":
+            with open(PATH_MEM+mempath, 'rb') as f:
+                update.message.reply_document(
+                    f, filename=gp.getname(), timeout=120)
+
     if utils.gamepop(gp) is None:
         return utils.errorHandler(update, "没有找到游戏", True)
 
@@ -888,7 +896,14 @@ def endgame(update: Update, context: CallbackContext) -> bool:
     if game is None:
         return utils.errorHandler(update, "没找到进行中的游戏。")
 
+    mempath = game.memfile
+
     utils.atgameending(game)
+
+    if mempath != "":
+        with open(PATH_MEM+mempath, 'rb') as f:
+            update.message.reply_document(
+                f, filename=gp.getname(), timeout=120)
 
     update.message.reply_text("游戏结束！")
     return True
@@ -2564,7 +2579,9 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     如果要正常结束游戏，使用`/endgame`可以将游戏的角色卡数据覆写到原本的数据上。
     如果要放弃这些游戏内进行的修改，使用`/abortgame`会直接删除这些副本副本。
     `/startgame`：正常地开始游戏，对所有玩家的卡片（type为PL）进行卡片检查。
-    `/startgame ignore`跳过开始游戏的检查，直接开始游戏。"""
+    `/startgame ignore`跳过开始游戏的检查，直接开始游戏。
+
+    开始后，bot会询问是否保存聊天文本数据。此时回复cancel或者取消，即可取消开始游戏。"""
     if utils.ischannel(update):
         return False
     utils.chatinit(update, context)
@@ -2579,10 +2596,10 @@ def startgame(update: Update, context: CallbackContext) -> bool:
     if gp.game is not None:
         return utils.errorHandler(update, "游戏已经在进行中")
 
-    # 开始执行
     if gp.pausedgame is not None:
         return continuegame(update, context)  # 检测到游戏暂停中，直接继续
 
+    # 开始验证
     if not(len(context.args) > 0 and context.args[0] == "ignore"):
         if len(gp.cards) == 0:
             return utils.errorHandler(update, "本群没有任何卡片，无法开始游戏")
@@ -2599,34 +2616,9 @@ def startgame(update: Update, context: CallbackContext) -> bool:
         if not canstart:
             return False
 
-    gp.game = GroupGame(gp.id, gp.cards)
-    # 构建数据关联
-    gp.game.group = gp
-    gp.game.kp = gp.kp
-    kp.kpgames[gp.id] = gp.game
-
-    kpcardcount = 0
-    kpcardptr: GameCard = None
-    for card in gp.game.cards.values():
-        dicebot.gamecards[card.id] = card
-        card.group = gp
-        card.player = dicebot.getcard(card.id).player
-        card.player.gamecards[card.id] = card
-
-        if card.player == gp.kp:
-            kpcardcount += 1
-            kpcardptr = card
-
-    if kpcardcount == 1:
-        gp.game.kpctrl = kpcardptr
-        dicebot.sendto(gp.kp, "在游戏中只有一张卡，操作的卡片自动切换到该卡：" +
-                       gp.game.kpctrl.getname())
-    elif kpcardcount > 1:
-        dicebot.sendto(
-            gp.kp, f"NPC卡片多于1张，在需要使用NPC卡片进行对抗前，请使用指令：\n`/switchgamecard {gp.id}`")
-
-    gp.game.write()
-    update.message.reply_text("游戏开始！")
+    update.message.reply_text(
+        "准备开始游戏，是否需要记录聊天文本？如果需要记录文本，请回复'记录'。回复'cancel'或者'取消'来取消游戏。")
+    utils.addOP(gp.id, "startgame")
     return True
 
 
@@ -2956,7 +2948,13 @@ def textHandler(update: Update, context: CallbackContext) -> bool:
         dicebot.migrateto = newid
         return True
 
-    if update.message.text == "cancel":
+    if utils.isgroupmsg(update):
+        gp = dicebot.forcegetgroup(update)
+        if gp.game is not None and gp.game.memfile != "":
+            utils.textmem(update)
+
+    if update.message.text in ["cancel", "取消"]:
+        update.message.reply_text("操作取消")
         utils.popOP(utils.getchatid(update))
         return True
 
@@ -2983,7 +2981,8 @@ def textHandler(update: Update, context: CallbackContext) -> bool:
         return utils.textpassjob(update)
     if opers[0] == "passskill":
         return utils.textpassskill(update)
-
+    if oper == "startgame":
+        return utils.textstartgame(update)
     return False
 
 

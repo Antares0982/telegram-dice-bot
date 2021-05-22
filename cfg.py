@@ -6,7 +6,7 @@ from os import getcwd, path, makedirs
 __all__ = [
     "PROXY", "PROXY_URL", "TOKEN", "DATA_PATH", "ADMIN_ID", "IGNORE_JOB_DICT", "VERSION", "BOT_ID",
     "PATH_PLAYERS", "PATH_GROUPS", "GLOBAL_DATA_PATH", "PATH_SKILLDICT", "PATH_JOBDICT", "PATH_HANDLERS",
-    "CREATE_CARD_HELP", "HELP_TEXT", "PATH_CARDS", "PATH_GAME_CARDS"
+    "CREATE_CARD_HELP", "HELP_TEXT", "PATH_CARDS", "PATH_GAME_CARDS", "PATH_MEM"
 ]
 
 PROXY: bool = False
@@ -79,6 +79,7 @@ if platform == "win32":
     PATH_CARDS = DATA_PATH+"cards\\"
     PATH_GAME_CARDS = DATA_PATH+"cards\\game\\"
     GLOBAL_DATA_PATH = DATA_PATH+"global\\"
+    PATH_MEM = DATA_PATH+"textmem\\"
 else:
     if DATA_PATH[-1] != '/':
         DATA_PATH += '/'
@@ -87,6 +88,7 @@ else:
     PATH_CARDS = DATA_PATH+"cards/"
     PATH_GAME_CARDS = DATA_PATH+"cards/game/"
     GLOBAL_DATA_PATH = DATA_PATH+"global/"
+    PATH_MEM = DATA_PATH+"textmem/"
 
 if not path.exists(PATH_CARDS):
     makedirs(PATH_CARDS)
@@ -96,7 +98,8 @@ if not path.exists(PATH_GROUPS):
     makedirs(PATH_GROUPS)
 if not path.exists(PATH_PLAYERS):
     makedirs(PATH_PLAYERS)
-
+if not path.exists(PATH_MEM):
+    makedirs(PATH_MEM)
 
 PATH_SKILLDICT = GLOBAL_DATA_PATH+r'skilldict.json'
 PATH_JOBDICT = GLOBAL_DATA_PATH+r'jobdict.json'
