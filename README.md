@@ -1,5 +1,5 @@
 # telegram-dice-bot
-tg跑团用骰子机器人，目前版本`v1.2.0`
+tg跑团用骰子机器人，目前版本`v1.2.1`
 
 如果有任何意见或修改建议请提交issue或者联系[我](https://t.me/AntaresChr)。
 

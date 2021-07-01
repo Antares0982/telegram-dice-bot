@@ -19,7 +19,7 @@ class baseBot(object):
                                    "proxy_url": PROXY_URL})
         else:
             self.updater = Updater(token=TOKEN, use_context=True)
-
+        
         self.bot: Bot = self.updater.bot
         self.workingMethod: Dict[int, str] = {}  # key为chat_id，而非user.id
 

@@ -85,8 +85,14 @@ def main():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
     global mainbot
     mainbot = mainBot()
+    pass
+    try:
+        mainbot.importHandlers()
+    except Exception as e:
+        mainbot.updater.bot.send_message(chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
+        print("出现问题")
+        raise e
     mainbot.start()
-
 
 if __name__ == "__main__":
     main()
