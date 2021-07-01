@@ -629,7 +629,7 @@ class DiceBot:
 
 try:
     dicebot = DiceBot()
-except:
+except Exception as e:
     updater.bot.send_message(chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
     print("出现问题")
-    exit()
+    raise e
