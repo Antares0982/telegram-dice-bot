@@ -5,7 +5,7 @@ import time
 from typing import List, Optional, Tuple, Union, overload
 
 from telegram import Update
-from telegram.error import BadRequest, ChatMigrated
+from telegram.error import BadRequest, ChatMigrated, Unauthorized
 from telegram.ext import Updater
 from telegram.message import Message
 
@@ -133,7 +133,7 @@ class DiceBot:
                 try:
                     gp.chat = self.updater.bot.get_chat(chat_id=gp.id)
                     gp.name = gp.chat.title
-                except BadRequest:
+                except (BadRequest, Unauthorized):
                     self.sendtoAdmin("群："+str(gp.id)+" " +
                                      gp.name+"telegram chat无法获取")
 
