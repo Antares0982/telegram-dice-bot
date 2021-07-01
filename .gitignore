@@ -10,7 +10,7 @@ data/groups/*
 data/textmem/*
 .*
 !.gitignore
-
+old*
 nohup*
 
 # Byte-compiled / optimized / DLL files

@@ -66,7 +66,7 @@ except (NoSectionError, NoOptionError):
     __defaultcfg()
     raise Exception("配置文件不完整，请检查配置文件")
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 BOT_ID = int(TOKEN.split(":")[0])
 
