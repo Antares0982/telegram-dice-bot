@@ -1,11 +1,12 @@
-#!/usr/bin/python3 -O
 import os
+import sqlite3
 import time
+import traceback
 from signal import SIGINT
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
-from telegram import Bot, CallbackQuery
-from telegram.error import NetworkError, TimedOut
+from telegram import Bot, CallbackQuery, Update
+from telegram.error import BadRequest, NetworkError, TimedOut
 from telegram.ext import (CallbackContext, CallbackQueryHandler,
                           CommandHandler, Filters, MessageHandler, Updater)
 
@@ -19,13 +20,15 @@ class baseBot(object):
                                    "proxy_url": PROXY_URL})
         else:
             self.updater = Updater(token=TOKEN, use_context=True)
-        
+
         self.bot: Bot = self.updater.bot
         self.workingMethod: Dict[int, str] = {}  # key为chat_id，而非user.id
 
         self.lastchat: int = ADMIN_ID
         self.lastuser: int = ADMIN_ID
         self.lastmsgid: int = -1  # 默认-1，如果是按钮响应需要调整到-1
+        self.blacklist: List[int] = []
+        self.readblacklist()
 
     def start(self) -> None:
         self.importHandlers()
@@ -33,12 +36,38 @@ class baseBot(object):
         self.updater.start_polling(drop_pending_updates=True)
         self.updater.idle()
 
+    def readblacklist(self):
+        self.blacklist = []
+        conn = sqlite3.connect(blacklistdatabase)
+        c = conn.cursor()
+        cur = c.execute("SELECT * FROM BLACKLIST;")
+        ans = cur.fetchall()
+        conn.close()
+        for tgid in ans:
+            self.blacklist.append(tgid)
+
+    def addblacklist(self, id: int):
+        if id in self.blacklist:
+            return
+        self.blacklist.append(id)
+        conn = sqlite3.connect(blacklistdatabase)
+        c = conn.cursor()
+        c.execute(f"""INSERT INTO BLACKLIST(TGID)
+        VALUES(id);""")
+        conn.commit()
+        conn.close()
+
     def renewStatus(self, update: Update) -> None:
         """在每个command Handler前调用，是指令的前置函数"""
         self.lastchat = getchatid(update)
+
         if update.callback_query is None:
-            self.lastuser = getfromid(update)
+            if ischannel(update):
+                self.lastuser = -1
+            else:
+                self.lastuser = getfromid(update)
             self.lastmsgid = getmsgid(update)
+
         else:
             self.lastuser = update.callback_query.from_user.id
             self.lastmsgid = -1
@@ -146,10 +175,14 @@ class baseBot(object):
 
     @staticmethod
     def queryError(query: CallbackQuery) -> False:
-        query.edit_message_text(text="(*￣︿￣) 这个按钮请求已经无效了", reply_markup=None)
+        try:
+            query.edit_message_text(
+                text="这个按钮请求已经无效了", reply_markup=None)
+        except BadRequest:
+            query.delete_message()
         return False
 
-    def importHandlers(self) -> bool:
+    def importHandlers(self) -> None:
         for key in self.__dir__():
             func = getattr(self, key)
             if type(func) is commandCallbackMethod:
@@ -158,12 +191,21 @@ class baseBot(object):
 
         self.updater.dispatcher.add_handler(
             MessageHandler(Filters.text & (~Filters.command) & (~Filters.video) & (
-                ~Filters.photo) & (~Filters.sticker), self.textHandler))
+                ~Filters.photo) & (~Filters.sticker) & (~Filters.chat_type.channel), self.textHandler))
+
+        self.updater.dispatcher.add_handler(MessageHandler(
+            Filters.chat_type.channel, self.channelHandler))
+
+        self.updater.dispatcher.add_handler(MessageHandler(
+            (Filters.photo | Filters.sticker) & (~Filters.chat_type.channel), self.photoHandler))
+
         self.updater.dispatcher.add_handler(
             CallbackQueryHandler(self.buttonHandler))
-        self.updater.dispatcher.add_handler(MessageHandler(
-            Filters.photo | Filters.sticker, self.photoHandler))
+
         self.updater.dispatcher.add_error_handler(self.errorHandler)
+
+        self.updater.dispatcher.add_handler(
+            MessageHandler(Filters.command, self.unknowncommand))
 
     # 指令
     @commandCallbackMethod
@@ -174,11 +216,17 @@ class baseBot(object):
 
     @commandCallbackMethod
     def stop(self, update: Update, context: CallbackContext) -> bool:
-        if getfromid(update) != ADMIN_ID:
+        if not isfromme(update):
+            self.reply("你没有权限")
             return False
+        try:
+            self.beforestop()
+        except:
+            ...
         self.reply(text="主人再见QAQ")
         pid = os.getpid()
         os.kill(pid, SIGINT)
+        return True
 
     @commandCallbackMethod
     def getid(self, update: Update, context: CallbackContext) -> None:
@@ -197,15 +245,23 @@ class baseBot(object):
 
     def textHandler(self, update: Update, context: CallbackContext) -> handleStatus:
         """Override"""
-        return handlePassed()
-
-    def buttonHandler(self, update: Update, context: CallbackContext) -> handleStatus:
-        """Override"""
-        return handlePassed()
+        return handlePassed
 
     def photoHandler(self, update: Update, context: CallbackContext) -> handleStatus:
         """Override"""
-        return handlePassed()
+        return handlePassed
+
+    def channelHandler(self, update: Update, context: CallbackContext) -> handleStatus:
+        """Override"""
+        return handlePassed
+
+    def editedChannelHandler(self, update: Update, context: CallbackContext) -> handleStatus:
+        """Override"""
+        return handlePassed
+
+    def buttonHandler(self, update: Update, context: CallbackContext) -> handleStatus:
+        """Override"""
+        return handlePassed
 
     # 错误处理
     def errorHandler(self, update: object, context: CallbackContext):
@@ -214,6 +270,33 @@ class baseBot(object):
             raise err
 
         self.reply(
-            chat_id=ADMIN_ID,
+            chat_id=MYID,
             text=f"哎呀，出现了未知的错误呢……\n{err.__class__}\n\
-                {err}\ntraceback:{err.__traceback__}")
+                {err}\ntraceback:{traceback.format_exc()}")
+
+    # 未知指令
+    def unknowncommand(self, update: Update, context: CallbackContext):
+        self.renewStatus(update)
+        try:
+            if not isfromme(update):
+                self.reply("没有这个指令")
+            else:
+                self.reply("似乎没有这个指令呢……")
+        except:
+            ...
+
+    # 聊天迁移
+    @classmethod
+    def chatmigrate(cls, oldchat: int, newchat: int, instance: 'baseBot'):
+        """Override"""
+        if cls is baseBot:
+            conn = sqlite3.connect(blacklistdatabase)
+            c = conn.cursor()
+            c.execute(f"""UPDATE BLACKLIST
+            SET TGID={newchat} WHERE TGID={oldchat}""")
+            if oldchat in instance.blacklist:
+                instance.blacklist[instance.blacklist.index(oldchat)] = newchat
+
+    def beforestop(self):
+        """Override"""
+        return

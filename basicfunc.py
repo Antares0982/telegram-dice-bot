@@ -49,15 +49,11 @@ def popallempties(d: Dict[Any, dict]) -> bool:
     return ans
 
 
-def isadmin(update: Update, userid: int) -> bool:
+def isadmin(chatid: int, userid: int) -> bool:
     """检测发消息的人是不是群管理员"""
-    if isprivatemsg(update):
+    if chatid>=0:
         return False
-    admins = update.effective_chat.get_administrators()
-    for admin in admins:
-        if admin.user.id == userid:
-            return True
-    return False
+    
 
 
 def recallmsg(update: Update) -> bool:

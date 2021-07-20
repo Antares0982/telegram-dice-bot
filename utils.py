@@ -1,5 +1,3 @@
-#!/usr/bin/python3 -O
-
 from functools import wraps
 from typing import TYPE_CHECKING, Callable, TypeVar
 
@@ -11,9 +9,28 @@ from cfg import *
 if TYPE_CHECKING:
     from telegram.ext import CallbackContext
 
-    from basebot import baseBot
+    from dicebot import diceBot
 
-RT = TypeVar('RT')
+_RT = TypeVar('_RT')
+# FLAGS
+
+CANREAD = 1
+OWNCARD = 2
+CANSETINFO = 4
+CANDISCARD = 8
+CANMODIFY = 16
+
+INGROUP = 1
+GROUPKP = 2
+GROUPADMIN = 4
+BOTADMIN = 8
+
+STATUS_DEAD = "dead"
+STATUS_ALIVE = "alive"
+STATUS_SERIOUSLYWOUNDED = "seriously wounded"
+STATUS_NEARDEATH = "near-death"
+STATUS_TEMPSTABLE = "temporarily stable"
+STATUS_PERMANENTINSANE = "permanently insane"
 
 
 def isfromme(update: Update) -> bool:
@@ -49,6 +66,8 @@ def ischannel(update: Update) -> bool:
 
 
 class handleStatus(object):
+    __slots__ = ['block', 'normal']
+
     def __init__(self, normal: bool, block: bool) -> None:
         self.block: bool = block
         self.normal: bool = normal
@@ -60,8 +79,13 @@ class handleStatus(object):
         return self.block
 
 
+handlePassed = handleStatus(True, False)
+
+
 @final
 class handleBlocked(handleStatus):
+    __slots__ = []
+
     def __init__(self, normal: bool = True) -> None:
         super().__init__(normal=normal, block=True)
 
@@ -70,39 +94,13 @@ class handleBlocked(handleStatus):
 
 
 @final
-class handlePassed(handleStatus):
-    def __init__(self) -> None:
-        super().__init__(True, False)
-
-    def __bool__(self):
-        return True
-
-
-@final
-class commandCallback(object):
-    def __init__(self, func: Callable) -> None:
-        wraps(func)(self)
-
-    def __call__(self, *args, **kwargs):
-        numOfArgs = len(args)+len(kwargs.keys())
-        if numOfArgs != 2:
-            raise TypeError(f"指令的callback function参数个数应为2，但接受到{numOfArgs}个")
-        return self.__wrapped__(*args, **kwargs)
-
-    def __get__(self, instance, cls):
-        if instance is not None:
-            raise TypeError("该装饰器不适用于方法")
-        return self
-
-
-@final
 class commandCallbackMethod(object):
     """表示一个指令的callback函数，仅限于类的成员方法。
     调用时，会执行一次指令的前置函数。"""
 
-    def __init__(self, func: Callable[[Update, 'CallbackContext'], RT]) -> None:
+    def __init__(self, func: Callable[[Update, 'CallbackContext'], _RT]) -> None:
         wraps(func)(self)
-        self.instance: 'baseBot' = None
+        self.instance: 'diceBot' = None
 
     def __call__(self, *args, **kwargs):
         numOfArgs = len(args)+len(kwargs.keys())
@@ -124,6 +122,7 @@ class commandCallbackMethod(object):
         if self.instance is None:
             raise RuntimeError("command callback method还未获取实例")
         self.instance.renewStatus(update)
+        self.instance.chatinit(update)
 
     def __get__(self, instance, cls):
         if instance is None:
@@ -131,3 +130,19 @@ class commandCallbackMethod(object):
         if self.instance is None:
             self.instance = instance
         return self
+
+# @final
+# class commandCallback(object):
+#     def __init__(self, func: Callable) -> None:
+#         wraps(func)(self)
+
+#     def __call__(self, *args, **kwargs):
+#         numOfArgs = len(args)+len(kwargs.keys())
+#         if numOfArgs != 2:
+#             raise TypeError(f"指令的callback function参数个数应为2，但接受到{numOfArgs}个")
+#         return self.__wrapped__(*args, **kwargs)
+
+#     def __get__(self, instance, cls):
+#         if instance is not None:
+#             raise TypeError("该装饰器不适用于方法")
+#         return self
