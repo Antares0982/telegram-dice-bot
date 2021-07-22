@@ -64,7 +64,7 @@ class adminCommand(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isprivatemsg(update):
+        if isprivate(update):
             return self.errorInfo("游戏中才可以修改HP。")
         gp = self.forcegetgroup(update)
         kp = self.forcegetplayer(update)
@@ -220,7 +220,7 @@ class adminCommand(diceBot):
             return False
         self.chatinit(update, context)
 
-        if not self.isgroupmsg(update):
+        if not isgroup(update):
             return self.errorInfo("在群聊使用该指令。")
         if not self.isadmin(update, self.BOT_ID):
             return self.errorInfo("Bot没有权限")
@@ -314,10 +314,10 @@ class adminCommand(diceBot):
         delnum = 1
         chatid = self.getchatid(update)
 
-        if self.isgroupmsg(update) and not self.isadmin(update, BOT_ID):
+        if isgroup(update) and not self.isadmin(update, BOT_ID):
             return self.errorInfo("Bot没有管理权限")
 
-        if self.isgroupmsg(update) and self.checkaccess(self.forcegetplayer(update), self.forcegetgroup(update)) & (GROUPKP | GROUPADMIN) == 0:
+        if isgroup(update) and self.checkaccess(self.forcegetplayer(update), self.forcegetgroup(update)) & (GROUPKP | GROUPADMIN) == 0:
             return self.errorInfo("没有权限", True)
 
         if len(context.args) >= 1:
@@ -437,7 +437,7 @@ class adminCommand(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isprivatemsg(update):
+        if isprivate(update):
             return self.errorInfo("请在群内用该指令设置规则")
 
         gp = self.forcegetgroup(update)

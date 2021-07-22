@@ -36,7 +36,7 @@ class diceCommand(diceBot):
 
         dicename = context.args[0]
 
-        if self.isprivatemsg(update):
+        if isprivate(update):
             self.reply(self.commondice(dicename))
             return True
 
@@ -180,7 +180,7 @@ class diceCommand(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isprivatemsg(update):
+        if isprivate(update):
             return self.errorInfo("在游戏中才能进行sancheck。")
 
         if len(context.args) == 0:

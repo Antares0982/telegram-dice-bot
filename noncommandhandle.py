@@ -46,7 +46,7 @@ class nonCommandHandlers(diceBot):
             self.migrateto = newid
             return True
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             gp = self.forcegetgroup(update)
             if gp.game is not None and gp.game.memfile != "":
                 self.textmem(update)
@@ -91,7 +91,7 @@ class nonCommandHandlers(diceBot):
 
         if query.data == "None":
             return False
-        if self.isgroupmsg(update):
+        if isgroup(update):
             return False
 
         args = query.data.split(" ")

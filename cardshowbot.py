@@ -22,7 +22,7 @@ class cardShowBot(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             return self.errorInfo("使用该指令请发送私聊消息", True)
 
         if len(context.args) == 0:
@@ -111,7 +111,7 @@ class cardShowBot(diceBot):
         if len(pl.cards) == 0:
             return self.errorInfo("你没有任何卡。")
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             # 群消息，只发送本群的卡
             gp = self.forcegetgroup(update)
             rttexts: List[str] = []
@@ -172,7 +172,7 @@ class cardShowBot(diceBot):
 
         card = rpcard if rpcard is not None else None
         if card is None:
-            if self.isgroupmsg(update):
+            if isgroup(update):
                 gp = self.forcegetgroup(update)
                 card = self.findcardfromgroup(pl, gp)
                 if card is None:
@@ -186,7 +186,7 @@ class cardShowBot(diceBot):
 
         rttext = ""
 
-        if game is not None and self.isgroupmsg(update):
+        if game is not None and isgroup(update):
             if card.id in game.cards:
                 rttext = "显示游戏中的卡：\n"
                 card = game.cards[card.id]
@@ -197,7 +197,7 @@ class cardShowBot(diceBot):
         if not self.checkaccess(pl, card) & CANREAD:
             return self.errorInfo("没有权限")
 
-        if card.type != PLTYPE and self.isgroupmsg(update):
+        if card.type != PLTYPE and isgroup(update):
             return self.errorInfo("非玩家卡片不可以在群内显示")
 
         if len(context.args) == 0:
@@ -253,7 +253,7 @@ class cardShowBot(diceBot):
         rttext: str = ""
         cardi: Optional[GameCard] = None
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             cardi = self.getgamecard(cdid)
             if cardi is not None:
                 rttext = "显示游戏内的卡片\n"
@@ -268,7 +268,7 @@ class cardShowBot(diceBot):
             rttext = "显示游戏外的卡片\n"
 
         # 检查是否有权限
-        if self.isprivatemsg(update):
+        if isprivate(update):
 
             pl = self.forcegetplayer(update)
 
@@ -311,7 +311,7 @@ class cardShowBot(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             gp = self.forcegetgroup(update)
 
             out = bool(len(context.args) == 0) or bool(

@@ -374,8 +374,6 @@ class GameCard(datatype):
         rttext += "建议技能: "+"\n"
         rttext += str(self.suggestskill)+"\n"
 
-        # TODO 角色卡检查
-
         rttext += "其他属性: "+"\n"
         rttext += str(self.attr)+"\n"
 
@@ -411,6 +409,7 @@ class GameCard(datatype):
         self.info = CardInfo()
         self.skill = Skill()
         self.interest = Skill()
+        self.interest.type = "兴趣"
         self.suggestskill = SgSkill()
         self.attr = CardAttr()
         self.tempstatus = CardStatus()

@@ -33,11 +33,7 @@ class cardCreate(diceBot):
         `playerid`会自动识别为发送者，无需填写`playerid`。
         指令使用者是KP的情况下，才可以指定`playerid`这个属性，否则卡片无效。
         给定`id`属性的话，在指定的卡id已经被占用的时候，会重新自动选取。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
-
-        if self.isgroupmsg(update):
+        if isgroup(update):
             return self.errorInfo("向我发送私聊消息来添加卡", True)
         if len(context.args) == 0:
             return self.errorInfo("需要参数")
@@ -196,7 +192,7 @@ class cardCreate(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             return self.errorInfo("发送私聊消息删除卡。")
 
         pl = self.getplayer(update)  # 发送者
@@ -299,7 +295,7 @@ class cardCreate(diceBot):
         gp: Optional[Group] = None
         newcdid: Optional[int] = None
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             # 先检查是否有该玩家信息
             rtbutton = [[InlineKeyboardButton(
                 text="跳转到私聊", callback_data="None", url="t.me/"+self.updater.bot.username)]]
@@ -355,7 +351,7 @@ class cardCreate(diceBot):
         assert(gpid is not None)
 
         remsgid = None
-        if self.isprivatemsg(update):
+        if isprivate(update):
             remsgid = update.message.message_id
         else:
             assert(rp_markup)
@@ -378,6 +374,7 @@ class cardCreate(diceBot):
             return self.errorInfo("选中的卡不可重置。如果您使用了 /switch 切换操作中的卡，请使用 /switch 切换回要重置的卡")
 
         pl.controlling.backtonewcard()
+        pl.controlling.interest.points = pl.controlling.data.INT*2
         self.reply(pl.controlling.data.datainfo)
         if pl.controlling.data.countless50discard():
             pl.controlling.discard = True
@@ -397,7 +394,7 @@ class cardCreate(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             return self.errorInfo("发送私聊消息创建角色卡。")
 
         gp = self.getgp(-1)

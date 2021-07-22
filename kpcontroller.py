@@ -15,7 +15,7 @@ class kpController(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isprivatemsg(update):
+        if isprivate(update):
             return self.errorInfo('发群消息撤销自己的KP权限')
 
         gp = self.forcegetgroup(update)
@@ -46,7 +46,7 @@ class kpController(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isprivatemsg(update):
+        if isprivate(update):
             return self.errorInfo('发送群消息添加KP')
 
         gp = self.forcegetgroup(update)
@@ -90,7 +90,7 @@ class kpController(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isprivatemsg(update):
+        if isprivate(update):
             return self.errorInfo("发送群消息强制转移KP权限")
 
         gp = self.getgp(update)

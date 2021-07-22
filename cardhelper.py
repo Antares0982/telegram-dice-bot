@@ -87,7 +87,7 @@ class cardHelper(diceBot):
             return self.errorInfo("找不到卡。")
 
         if len(context.args) == 0:
-            if self.isprivatemsg(update):
+            if isprivate(update):
                 self.addOP(self.getchatid(update), "setname")
             else:
                 self.addOP(self.getchatid(update),
@@ -112,7 +112,7 @@ class cardHelper(diceBot):
         if pl.controlling is None:
             return self.errorInfo("找不到卡。", True)
         if len(context.args) == 0:
-            if self.isgroupmsg(update):
+            if isgroup(update):
                 gpid = self.getchatid(update)
                 self.addOP(gpid, "setsex "+str(pl.id))
                 self.reply("请输入性别：")
@@ -179,7 +179,7 @@ class cardHelper(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             return self.errorInfo("发私聊消息来增改技能", True)
 
         pl = self.forcegetplayer(update)
@@ -352,7 +352,7 @@ class cardHelper(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             return self.errorInfo("私聊使用该指令")
 
         pl = self.forcegetplayer(update)
@@ -436,7 +436,7 @@ class cardHelper(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             return self.errorInfo("发送私聊消息设置年龄。", True)
 
         pl = self.forcegetplayer(update)
@@ -494,7 +494,7 @@ class cardHelper(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             return self.errorInfo("发送私聊消息设置职业。")
 
         pl = self.forcegetplayer(update)
@@ -548,7 +548,7 @@ class cardHelper(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             return self.errorInfo("对bot私聊来切换卡。")
 
         pl = self.forcegetplayer(update)
@@ -632,7 +632,7 @@ class cardHelper(diceBot):
 
         gpid = iid
 
-        if self.isgroupmsg(update):
+        if isgroup(update):
             return self.errorInfo("请直接指定要切换的卡id，或者向bot发送私聊消息切换卡！")
 
         gp = self.getgp(gpid)

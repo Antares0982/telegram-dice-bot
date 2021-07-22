@@ -772,9 +772,9 @@ class diceBot(baseBot):
         # 检测是否处于newcard状态
         opers = self.getOP(fromuser)
 
-        if opers != "" and self.isgroupmsg(update):
+        if opers != "" and isgroup(update):
             opers = opers.split(" ")
-            if self.isgroupmsg(update) and opers[0] == "newcard":
+            if isgroup(update) and opers[0] == "newcard":
                 self.popOP(fromuser)
 
                 if self.hascard(fromuser, chatid) and self.getgp(update).kp is not None and self.getgp(update).kp != pl:
@@ -805,7 +805,7 @@ class diceBot(baseBot):
             return False
         self.chatinit(update, context)
 
-        if not self.isprivatemsg(update):
+        if not isprivate(update):
             return self.errorInfo("请在私聊环境查看手册")
 
         if len(self.MANUALTEXTS) == 0:
@@ -862,7 +862,7 @@ class diceBot(baseBot):
 
         if len(context.args) == 0:
             return self.errorInfo("没有参数", True)
-        if not self.isgroupmsg(update):
+        if not isgroup(update):
             return self.errorInfo("在群里设置临时检定")
         if not self.isint(context.args[0]):
             return self.errorInfo("临时检定修正应当是整数", True)

@@ -24,7 +24,7 @@ class gameController(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isprivatemsg(update):
+        if isprivate(update):
             return self.errorInfo("游戏需要在群里进行")
 
         gp = self.forcegetgroup(update)
@@ -66,7 +66,7 @@ class gameController(diceBot):
             return False
         self.chatinit(update, context)
 
-        if not self.isgroupmsg(update):
+        if not isgroup(update):
             return self.errorInfo("发送群聊消息来中止游戏")
         gp = self.forcegetgroup(update)
         kp = self.forcegetplayer(update)
@@ -99,7 +99,7 @@ class gameController(diceBot):
             return False
         self.chatinit(update, context)
 
-        if not self.isgroupmsg(update):
+        if not isgroup(update):
             return self.errorInfo("发送群消息暂停游戏")
 
         gp = self.forcegetgroup(update)
@@ -128,7 +128,7 @@ class gameController(diceBot):
             return False
         self.chatinit(update, context)
 
-        if not self.isgroupmsg(update):
+        if not isgroup(update):
             return self.errorInfo("群聊才能使用该指令")
 
         gp = self.forcegetgroup(update)
@@ -163,7 +163,7 @@ class gameController(diceBot):
             return False
         self.chatinit(update, context)
 
-        if not self.isgroupmsg(update):
+        if not isgroup(update):
             return self.errorInfo("发送群消息暂停游戏")
 
         gp = self.forcegetgroup(update)

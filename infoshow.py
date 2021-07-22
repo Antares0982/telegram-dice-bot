@@ -16,7 +16,7 @@ class infoShow(diceBot):
             return False
         self.chatinit(update, context)
 
-        if not self.isprivatemsg(update):
+        if not isprivate(update):
             return self.errorInfo("请在私聊中使用该指令")
 
         rttext = "职业列表："
@@ -52,7 +52,7 @@ class infoShow(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isprivatemsg(update):
+        if isprivate(update):
             return self.errorInfo("请在群内查看规则")
 
         gp = self.forcegetgroup(update)
@@ -87,7 +87,7 @@ class infoShow(diceBot):
             return False
         self.chatinit(update, context)
 
-        if self.isgroupmsg(update):  # Group msg: do nothing, even sender is USER or KP
+        if isgroup(update):  # Group msg: do nothing, even sender is USER or KP
             return self.errorInfo("没有这一指令", True)
 
         user = self.forcegetplayer(update)
