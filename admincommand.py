@@ -84,7 +84,7 @@ class adminCommand(diceBot):
         if rppl is None:
             if len(context.args) < 2:
                 return self.errorInfo("请用回复或@用户名的方式来选择玩家改变HP")
-            if not self.isint(context.args[0]) or int(context.args[0]) < 0:
+            if not isint(context.args[0]) or int(context.args[0]) < 0:
                 return self.errorInfo("参数无效")
             rppl = self.getplayer(int(context.args[0]))
             if rppl is None:
@@ -118,7 +118,7 @@ class adminCommand(diceBot):
             chp = chp[0]+str(diceans)
         else:
             # 直接修改生命为目标值的情形。不支持dicecalculator()，仅支持整数
-            if not self.isint(chp) or int(chp) > 100 or int(chp) < 0:
+            if not isint(chp) or int(chp) > 100 or int(chp) < 0:
                 return self.errorInfo("参数无效", True)
 
         if cardi.status == STATUS_DEAD:
@@ -192,7 +192,7 @@ class adminCommand(diceBot):
         if rppl is None:
             if len(context.args) == 0:
                 return self.errorInfo("使用回复或@username指定恢复者")
-            if not self.isint(context.args[0]) or int(context.args[0]) < 0:
+            if not isint(context.args[0]) or int(context.args[0]) < 0:
                 return self.errorInfo("参数无效", True)
 
             rppl = self.getplayer(int(context.args[0]))
@@ -241,7 +241,7 @@ class adminCommand(diceBot):
             return self.errorInfo("邀请链接发送失败！")
 
         rtbutton = [[InlineKeyboardButton(
-            text="跳转到私聊", callback_data="None", url="t.me/"+self.updater.bot.username)]]
+            text="跳转到私聊", callback_data="None", url="t.me/"+self.bot.username)]]
         rp_markup = InlineKeyboardMarkup(rtbutton)
 
         self.reply("群邀请链接已经私聊发送。", reply_markup=rp_markup)
@@ -268,7 +268,7 @@ class adminCommand(diceBot):
         if rppl is None:
             if len(context.args) == 0:
                 return self.errorInfo("使用回复或@username指定恢复者")
-            if not self.isint(context.args[0]) or int(context.args[0]) < 0:
+            if not isint(context.args[0]) or int(context.args[0]) < 0:
                 return self.errorInfo("参数无效", True)
 
             rppl = self.getplayer(int(context.args[0]))
@@ -312,7 +312,7 @@ class adminCommand(diceBot):
         self.chatinit(update, context)
 
         delnum = 1
-        chatid = self.getchatid(update)
+        chatid = getchatid(update)
 
         if isgroup(update) and not self.isadmin(update, BOT_ID):
             return self.errorInfo("Bot没有管理权限")
@@ -321,7 +321,7 @@ class adminCommand(diceBot):
             return self.errorInfo("没有权限", True)
 
         if len(context.args) >= 1:
-            if not self.isint(context.args[0]) or int(context.args[0]) <= 0:
+            if not isint(context.args[0]) or int(context.args[0]) <= 0:
                 return self.errorInfo("参数错误", True)
             delnum = int(context.args[0])
             if delnum > 10:
@@ -364,7 +364,7 @@ class adminCommand(diceBot):
         if rppl is None:
             if len(context.args) == 0:
                 return self.errorInfo("使用回复或@username指定恢复者")
-            if not self.isint(context.args[0]) or int(context.args[0]) < 0:
+            if not isint(context.args[0]) or int(context.args[0]) < 0:
                 return self.errorInfo("参数无效", True)
 
             rppl = self.getplayer(int(context.args[0]))
@@ -457,7 +457,7 @@ class adminCommand(diceBot):
             j = i+1
             tplist: List[int] = []
             while j < len(context.args):
-                if self.isint(context.args[j]):
+                if isint(context.args[j]):
                     tplist.append(int(context.args[j]))
                     j += 1
                 else:

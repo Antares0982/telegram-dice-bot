@@ -122,7 +122,7 @@ class diceBot(baseBot):
 
             if gp.chat is None and gp.id != -1:
                 try:
-                    gp.chat = self.updater.bot.get_chat(chat_id=gp.id)
+                    gp.chat = self.bot.get_chat(chat_id=gp.id)
                     gp.name = gp.chat.title
                 except (BadRequest, Unauthorized):
                     self.sendtoAdmin("群："+str(gp.id)+" " +
@@ -141,7 +141,7 @@ class diceBot(baseBot):
         for pl in self.players.values():
             if pl.chat is None and pl.id != 0:
                 try:
-                    pl.chat = self.updater.bot.get_chat(chat_id=pl.id)
+                    pl.chat = self.bot.get_chat(chat_id=pl.id)
                     pl.getname()
                     if pl.username != "":
                         self.usernametopl[pl.username] = pl
@@ -176,7 +176,7 @@ class diceBot(baseBot):
         return d
 
     def sendtoAdmin(self, msg: str) -> None:
-        self.updater.bot.send_message(chat_id=ADMIN_ID, text=msg)
+        self.reply(ADMIN_ID, msg)
 
     def checkconsistency(self):
         for card in self.cards.values():
@@ -280,7 +280,7 @@ class diceBot(baseBot):
         self.groups[gpid] = gp
 
         try:
-            gp.chat = self.updater.bot.get_chat(chat_id=gp.id)
+            gp.chat = self.bot.get_chat(chat_id=gp.id)
             gp.getname()
         except:
             self.sendtoAdmin("无法获取群"+str(gp.id)+" chat信息")
@@ -347,7 +347,7 @@ class diceBot(baseBot):
         self.players[plid] = pl
 
         try:
-            pl.chat = self.updater.bot.get_chat(chat_id=plid)
+            pl.chat = self.bot.get_chat(chat_id=plid)
             pl.getname()
             if pl.username != "":
                 self.usernametopl[pl.username] = pl
@@ -597,8 +597,8 @@ class diceBot(baseBot):
             chatid = pl
         try:
             if chatid >= 0:
-                return self.updater.bot.send_message(chat_id=chatid, text=msg, reply_markup=rpmarkup)
-            return self.updater.bot.send_message(chat_id=chatid, text=msg)
+                return self.bot.send_message(chat_id=chatid, text=msg, reply_markup=rpmarkup)
+            return self.bot.send_message(chat_id=chatid, text=msg)
         except ChatMigrated as e:
             if chatid in self.groups:
                 self.groupmigrate(chatid, e.new_chat_id)
@@ -633,6 +633,24 @@ class diceBot(baseBot):
             return False
         return self.IDENTIFIER == o.IDENTIFIER
 
+    @staticmethod
+    def searchifkp(pl: Player) -> bool:
+        """判断plid是否至少是一个群的kp"""
+        return bool(len(pl.kpgroups))
+
+    def addOP(self, chatid: int, op: str) -> None:
+        self.operation[chatid] = op
+
+    def popOP(self, chatid: int) -> str:
+        if chatid not in self.operation:
+            return ""
+        return self.operation.pop(chatid)
+
+    def getOP(self, chatid: int) -> str:
+        if chatid not in self.operation:
+            return ""
+        return self.operation[chatid]
+
     @commandCallbackMethod
     def addnewjob(self, update: Update, context: CallbackContext) -> bool:
         """向bot数据库中申请添加一个新的职业。
@@ -642,10 +660,6 @@ class diceBot(baseBot):
         `/addnewjob 刺客 30 60 EDU:2 DEX_STR:2 乔装 电器维修 斗殴 火器 锁匠 机械维修 潜行 心理学`。
         EDU等属性名请使用大写字母。
         审核完成后结果会私聊回复给kp，请开启与bot的私聊。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
-
         pl = self.forcegetplayer(update)
         if pl.id in self.addjobrequest:
             return self.errorInfo("已经提交过一个申请了")
@@ -659,7 +673,7 @@ class diceBot(baseBot):
         if len(context.args) <= 3:
             return self.errorInfo("参数长度不足")
 
-        if not self.isint(context.args[1]) or not self.isint(context.args[2]) or int(context.args[1]) < 0 or int(context.args[1]) > int(context.args[2]):
+        if not isint(context.args[1]) or not isint(context.args[2]) or int(context.args[1]) < 0 or int(context.args[1]) > int(context.args[2]):
             return self.errorInfo("信用范围参数无效")
 
         jobname: str = context.args[0]
@@ -670,7 +684,7 @@ class diceBot(baseBot):
         ptevalpairs: List[Tuple[str, int]] = []
         while i < len(context.args) and context.args[i].find(':') != -1:
             p = context.args[i].split(':')
-            if not self.isint(p[1]):
+            if not isint(p[1]):
                 return self.errorInfo("参数无效")
 
             ptevalpairs.append((p[0], int(p[1])))
@@ -711,10 +725,6 @@ class diceBot(baseBot):
         `/addnewskill --skillname --basicpoints`
         例如：`/addnewskill 识破 25`。
         审核完成后结果会私聊回复给kp，请开启与bot的私聊。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
-
         pl = self.forcegetplayer(update)
         if pl.id in self.addskillrequest:
             return self.errorInfo("已经提交过一个申请了")
@@ -728,7 +738,7 @@ class diceBot(baseBot):
         if len(context.args) < 2:
             return self.errorInfo("参数长度不足")
 
-        if not self.isint(context.args[1]) or int(context.args[1]) < 0 or int(context.args[1]) > 99:
+        if not isint(context.args[1]) or int(context.args[1]) < 0 or int(context.args[1]) > 99:
             return self.errorInfo("技能基础点数参数无效")
 
         skillname: str = context.args[0]
@@ -751,22 +761,26 @@ class diceBot(baseBot):
         self.reply("申请已经提交，请开启与我的私聊接收审核消息")
         return True
 
+
+    def getreplyplayer(self, update: Update) -> Optional[Player]:
+        """如果有回复的人，调用forcegetplayer获取玩家信息，否则返回None"""
+        if isprivatemsg(update):
+            return None
+        if isgroupmsg(update):
+            return self.forcegetplayer(update.message.reply_to_message.from_user.id) if update.message.reply_to_message is not None else None
+
     @commandCallbackMethod
     def getid(self, update: Update, context: CallbackContext) -> None:
         """获取所在聊天环境的id。
         私聊使用该指令发送用户id，群聊使用该指令则发送群id。
         在创建卡片等待群id时使用该指令，会自动创建卡。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
-
         rppl = self.getreplyplayer(update)
         if rppl is not None:
             self.reply("<code>"+str(rppl.id) +
                        "</code> \n点击即可复制", parse_mode='HTML')
             return None
 
-        chatid = self.getchatid(update)
+        chatid = getchatid(update)
         pl = self.forcegetplayer(update)
         fromuser = pl.id
         # 检测是否处于newcard状态
@@ -788,7 +802,7 @@ class diceBot(baseBot):
                     self.getnewcard(int(opers[1]), chatid, fromuser)
 
                 rtbutton = [[InlineKeyboardButton(
-                    text="跳转到私聊", callback_data="None", url="t.me/"+self.updater.bot.username)]]
+                    text="跳转到私聊", callback_data="None", url="t.me/"+self.bot.username)]]
                 rp_markup = InlineKeyboardMarkup(rtbutton)
 
                 self.reply("<code>"+str(chatid) +
@@ -836,13 +850,13 @@ class diceBot(baseBot):
                 self.reply(update.message.reply_to_message.link)
             else:
                 self.reply(
-                    f"reply_to message: chat id: {str(self.getchatid(update))} message id: {str(update.message.reply_to_message.message_id)}")
+                    f"reply_to message: chat id: {str(getchatid(update))} message id: {str(update.message.reply_to_message.message_id)}")
 
         if update.message.link is not None:
             self.reply(update.message.link)
         else:
             self.reply(
-                f"this message: chat id: {str(self.getchatid(update))} message id: {str(update.message.message_id)}")
+                f"this message: chat id: {str(getchatid(update))} message id: {str(update.message.message_id)}")
         return
 
     @commandCallbackMethod
@@ -864,7 +878,7 @@ class diceBot(baseBot):
             return self.errorInfo("没有参数", True)
         if not isgroup(update):
             return self.errorInfo("在群里设置临时检定")
-        if not self.isint(context.args[0]):
+        if not isint(context.args[0]):
             return self.errorInfo("临时检定修正应当是整数", True)
 
         gp = self.forcegetgroup(update)
@@ -874,7 +888,7 @@ class diceBot(baseBot):
         if game.kp != self.forcegetplayer(update):
             return self.errorInfo("KP才可以设置临时检定", True)
 
-        if len(context.args) >= 3 and self.isint(context.args[1]) and 0 <= int(context.args[1]):
+        if len(context.args) >= 3 and isint(context.args[1]) and 0 <= int(context.args[1]):
             card = self.getgamecard(int(context.args[1]))
             if card is None or card.group != gp:
                 return self.errorInfo("找不到这张卡")

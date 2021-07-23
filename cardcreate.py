@@ -52,7 +52,7 @@ class cardCreate(diceBot):
 
             if argname == "specialskill":
                 skillname, skillval = argval.split(":")
-                if not self.isint(skillval) or int(skillval) <= 0:
+                if not isint(skillval) or int(skillval) <= 0:
                     return self.errorInfo("技能值应该是正整数")
                 t["skill"]["skills"][skillname] = int(skillval)
                 continue
@@ -70,7 +70,7 @@ class cardCreate(diceBot):
             dt = self.findattrindict(t, argname)
             if not dt:  # 可能是技能，否则返回
                 if argname in self.skilllist or argname == "母语" or argname == "闪避":
-                    if not self.isint(argval) or int(argval) <= 0:
+                    if not isint(argval) or int(argval) <= 0:
                         return self.errorInfo("技能值应该是正整数")
 
                     dt = t["skill"]["skills"]
@@ -91,7 +91,7 @@ class cardCreate(diceBot):
                 dt[argname] = argval
 
             elif type(dt[argname]) is int:
-                if not self.isint(argval):
+                if not isint(argval):
                     return self.errorInfo(argname+"应该为int类型")
                 dt[argname] = int(argval)
 
@@ -107,7 +107,7 @@ class cardCreate(diceBot):
         if not self.searchifkp(pl):
             if t["playerid"] != 0 and t["playerid"] != pl.id:
                 return self.errorInfo("没有权限设置非自己的playerid")
-            t["playerid"] = self.getchatid(update)
+            t["playerid"] = getchatid(update)
         else:
             if t["groupid"] not in pl.kpgroups and t["playerid"] != 0 and t["playerid"] != pl.id:
                 return self.errorInfo("没有权限设置非自己的playerid")
@@ -152,7 +152,7 @@ class cardCreate(diceBot):
 
         if len(context.args) == 0:
             return self.errorInfo("需要卡id作为参数", True)
-        if not self.isint(context.args[0]) or int(context.args[0]) < 0:
+        if not isint(context.args[0]) or int(context.args[0]) < 0:
             return self.errorInfo("参数无效", True)
 
         cdid = int(context.args[0])
@@ -168,7 +168,7 @@ class cardCreate(diceBot):
         # 开始处理
         self.reply(
             f"请确认是否删除卡片\n姓名：{card.getname()}\n如果确认删除，请回复：确认。否则，请回复其他任何文字。")
-        self.addOP(self.getchatid(update), "delcard "+context.args[0])
+        self.addOP(getchatid(update), "delcard "+context.args[0])
         return True
 
     @commandCallbackMethod
@@ -201,7 +201,7 @@ class cardCreate(diceBot):
 
         if len(context.args) > 0:
             # 先处理context.args
-            if any(not self.isint(x) for x in context.args):
+            if any(not isint(x) for x in context.args):
                 return self.errorInfo("参数需要是整数")
             nargs = list(map(int, context.args))
 
@@ -298,17 +298,17 @@ class cardCreate(diceBot):
         if isgroup(update):
             # 先检查是否有该玩家信息
             rtbutton = [[InlineKeyboardButton(
-                text="跳转到私聊", callback_data="None", url="t.me/"+self.updater.bot.username)]]
+                text="跳转到私聊", callback_data="None", url="t.me/"+self.bot.username)]]
             rp_markup = InlineKeyboardMarkup(rtbutton)
             if self.getplayer(update) is None:
                 self.reply("请先开启与bot的私聊", reply_markup=rp_markup)
                 return True
 
             if len(context.args) > 0:
-                if not self.isint(context.args[0]) or int(context.args[0]) < 0:
+                if not isint(context.args[0]) or int(context.args[0]) < 0:
                     return self.errorInfo("参数无效")
 
-            gpid = self.getchatid(update)
+            gpid = getchatid(update)
             gp = self.forcegetgroup(gpid)
             if len(context.args) > 0:
                 newcdid = int(context.args[0])
@@ -316,7 +316,7 @@ class cardCreate(diceBot):
         elif len(context.args) > 0:
             msg = context.args[0]
 
-            if not self.isint(msg):
+            if not isint(msg):
                 return self.errorInfo("输入无效")
 
             if int(msg) >= 0:
@@ -325,7 +325,7 @@ class cardCreate(diceBot):
                 gpid = int(msg)
                 gp = self.forcegetgroup(gpid)
                 if len(context.args) > 1:
-                    if not self.isint(context.args[1]) or int(context.args[1]) < 0:
+                    if not isint(context.args[1]) or int(context.args[1]) < 0:
                         return self.errorInfo("输入无效")
                     newcdid = int(context.args[1])
 
@@ -333,10 +333,10 @@ class cardCreate(diceBot):
             self.reply(
                 "准备创建新卡。\n如果你不知道群id，在群里发送 /getid 即可创建角色卡。\n你也可以选择手动输入群id，请发送群id：")
             if newcdid is None:
-                self.addOP(self.getchatid(update), "newcard " +
+                self.addOP(getchatid(update), "newcard " +
                            str(update.message.message_id))
             else:
-                self.addOP(self.getchatid(update), "newcard " +
+                self.addOP(getchatid(update), "newcard " +
                            str(update.message.message_id)+" "+str(newcdid))
             return True
 
@@ -402,4 +402,4 @@ class cardCreate(diceBot):
             gp = self.creategp(-1)
             gp.kp = self.forcegetplayer(ADMIN_ID)
 
-        return self.getnewcard(update.message.message_id, -1, self.getchatid(update))
+        return self.getnewcard(update.message.message_id, -1, getchatid(update))

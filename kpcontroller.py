@@ -109,7 +109,7 @@ class kpController(diceBot):
         # 获取newkp
         newkpid: int
         if len(context.args) != 0:
-            if not self.isint(context.args[0]):
+            if not isint(context.args[0]):
                 return self.errorInfo("参数需要是整数", True)
             newkp = self.forcegetplayer(int(context.args[0]))
         else:

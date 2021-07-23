@@ -35,7 +35,7 @@ class cardShowBot(diceBot):
             if len(context.args) < 2:
                 return self.errorInfo("需要群ID")
             gpid = context.args[1]
-            if not self.isint(gpid) or int(gpid) >= 0:
+            if not isint(gpid) or int(gpid) >= 0:
                 return self.errorInfo("无效ID")
 
             gpid = int(gpid)
@@ -63,7 +63,7 @@ class cardShowBot(diceBot):
             if len(context.args) < 2:
                 return self.errorInfo("需要群ID")
             gpid = context.args[1]
-            if not self.isint(gpid) or int(gpid) >= 0:
+            if not isint(gpid) or int(gpid) >= 0:
                 return self.errorInfo("无效群ID")
 
             gp = self.getgp(gpid)
@@ -159,7 +159,7 @@ class cardShowBot(diceBot):
         rpcard: Optional[GameCard] = None
 
         if rppl is None and len(context.args) > 0:
-            if self.isint(context.args[0]):
+            if isint(context.args[0]):
                 rppl = self.getplayer(int(context.args[0]))
             if rppl is not None:
                 context.args = context.args[1:]
@@ -246,7 +246,7 @@ class cardShowBot(diceBot):
 
         if len(context.args) == 0:
             return self.errorInfo("需要参数")
-        if not self.isint(context.args[0]) or int(context.args[0]) < 0:
+        if not isint(context.args[0]) or int(context.args[0]) < 0:
             return self.errorInfo("卡id参数无效", True)
         cdid = int(context.args[0])
 

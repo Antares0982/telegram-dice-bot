@@ -53,10 +53,10 @@ class nonCommandHandlers(diceBot):
 
         if update.message.text in ["cancel", "取消"]:
             update.message.reply_text("操作取消")
-            self.popOP(self.getchatid(update))
+            self.popOP(getchatid(update))
             return True
 
-        oper = self.getOP(self.getchatid(update))
+        oper = self.getOP(getchatid(update))
         opers = oper.split(" ")
         if oper == "":
             self.botchat(update)
@@ -101,7 +101,7 @@ class nonCommandHandlers(diceBot):
                 return self.errorHandlerQ(query, "该请求已经过期，请点击 /choosedec 重新进行操作。")
             return self.errorHandlerQ(query, "该请求已经过期。")
 
-        chatid = self.getchatid(update)
+        chatid = getchatid(update)
         pl = self.forcegetplayer(query.from_user.id)
         card1 = pl.controlling
         args = args[1:]

@@ -6,7 +6,7 @@ from os import getcwd, path, makedirs
 __all__ = [
     "PROXY", "PROXY_URL", "TOKEN", "DATA_PATH", "ADMIN_ID", "IGNORE_JOB_DICT", "VERSION", "BOT_ID",
     "PATH_PLAYERS", "PATH_GROUPS", "GLOBAL_DATA_PATH", "PATH_SKILLDICT", "PATH_JOBDICT", "PATH_HANDLERS",
-    "CREATE_CARD_HELP", "HELP_TEXT", "PATH_CARDS", "PATH_GAME_CARDS", "PATH_MEM"
+    "CREATE_CARD_HELP", "HELP_TEXT", "PATH_CARDS", "PATH_GAME_CARDS", "PATH_MEM", "blacklistdatabase"
 ]
 
 PROXY: bool = False
@@ -18,7 +18,7 @@ IGNORE_JOB_DICT: bool = False
 
 
 def __cfgparse():
-    global PROXY, PROXY_URL, TOKEN, DATA_PATH, ADMIN_ID, IGNORE_JOB_DICT
+    global PROXY, PROXY_URL, TOKEN, DATA_PATH, ADMIN_ID, IGNORE_JOB_DICT, blacklistdatabase
     cfgparser = ConfigParser()
     cfgparser.read('config.ini')
 
@@ -33,6 +33,7 @@ def __cfgparse():
 
     IGNORE_JOB_DICT = cfgparser.getboolean("SETTINGS", "ignore_job_dict")
 
+    blacklistdatabase = cfgparser.get("SETTINGS", "blacklistdatabase")
 
 def __defaultcfg():
     cfgparser = ConfigParser()
@@ -55,6 +56,11 @@ def __defaultcfg():
 
     cfgparser["SETTINGS"] = {}
     cfgparser["SETTINGS"]["ignore_job_dict"] = 'true'
+    if platform == 'win32':
+        cfgparser["SETTINGS"]["blacklistdatabase"] = getcwd()+'\\data\\blacklist.db'
+    else:
+        cfgparser["SETTINGS"]["blacklistdatabase"] = getcwd()+'/data/blacklist.db'
+
 
     with open("sample_config.ini", 'w') as f:
         cfgparser.write(f)

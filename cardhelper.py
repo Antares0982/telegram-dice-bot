@@ -88,9 +88,9 @@ class cardHelper(diceBot):
 
         if len(context.args) == 0:
             if isprivate(update):
-                self.addOP(self.getchatid(update), "setname")
+                self.addOP(getchatid(update), "setname")
             else:
-                self.addOP(self.getchatid(update),
+                self.addOP(getchatid(update),
                            "setname "+str(card1.playerid))
             self.reply("请输入姓名：")
             return True
@@ -113,7 +113,7 @@ class cardHelper(diceBot):
             return self.errorInfo("找不到卡。", True)
         if len(context.args) == 0:
             if isgroup(update):
-                gpid = self.getchatid(update)
+                gpid = getchatid(update)
                 self.addOP(gpid, "setsex "+str(pl.id))
                 self.reply("请输入性别：")
                 return True
@@ -144,7 +144,7 @@ class cardHelper(diceBot):
         if len(context.args) < 2:
             return self.errorInfo("至少需要两个参数。")
 
-        if not self.isint(context.args[0]) or not self.isint(context.args[1]):
+        if not isint(context.args[0]) or not isint(context.args[1]):
             return self.errorInfo("参数无效", True)
 
         oldid = int(context.args[0])
@@ -249,7 +249,7 @@ class cardHelper(diceBot):
             return self.errorInfo("需要参数", True)
         if len(context.args) == 1 and self.getreplyplayer(update) is None:
             return self.errorInfo("参数不足", True)
-        if not self.isint(context.args[0]) or (len(context.args) > 1 and not self.isint(context.args[1])):
+        if not isint(context.args[0]) or (len(context.args) > 1 and not isint(context.args[1])):
             return self.errorInfo("参数无效", True)
         if int(context.args[0]) < 0 or (len(context.args) > 1 and int(context.args[1]) < 0):
             return self.errorInfo("负数参数无效", True)
@@ -295,7 +295,7 @@ class cardHelper(diceBot):
 
         if len(context.args) < 2:
             return self.errorInfo("至少需要2个参数", True)
-        if not self.isint(context.args[0]) or not self.isint(context.args[1]):
+        if not isint(context.args[0]) or not isint(context.args[1]):
             return self.errorInfo("参数无效", True)
 
         newgpid = int(context.args[1])
@@ -396,7 +396,7 @@ class cardHelper(diceBot):
             return self.errorInfo("需要至少3个参数", True)
 
         card_id = context.args[0]
-        if not self.isint(card_id) or int(card_id) < 0:
+        if not isint(card_id) or int(card_id) < 0:
             return self.errorInfo("无效ID", True)
 
         card_id = int(card_id)
@@ -449,11 +449,11 @@ class cardHelper(diceBot):
 
         if len(context.args) == 0:
             self.reply("请输入年龄：")
-            self.addOP(self.getchatid(update), "setage")
+            self.addOP(getchatid(update), "setage")
             return True
 
         age = context.args[0]
-        if not self.isint(age):
+        if not isint(age):
             return self.errorInfo("输入无效")
 
         age = int(age)
@@ -570,7 +570,7 @@ class cardHelper(diceBot):
             return True
 
         if len(context.args) > 0:
-            if not self.isint(context.args[0]):
+            if not isint(context.args[0]):
                 return self.errorInfo("输入无效。")
             cdid = int(context.args[0])
             if cdid < 0:
@@ -611,7 +611,7 @@ class cardHelper(diceBot):
         if len(context.args) == 0:
             return self.errorInfo("需要参数")
 
-        if not self.isint(context.args[0]):
+        if not isint(context.args[0]):
             return self.errorInfo("参数无效")
 
         pl = self.forcegetplayer(update)

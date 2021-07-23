@@ -43,8 +43,8 @@ class diceCommand(diceBot):
         gp = self.forcegetgroup(update)
 
         # 检查输入参数是不是一个基础骰子，如果是则直接计算骰子
-        if gp.game is None or dicename.find('d') >= 0 or self.isint(dicename):
-            if self.isint(dicename) and int(dicename) > 0:
+        if gp.game is None or dicename.find('d') >= 0 or isint(dicename):
+            if isint(dicename) and int(dicename) > 0:
                 dicename = "1d"+dicename
             rttext = self.commondice(dicename)
             if rttext == "Invalid input.":
@@ -125,7 +125,7 @@ class diceCommand(diceBot):
         elif dicename in self.skilllist:
             test = self.skilllist[dicename]
 
-        elif dicename[:2] == "暗骰" and (self.isint(dicename[2:]) or len(dicename) == 2):
+        elif dicename[:2] == "暗骰" and (isint(dicename[2:]) or len(dicename) == 2):
             if len(dicename) != 2:
                 test = int(dicename[2:])
             else:
@@ -229,19 +229,19 @@ class diceCommand(diceBot):
         sanloss, m, n = 0, 0, 0
 
         if anstype == "大失败":
-            if self.isint(checkfail):
+            if isint(checkfail):
                 sanloss = int(checkfail)
             else:
                 t = checkfail.split("+")
                 for tt in t:
-                    if self.isint(tt):
+                    if isint(tt):
                         sanloss += int(tt)
                     else:
                         ttt = tt.split('d')
                         sanloss += int(ttt[0])*int(ttt[1])
 
         elif anstype == "失败":
-            if self.isint(checkfail):
+            if isint(checkfail):
                 sanloss = int(checkfail)
             else:
                 m, n = checkfail.split("d", maxsplit=1)
@@ -249,7 +249,7 @@ class diceCommand(diceBot):
                 sanloss = int(sum(self.dicemdn(m, n)))
 
         else:
-            if self.isint(checkpass):
+            if isint(checkpass):
                 sanloss = int(checkpass)
             else:
                 m, n = checkpass.split("d", maxsplit=1)
