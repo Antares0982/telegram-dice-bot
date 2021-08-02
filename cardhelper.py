@@ -9,14 +9,168 @@ class cardHelper(diceBot):
         if not hasattr(self, "updater"):
             diceBot.__init__(self)
 
+    def addskill1(self, update: Update, context: CallbackContext, card1: GameCard) -> bool:
+        """该函数在`/addskill`接收且仅接收一个参数时调用。制作技能数值表。"""
+        # skillname is already checked if in SKILL_DICT
+        # First search if args skillname in skill or suggestskill.
+        # Otherwise, if (not suggestskill) and main points>0, should add main skill. Else should add Interest skill
+        # Show button for numbers
+        skillname = context.args[0]
+        m = self.getskilllevelfromdict(card1, skillname)
+
+        if skillname == "信用" and card1.info.job in self.joblist:
+            m = max(m, self.joblist[card1.info.job][0])
+
+        if skillname in card1.skill.allskills():  # GOOD TRAP: cgmainskill
+            mm = self.skillmaxval(skillname, card1, True)
+            rtbuttons = self.makeIntButtons(m, mm, "cgmainskill", skillname)
+            rp_markup = InlineKeyboardMarkup(rtbuttons)
+            update.message.reply_text(
+                "更改主要技能点数。剩余技能点："+str(card1.skill.points)+" 技能名称："+skillname+"，当前技能点："+str(card1.skill.get(skillname)), reply_markup=rp_markup)
+            return True
+
+        if skillname in card1.suggestskill.allskills():  # GOOD TRAP: addsgskill
+            mm = self.skillmaxval(skillname, card1, True)
+            rtbuttons = self.makeIntButtons(m, mm, "addsgskill", skillname)
+            rp_markup = InlineKeyboardMarkup(rtbuttons)
+            update.message.reply_text(
+                "添加建议技能。剩余技能点："+str(card1.skill.points)+" 技能名称："+skillname, reply_markup=rp_markup)
+            return True
+
+        if skillname in card1.interest.allskills():  # GOOD TRAP: cgintskill
+            mm = self.skillmaxval(skillname, card1, False)
+            rtbuttons = self.makeIntButtons(m, mm, "cgintskill", skillname)
+            rp_markup = InlineKeyboardMarkup(rtbuttons)
+            update.message.reply_text(
+                "更改兴趣技能点数。剩余技能点："+str(card1.interest.points)+" 技能名称："+skillname+"，当前技能点："+str(card1.interest.get(skillname)), reply_markup=rp_markup)
+            return True
+
+        if card1.skill.points > 0:  # GOOD TRAP: addmainskill
+            mm = self.skillmaxval(skillname, card1, True)
+            rtbuttons = self.makeIntButtons(m, mm, "addmainskill", skillname)
+            rp_markup = InlineKeyboardMarkup(rtbuttons)
+            update.message.reply_text(
+                "添加主要技能。剩余技能点："+str(card1.skill.points)+" 技能名称："+skillname, reply_markup=rp_markup)
+            return True
+
+        mm = self.skillmaxval(skillname, card1, False)
+        rtbuttons = (m, mm, "addintskill", skillname)
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        update.message.reply_text(
+            "添加兴趣技能。剩余技能点："+str(card1.interest.points)+" 技能名称："+skillname, reply_markup=rp_markup)
+        return True
+
+    def addmainskill(self, skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
+        """该函数对没有`skillname`这项技能的卡使用。将主要技能值设置为`skillvalue`。"""
+        if card1.skill.points == 0:
+            return self.errorInfo("你已经没有剩余点数了")
+        if skillvalue < self.getskilllevelfromdict(card1, skillname) or skillvalue > self.skillmaxval(skillname, card1, True):
+            return self.errorInfo("目标技能点太高或太低")
+        # 计算点数消耗
+        costval = self.evalskillcost(skillname, skillvalue, card1, True)
+        update.message.reply_text(
+            "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
+        card1.skill.set(skillname, skillvalue, costval)
+        card1.write()
+        return True
+
+    def addsgskill(self, skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
+        """添加一个建议的技能。直接调用`addmainskill`完成。"""
+        if not self.addmainskill(skillname, skillvalue, card1, update):
+            return False
+        card1.suggestskill.pop(skillname)
+        card1.write()
+        return True
+
+    def addintskill(self, skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
+        """该函数对没有`skillname`这项技能的卡使用。将兴趣技能值设置为`skillvalue`。"""
+        if card1.interest.points == 0:
+            return self.errorInfo("你已经没有剩余点数了")
+        if skillvalue < self.getskilllevelfromdict(card1, skillname) or skillvalue > self.skillmaxval(skillname, card1, False):
+            return self.errorInfo("目标技能点太高或太低")
+        # 计算点数消耗
+        costval = self.evalskillcost(skillname, skillvalue, card1, False)
+        update.message.reply_text(
+            "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
+        card1.interest.set(skillname, skillvalue, costval)
+        card1.write()
+        return True
+
+    # Change main skill level
+    def cgmainskill(self, skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
+        """修改主要技能的值。如果将技能点调低，返还技能点数。"""
+        if skillvalue < self.getskilllevelfromdict(card1, skillname) or skillvalue > self.skillmaxval(skillname, card1, True):
+            return self.errorInfo("目标技能点太高或太低")
+        costval = self.evalskillcost(skillname, skillvalue, card1, True)
+        if costval >= 0:
+            update.message.reply_text(
+                "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
+        else:
+            update.message.reply_text(
+                "技能设置成功："+skillname+" "+str(skillvalue)+"，返还点数："+str(-costval))
+        card1.skill.set(skillname, skillvalue, costval)
+        card1.write()
+        return True
+
+    def cgintskill(self, skillname: str, skillvalue: int, card1: GameCard, update: Update) -> bool:
+        """修改兴趣技能的值。如果将技能点调低，返还技能点数。"""
+        if skillvalue < self.getskilllevelfromdict(card1, skillname) or skillvalue > self.skillmaxval(skillname, card1, False):
+            return self.errorInfo("目标技能点太高或太低")
+        costval = self.evalskillcost(skillname, skillvalue, card1, False)
+        if costval >= 0:
+            update.message.reply_text(
+                "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
+        else:
+            update.message.reply_text(
+                "技能设置成功："+skillname+" "+str(skillvalue)+"，返还点数："+str(-costval))
+        card1.interest.set(skillname, skillvalue, costval)
+        card1.group.write()
+        return True
+
+    def addcredit(self, update: Update, card1: GameCard) -> bool:
+        update.message.reply_text("请先设置信用！")
+        gp = card1.group
+        if card1.info.job in self.joblist:
+            m = self.joblist[card1.info.job][0]
+            mm = self.joblist[card1.info.job][1]
+        else:
+            aged, ok = self.skillcantouchmax(card1, "信用")
+            if aged:
+                skillmaxrule = gp.rule.skillmaxAged
+            else:
+                skillmaxrule = gp.rule.skillmax
+            m = 0
+            if ok:
+                mm = skillmaxrule[1]
+            else:
+                mm = skillmaxrule[0]
+        rtbuttons = self.makeIntButtons(m, mm, "addmainskill", "信用")
+        rp_markup = InlineKeyboardMarkup(rtbuttons)
+        update.message.reply_text(
+            "添加主要技能。剩余技能点："+str(card1.skill.points)+" 技能名称：信用", reply_markup=rp_markup)
+        return True
+
+    def cgcredit(self, update: Update, card1: GameCard) -> bool:
+        m = 0
+        mm = -1
+        if card1.info.job in self.joblist:
+            m = self.joblist[card1.info.job][0]
+            mm = self.joblist[card1.info.job][1]
+            mm = min(mm, self.skillmaxval("信用", card1, True))
+        else:
+            mm = self.skillmaxval("信用", card1, True)
+
+        rtbutton = self.makeIntButtons(m, mm, "cgmainskill", "信用")
+        rp_markup = InlineKeyboardMarkup(rtbutton)
+        update.message.reply_text(text="修改信用，现在还剩"+str(card1.skill.points)+"点，当前信用："+str(
+            card1.skill.get("信用")), reply_markup=rp_markup)
+        return True
+
     @commandCallbackMethod
     def randombkg(self, update: Update, context: CallbackContext) -> bool:
         """生成随机的背景故事。
 
         获得当前发送者选中的卡，生成随机的背景故事并写入。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         pl = self.forcegetplayer(update)
         card = pl.controlling
@@ -46,9 +200,6 @@ class cardHelper(diceBot):
         `thirdencounter`第三类接触。
 
         第二至最后一个参数将被空格连接成为一段文字，填入背景故事中。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         pl = self.forcegetplayer(update)
         if len(context.args) <= 1:
@@ -78,9 +229,6 @@ class cardHelper(diceBot):
         `/setname --name`：直接设定姓名。
         `/setname`：bot将等待输入姓名。
         设置的姓名可以带有空格等字符。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         card1 = self.forcegetplayer(update).controlling
         if card1 is None:
@@ -104,9 +252,6 @@ class cardHelper(diceBot):
         """设置性别。比较明显的性别词汇会被自动分类为男性或女性，其他的性别也可以设置。
         `/setsex 性别`：直接设置。
         `/setsex`：使用交互式的方法设置性别。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         pl = self.forcegetplayer(update)
         if pl.controlling is None:
@@ -137,9 +282,6 @@ class cardHelper(diceBot):
 
         如果`newid`已经被占用，则指令无效。
         这一行为将同时改变游戏内以及游戏外的卡id。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if len(context.args) < 2:
             return self.errorInfo("至少需要两个参数。")
@@ -175,9 +317,6 @@ class cardHelper(diceBot):
 
         `/addskill`：生成按钮，玩家按照提示一步步操作。
         `/addskill 技能名`：修改某项技能的点数。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if isgroup(update):
             return self.errorInfo("发私聊消息来增改技能", True)
@@ -222,9 +361,6 @@ class cardHelper(diceBot):
     def additem(self, update: Update, context: CallbackContext) -> bool:
         """为你的人物卡添加一些物品。用空格，制表符或回车来分隔不同物品。
         `/additem --item1 --item2...`"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         card = self.forcegetplayer(update).controlling
         if card is None:
@@ -241,9 +377,6 @@ class cardHelper(diceBot):
         回复某人`/cardtransfer --cardid`：将卡转移给被回复的人。要求参数有且仅有一个。
         只有卡片拥有者或者KP有权使用该指令。
         如果对方不是KP且对方已经在本群有卡，则无法转移。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if len(context.args) == 0:
             return self.errorInfo("需要参数", True)
@@ -289,9 +422,6 @@ class cardHelper(diceBot):
         指令格式：
         `/changegroup --groupid/--cardid --newgroupid`
         """
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if len(context.args) < 2:
             return self.errorInfo("至少需要2个参数", True)
@@ -348,9 +478,6 @@ class cardHelper(diceBot):
 
     @commandCallbackMethod
     def choosedec(self, update: Update, context: CallbackContext) -> bool:
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if isgroup(update):
             return self.errorInfo("私聊使用该指令")
@@ -383,9 +510,6 @@ class cardHelper(diceBot):
         想要修改所属群，使用指令
         `/changegroup --cardid --newgroupid`
         （参考`/help changegroup`）。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         pl = self.forcegetplayer(update)
         if not self.searchifkp(pl) and pl.id != ADMIN_ID:
@@ -432,10 +556,6 @@ class cardHelper(diceBot):
 
     @commandCallbackMethod
     def setage(self, update: Update, context: CallbackContext):
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
-
         if isgroup(update):
             return self.errorInfo("发送私聊消息设置年龄。", True)
 
@@ -462,9 +582,6 @@ class cardHelper(diceBot):
     @commandCallbackMethod
     def setasset(self, update: Update, context: CallbackContext) -> bool:
         """设置你的角色卡的资金或财产，一段文字描述即可。`/setasset`"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         card = self.forcegetplayer(update).controlling
         if card is None:
@@ -490,9 +607,6 @@ class cardHelper(diceBot):
         否则不能设置。如果设置了非经典职业，技能点计算方法为教育乘4。
 
         在力量、体质等属性减少值计算完成后才可以设置职业。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if isgroup(update):
             return self.errorInfo("发送私聊消息设置职业。")
@@ -517,11 +631,11 @@ class cardHelper(diceBot):
             return True
 
         jobname = context.args[0]
-        if not IGNORE_JOB_DICT and jobname not in self.self.joblist:
+        if not IGNORE_JOB_DICT and jobname not in self.joblist:
             return self.errorInfo("该职业无法设置")
 
         card.info.job = jobname
-        if jobname not in self.self.joblist:
+        if jobname not in self.joblist:
             self.reply(
                 "这个职业不在职业表内，你可以用'/addskill 技能名 点数 (main/interest)'来选择技能！如果有interest参数，该技能将是兴趣技能并消耗兴趣技能点。")
             card.skill.points = int(card.data.EDU*4)
@@ -544,9 +658,6 @@ class cardHelper(diceBot):
         玩家只能修改目前操作的卡的基本信息，例如：年龄、性别、背景、技能点数等。
         `/switch`：生成按钮来切换卡。
         `/switch --cdid`切换至id为`cdid`的卡。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if isgroup(update):
             return self.errorInfo("对bot私聊来切换卡。")
@@ -604,9 +715,6 @@ class cardHelper(diceBot):
 
         （仅限私聊时）`/switchgamecard --groupid`：创建按钮，让KP选择要用的卡。
         （私聊群聊皆可）`/switchgamecard --cardid`：切换到id为cardid的卡并控制。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if len(context.args) == 0:
             return self.errorInfo("需要参数")

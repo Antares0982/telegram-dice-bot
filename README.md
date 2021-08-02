@@ -34,14 +34,14 @@ bot的所有指令帮助文档都在代码内可以查到。当bot正常运行�
 
 bot需要在群聊中进行游戏，如果要开始游戏，将bot拉入群。
 
-在群内发送指令`/addkp`，就可以将您自己设置为KP。这之后如果需要撤销自己的KP，发送指令`/delkp`。
+在群内发送指令`/bindkp`，就可以将您自己设置为KP。这之后如果需要撤销自己的KP，发送指令`/unbindkp`。
 
 管理员可以使用`/transferkp`强制转移KP权限。
 
 查询更多内容，请向bot发送以下指令：
 
-`/help addkp`
-`/help delkp`
+`/help bindkp`
+`/help unbindkp`
 `/help transferkp`
 
 ### 卡片

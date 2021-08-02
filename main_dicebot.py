@@ -4,6 +4,7 @@ import logging
 from typing import List
 
 from telegram.ext import CallbackContext
+from telegram.ext.filters import Filters
 
 from admincommand import adminCommand
 from basebot import baseBot
@@ -14,11 +15,12 @@ from dicecommand import diceCommand
 from gamecontroller import gameController
 from infoshow import infoShow
 from kpcontroller import kpController
+from noncommandhandle import nonCommandHandlers
 from utils import *
 
 
 @final
-class mainBot(adminCommand, cardCreate, cardHelper, cardShowBot, diceCommand, gameController, infoShow, kpController):
+class mainBot(adminCommand, cardCreate, cardHelper, cardShowBot, diceCommand, gameController, infoShow, kpController, nonCommandHandlers):
     def __init__(self) -> None:
         print("subclass init")
         for cls in self.__class__.__bases__:
@@ -67,9 +69,12 @@ class mainBot(adminCommand, cardCreate, cardHelper, cardShowBot, diceCommand, ga
             raise e
 
     def textHandler(self, update: Update, context: CallbackContext) -> bool:
-        if update.message.migrate_from_chat_id is not None:
+        if update.message.migrate_to_chat_id is not None:
             self.chatmigrate(
-                update.message.migrate_from_chat_id, getchatid(update))
+                getchatid(update), update.message.migrate_to_chat_id)
+            return True
+
+        if Filters.status_update(update):
             return True
 
         self.renewStatus(update)
@@ -130,17 +135,16 @@ class mainBot(adminCommand, cardCreate, cardHelper, cardShowBot, diceCommand, ga
 
         return False
 
-    @classmethod
-    def chatmigrate(cls, oldchat: int, newchat: int, instance: 'mainBot'):
+    def chatmigrate(self, oldchat: int, newchat: int):
         errs: List[Exception] = []
         try:
-            baseBot.chatmigrate(oldchat, newchat, instance)
+            baseBot.chatmigrate(self, oldchat, newchat)
         except Exception as e:
             errs.append(e)
 
-        for kls in cls.__bases__:
+        for kls in self.__class__.__bases__:
             try:
-                kls.chatmigrate(oldchat, newchat, instance)
+                kls.chatmigrate(self, oldchat, newchat)
             except Exception as e:
                 errs.append(e)
 
@@ -159,16 +163,16 @@ def main():
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
     global mainbot
-    mainbot = mainBot()
+
     pass
+    mainbot = mainBot()
     try:
-        mainbot.importHandlers()
+        mainbot.botstart()
     except Exception as e:
-        mainbot.updater.bot.send_message(
+        mainbot.reply(
             chat_id=ADMIN_ID, text="读取文件出现问题，请检查json文件！")
         print("出现问题")
         raise e
-    mainbot.start()
 
 
 if __name__ == "__main__":

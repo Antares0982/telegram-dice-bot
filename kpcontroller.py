@@ -8,12 +8,10 @@ class kpController(diceBot):
             diceBot.__init__(self)
 
     @commandCallbackMethod
-    def delkp(self, update: Update, context: CallbackContext) -> bool:
+    def unbindkp(self, update: Update, context: CallbackContext) -> bool:
         """撤销自己的KP权限。只有当前群内KP可以使用该指令。
         在撤销KP之后的新KP会自动获取原KP的所有NPC的卡片"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
+        
 
         if isprivate(update):
             return self.errorInfo('发群消息撤销自己的KP权限')
@@ -36,15 +34,13 @@ class kpController(diceBot):
         return True
 
     @commandCallbackMethod
-    def addkp(self, update: Update, context: CallbackContext) -> bool:
-        """添加KP。在群里发送`/addkp`将自己设置为KP。
+    def bindkp(self, update: Update, context: CallbackContext) -> bool:
+        """添加KP。在群里发送`/bindkp`将自己设置为KP。
         如果这个群已经有一名群成员是KP，则该指令无效。
         若原KP不在群里，该指令可以替换KP。
 
-        如果原KP在群里，需要先发送`/delkp`来撤销自己的KP，或者管理员用`/transferkp`来强制转移KP权限。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
+        如果原KP在群里，需要先发送`/unbindkp`来撤销自己的KP，或者管理员用`/transferkp`来强制转移KP权限。"""
+        
 
         if isprivate(update):
             return self.errorInfo('发送群消息添加KP')
@@ -61,7 +57,7 @@ class kpController(diceBot):
                     return self.errorInfo("程序错误：不符合添加KP要求，请检查代码")
                 return True
 
-            return self.errorInfo("你已经是KP了", True) if gp.kp == kp else self.errorInfo('这个群已经有一位KP了，请先让TA发送 /delkp 撤销自己的KP。如果需要强制更换KP，请管理员用\'/transferkp kpid\'添加本群成员为KP，或者 /transferkp 将自己设为KP。')
+            return self.errorInfo("你已经是KP了", True) if gp.kp == kp else self.errorInfo('这个群已经有一位KP了，请先让TA发送 /unbindkp 撤销自己的KP。如果需要强制更换KP，请管理员用\'/transferkp kpid\'添加本群成员为KP，或者 /transferkp 将自己设为KP。')
 
         # 该群没有KP，可以直接添加KP
         self.addkp(gp, kp)
@@ -85,11 +81,6 @@ class kpController(diceBot):
         `/transferkp`：将当前群KP权限转移到自身。
 
         `/trasferkp`(reply to someone)：将kp权限转移给被回复者。"""
-
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
-
         if isprivate(update):
             return self.errorInfo("发送群消息强制转移KP权限")
 

@@ -12,6 +12,7 @@ data/textmem/*
 !.gitignore
 old*
 nohup*
+sqlite.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

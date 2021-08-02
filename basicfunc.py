@@ -12,7 +12,7 @@ from cfg import *
 def __isint(a: str) -> bool:
     try:
         int(a)
-    except:
+    except Exception:
         return False
     return True
 

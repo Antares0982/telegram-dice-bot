@@ -20,9 +20,7 @@ class gameController(diceBot):
         `/startgame ignore`跳过开始游戏的检查，直接开始游戏。
 
         开始后，bot会询问是否保存聊天文本数据。此时回复cancel或者取消，即可取消开始游戏。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
+        
 
         if isprivate(update):
             return self.errorInfo("游戏需要在群里进行")
@@ -62,9 +60,7 @@ class gameController(diceBot):
     @commandCallbackMethod
     def abortgame(self, update: Update, context: CallbackContext) -> bool:
         """放弃游戏。只有KP能使用该指令。这还将导致放弃在游戏中做出的所有修改，包括hp，SAN等。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
+        
 
         if not isgroup(update):
             return self.errorInfo("发送群聊消息来中止游戏")
@@ -95,9 +91,7 @@ class gameController(diceBot):
         当有中途加入的玩家时，使用该指令先暂停游戏，再继续游戏即可将新的角色卡加入进来。
         可以在暂停时（或暂停前）修改：姓名、性别、随身物品、财产、背景故事，
         继续游戏后会覆盖游戏中的这些属性。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
+        
 
         if not isgroup(update):
             return self.errorInfo("发送群消息暂停游戏")
@@ -124,9 +118,7 @@ class gameController(diceBot):
         这一指令会导致所有角色卡的所有权转移给KP，之后玩家无法再操作这张卡片。
         同时，游戏外的卡片会被游戏内的卡片覆写。
         如果还没有准备好进行覆写，就不要使用这一指令。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
+        
 
         if not isgroup(update):
             return self.errorInfo("群聊才能使用该指令")
@@ -159,9 +151,7 @@ class gameController(diceBot):
         当有中途加入的玩家时，使用该指令先暂停游戏，再继续游戏即可将新的角色卡加入进来。
         可以在暂停时（或暂停前）修改：姓名、性别、随身物品、财产、背景故事，
         继续游戏后会覆盖游戏中的这些属性。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
+        
 
         if not isgroup(update):
             return self.errorInfo("发送群消息暂停游戏")

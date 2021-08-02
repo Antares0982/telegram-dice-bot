@@ -6,7 +6,8 @@ from os import getcwd, path, makedirs
 __all__ = [
     "PROXY", "PROXY_URL", "TOKEN", "DATA_PATH", "ADMIN_ID", "IGNORE_JOB_DICT", "VERSION", "BOT_ID",
     "PATH_PLAYERS", "PATH_GROUPS", "GLOBAL_DATA_PATH", "PATH_SKILLDICT", "PATH_JOBDICT", "PATH_HANDLERS",
-    "CREATE_CARD_HELP", "HELP_TEXT", "PATH_CARDS", "PATH_GAME_CARDS", "PATH_MEM", "blacklistdatabase"
+    "CREATE_CARD_HELP", "HELP_TEXT", "GROUP_HELP_TEXT", "PATH_CARDS", "PATH_GAME_CARDS", "PATH_MEM",
+    "blacklistdatabase"
 ]
 
 PROXY: bool = False
@@ -35,6 +36,7 @@ def __cfgparse():
 
     blacklistdatabase = cfgparser.get("SETTINGS", "blacklistdatabase")
 
+
 def __defaultcfg():
     cfgparser = ConfigParser()
 
@@ -57,10 +59,11 @@ def __defaultcfg():
     cfgparser["SETTINGS"] = {}
     cfgparser["SETTINGS"]["ignore_job_dict"] = 'true'
     if platform == 'win32':
-        cfgparser["SETTINGS"]["blacklistdatabase"] = getcwd()+'\\data\\blacklist.db'
+        cfgparser["SETTINGS"]["blacklistdatabase"] = getcwd() + \
+            '\\data\\blacklist.db'
     else:
-        cfgparser["SETTINGS"]["blacklistdatabase"] = getcwd()+'/data/blacklist.db'
-
+        cfgparser["SETTINGS"]["blacklistdatabase"] = getcwd() + \
+            '/data/blacklist.db'
 
     with open("sample_config.ini", 'w') as f:
         cfgparser.write(f)
@@ -126,3 +129,11 @@ HELP_TEXT = "欢迎使用COC dice bot，目前版本：v"+VERSION+"""
 作者：@AntaresChr
 使用 /manual 查看手册，或者查看telegraph手册 https://telegra.ph/Dicebot-manual-05-08 ，使用 /help 查看指令的帮助。
 （私聊时偶尔触发嘴臭模式）"""
+
+GROUP_HELP_TEXT = "欢迎使用COC dice bot，目前版本：v"+VERSION+"""
+群内使用dice bot建议将bot设为管理员，因为telegram的隐私设置，
+没有管理员权限的dice bot，不能自动删除无效指令，无法接收文字消息互动，
+无法获取消息的回复消息，无法获取成员username来识别指令中的参数。
+如果您不愿意将dice bot提升为管理员的话，dice bot将只能接收指令和回复dice bot的消息。
+与bot进行文字交互时，回复bot来交互才可以正常运作消息。
+"""

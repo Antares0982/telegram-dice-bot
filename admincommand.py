@@ -9,6 +9,42 @@ class adminCommand(diceBot):
         if not hasattr(self, "updater"):
             diceBot.__init__(self)
 
+    def findexistgame(self, gpid: int) -> Optional[GroupGame]:
+        gp = self.getgp(gpid)
+        if not gp:
+            return None
+        return gp.getexistgame()
+
+    def groupcopy(self, oldgpid: int, newgpid: int, copyall: bool) -> bool:
+        """copyall为False则只复制NPC卡片"""
+        if self.findexistgame(oldgpid) is not None or self.findexistgame(newgpid) is not None:
+            return False
+
+        oldgp = self.forcegetgroup(oldgpid)
+        srclist: List[GameCard] = []
+        for card in oldgp.cards.values():
+            if not copyall and card.type == "PL":
+                continue
+            srclist.append(card)
+
+        if len(srclist) == 0:
+            return False
+
+        newids = self.getnewids(len(srclist))
+
+        dstlist = [GameCard(card.to_json()) for card in srclist]
+
+        for i in range(len(dstlist)):
+            dstlist[i].id = newids[i]
+
+        for card in dstlist:
+            self.addcardoverride(card, newgpid)
+
+        self.getgp(newgpid).write()
+        oldgp.write()
+
+        return True
+
     @commandCallbackMethod
     def copygroup(self, update: Update, context: CallbackContext) -> bool:
         """复制一个群的所有数据到另一个群。
@@ -60,9 +96,6 @@ class adminCommand(diceBot):
         下面的例子是无效输入：
         `/hp 1d3`：无法将HP设置为一个骰子的结果，恢复1d3生命请在参数前加上符号`+`，扣除同理。
         在生命变动的情况下，角色状态也会同步地变动。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if isprivate(update):
             return self.errorInfo("游戏中才可以修改HP。")
@@ -108,8 +141,8 @@ class adminCommand(diceBot):
                 return self.errorInfo("当第一个减号的后面是可计算的骰子，且存在加减法时，请在第一个符号之后使用括号")
 
             try:
-                diceans = self.dicecalculator(chp[1:])
-            except:
+                diceans = dicecalculator(chp[1:])
+            except Exception:
                 return self.errorInfo("参数无效", True)
 
             if diceans < 0:
@@ -175,9 +208,6 @@ class adminCommand(diceBot):
     def kill(self, update: Update, context: CallbackContext) -> bool:
         """使角色死亡。使用回复或者`@username`作为参数来选择对象撕卡。
         回复的优先级高于参数。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         kp = self.forcegetplayer(update)
         gp = self.forcegetgroup(update)
@@ -216,13 +246,10 @@ class adminCommand(diceBot):
         """获取群邀请链接，并私聊发送给用户。
 
         使用该指令必须要满足两个条件：指令发送者和bot都是该群管理员。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if not isgroup(update):
             return self.errorInfo("在群聊使用该指令。")
-        if not self.isadmin(update, self.BOT_ID):
+        if not self.isadmin(update, BOT_ID):
             return self.errorInfo("Bot没有权限")
         if not self.isadmin(update, update.message.from_user.id):
             return self.errorInfo("没有权限", True)
@@ -235,9 +262,9 @@ class adminCommand(diceBot):
             ivlink = context.bot.export_chat_invite_link(chat_id=gpid)
 
         try:
-            context.bot.send_message(
+            self.reply(
                 chat_id=adminid, text="群："+chat.title+"的邀请链接：\n"+ivlink)
-        except:
+        except Exception:
             return self.errorInfo("邀请链接发送失败！")
 
         rtbutton = [[InlineKeyboardButton(
@@ -251,9 +278,6 @@ class adminCommand(diceBot):
     def mad(self, update: Update, context: CallbackContext) -> bool:
         """使角色陷入永久疯狂。使用回复或者`@username`作为参数来选择对象撕卡。
         回复的优先级高于参数。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         kp = self.forcegetplayer(update)
         gp = self.forcegetgroup(update)
@@ -307,9 +331,6 @@ class adminCommand(diceBot):
         请不要重复发送该指令，否则可能造成有用的消息丢失。
         如果感觉删除没有完成，请先随意发送一条消息来拉取删除情况，
         而不是继续用`/delmsg`删除。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         delnum = 1
         chatid = getchatid(update)
@@ -327,14 +348,14 @@ class adminCommand(diceBot):
             if delnum > 10:
                 return self.errorInfo("一次最多删除10条消息")
 
-        lastmsgid = update.message.message_id
+        lastmsgid = self.lastmsgid
         while delnum >= 0:  # 这是因为要连同delmsg指令的消息也要删掉
             if lastmsgid < -100:
                 break
             try:
                 context.bot.delete_message(
                     chat_id=chatid, message_id=lastmsgid)
-            except:
+            except Exception:
                 lastmsgid -= 1
             else:
                 delnum -= 1
@@ -347,9 +368,6 @@ class adminCommand(diceBot):
     def recover(self, update: Update, context: CallbackContext) -> bool:
         """将重伤患者的状态恢复。使用回复或者`@username`作为参数来选择对象恢复。
         回复的优先级高于参数。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         kp = self.forcegetplayer(update)
         gp = self.forcegetgroup(update)
@@ -386,17 +404,14 @@ class adminCommand(diceBot):
     @commandCallbackMethod
     def reload(self, update: Update, context: CallbackContext) -> bool:
         """重新读取所有文件，只有bot管理者可以使用"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
-        if self.getmsgfromid(update) != self.ADMIN_ID:
+        if self.lastuser != ADMIN_ID:
             return self.errorInfo("没有权限", True)
 
         try:
             self.readall()
             self.construct()
-        except:
+        except Exception:
             return self.errorInfo("读取文件出现问题，请检查json文件！")
 
         self.reply('重新读取文件成功。')
@@ -433,9 +448,6 @@ class adminCommand(diceBot):
         `r[0]-r[1]`为检定大于等于50时大成功范围，否则是`r[2]-r[3]`。
 
         greatfail：大失败范围。同上。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if isprivate(update):
             return self.errorInfo("请在群内用该指令设置规则")

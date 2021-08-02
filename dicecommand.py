@@ -26,18 +26,15 @@ class diceCommand(diceBot):
         如果要进行一个暗骰，可以输入
         `/roll 暗骰`进行一次检定为50的暗骰，或者
         `/roll 暗骰60`进行一次检定为60的暗骰。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if len(context.args) == 0:
-            self.reply(self.commondice("1d100"))  # 骰1d100
+            self.reply(commondice("1d100"))  # 骰1d100
             return True
 
         dicename = context.args[0]
 
         if isprivate(update):
-            self.reply(self.commondice(dicename))
+            self.reply(commondice(dicename))
             return True
 
         gp = self.forcegetgroup(update)
@@ -46,7 +43,7 @@ class diceCommand(diceBot):
         if gp.game is None or dicename.find('d') >= 0 or isint(dicename):
             if isint(dicename) and int(dicename) > 0:
                 dicename = "1d"+dicename
-            rttext = self.commondice(dicename)
+            rttext = commondice(dicename)
             if rttext == "Invalid input.":
                 return self.errorInfo("输入无效")
             self.reply(rttext)
@@ -142,7 +139,7 @@ class diceCommand(diceBot):
 
         if test < 1:
             test = 1
-        testval = self.dicemdn(1, 100)[0]
+        testval = dicemdn(1, 100)[0]
         rttext = dicename+" 检定/出目："+str(test)+"/"+str(testval)+" "
 
         greatsuccessrule = gp.rule.greatsuccess
@@ -176,9 +173,6 @@ class diceCommand(diceBot):
     def sancheck(self, update: Update, context: CallbackContext) -> bool:
         """进行一次sancheck，格式如下：
         `/sancheck checkpass/checkfail`"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if isprivate(update):
             return self.errorInfo("在游戏中才能进行sancheck。")
@@ -191,7 +185,7 @@ class diceCommand(diceBot):
             return self.errorInfo("将成功和失败的扣除点数用/分开。")
 
         checkpass, checkfail = checkname.split(sep='/', maxsplit=1)
-        if not self.isadicename(checkpass) or not self.isadicename(checkfail):
+        if not isadicename(checkpass) or not isadicename(checkfail):
             return self.errorInfo("无效输入")
 
         gp = self.forcegetgroup(update)
@@ -212,7 +206,7 @@ class diceCommand(diceBot):
 
         rttext = "理智：检定/出目 "
         sanity = card1.attr.SAN
-        check = self.dicemdn(1, 100)[0]
+        check = dicemdn(1, 100)[0]
         rttext += str(sanity)+"/"+str(check)+" "
         greatfailrule = gp.rule.greatfail
         if (sanity < 50 and check >= greatfailrule[2] and check <= greatfailrule[3]) or (sanity >= 50 and check >= greatfailrule[0] and check <= greatfailrule[1]):  # 大失败
@@ -246,7 +240,7 @@ class diceCommand(diceBot):
             else:
                 m, n = checkfail.split("d", maxsplit=1)
                 m, n = int(m), int(n)
-                sanloss = int(sum(self.dicemdn(m, n)))
+                sanloss = int(sum(dicemdn(m, n)))
 
         else:
             if isint(checkpass):
@@ -254,7 +248,7 @@ class diceCommand(diceBot):
             else:
                 m, n = checkpass.split("d", maxsplit=1)
                 m, n = int(m), int(n)
-                sanloss = int(sum(self.dicemdn(m, n)))
+                sanloss = int(sum(dicemdn(m, n)))
 
         card1.attr.SAN -= sanloss
         rttext += str(sanloss)+"\n"

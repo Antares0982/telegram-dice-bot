@@ -51,7 +51,7 @@ class datatype:
         if hasattr(self, attr):
             try:
                 return str(self.__dict__[attr])
-            except:
+            except Exception:
                 raise ValueError("无法转换为str")
 
         for key in iter(self.__dict__):
@@ -552,7 +552,7 @@ class GameCard(datatype):
                 os.remove(PATH_GAME_CARDS+str(self.id)+".json")
             else:
                 os.remove(PATH_CARDS+str(self.id)+".json")
-        except:
+        except Exception:
             ...
 
     def __eq__(self, o: object) -> bool:
@@ -614,7 +614,7 @@ class Player(datatype):
         if hasattr(self, attr):
             try:
                 return str(self.__dict__[attr])
-            except:
+            except Exception:
                 raise ValueError("无法转换为str")
 
         return "找不到该属性"
@@ -636,7 +636,7 @@ class Player(datatype):
         try:
             self.chat = updater.bot.get_chat(chat_id=self.id)
             self.getname()
-        except:
+        except Exception:
             ...
         return None
 
@@ -708,7 +708,7 @@ class GroupGame(datatype):  # If defined, game is started.
         if hasattr(self, attr):
             try:
                 return str(self.__dict__[attr])
-            except:
+            except Exception:
                 raise ValueError("无法转换为str")
 
         return "找不到该属性"
@@ -943,7 +943,7 @@ class Group(datatype):
         if hasattr(self, attr):
             try:
                 return str(self.__dict__[attr])
-            except:
+            except Exception:
                 raise ValueError("无法转换为str")
 
         return "找不到该属性"
@@ -972,7 +972,7 @@ class Group(datatype):
         try:
             self.chat = updater.bot.get_chat(chat_id=self.id)
             self.getname()
-        except:
+        except Exception:
             ...
         return None
 
@@ -1011,7 +1011,7 @@ class Group(datatype):
             raise ValueError("删除文件时，Group实例没有id")
         try:
             os.remove(PATH_GROUPS+str(self.id)+".json")
-        except:
+        except Exception:
             ...
 
     def __str__(self) -> str:

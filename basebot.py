@@ -30,7 +30,7 @@ class baseBot(object):
         self.blacklist: List[int] = []
         self.readblacklist()
 
-    def start(self) -> None:
+    def botstart(self) -> None:
         self.importHandlers()
         self.reply(ADMIN_ID, "Bot is live!")
         self.updater.start_polling(drop_pending_updates=True)
@@ -151,7 +151,7 @@ class baseBot(object):
             try:
                 self.bot.delete_message(
                     chat_id=chat_id, message_id=msgid)
-            except:
+            except Exception:
                 if i == 4:
                     return False
                 continue
@@ -190,7 +190,7 @@ class baseBot(object):
                 self.updater.dispatcher.add_handler(CommandHandler(key, func))
 
         self.updater.dispatcher.add_handler(
-            MessageHandler(Filters.text & (~Filters.command) & (~Filters.video) & (
+            MessageHandler((Filters.text | Filters.status_update) & (~Filters.command) & (~Filters.video) & (
                 ~Filters.photo) & (~Filters.sticker) & (~Filters.chat_type.channel), self.textHandler))
 
         self.updater.dispatcher.add_handler(MessageHandler(
@@ -221,25 +221,25 @@ class baseBot(object):
             return False
         try:
             self.beforestop()
-        except:
+        except Exception:
             ...
         self.reply(text="主人再见QAQ")
         pid = os.getpid()
         os.kill(pid, SIGINT)
         return True
 
-    @commandCallbackMethod
-    def getid(self, update: Update, context: CallbackContext) -> None:
-        if ischannel(update):
-            return
-        if isgroup(update) and update.message.reply_to_message is not None:
-            self.reply(
-                text=f"群id：`{self.lastchat}`\n回复的消息的用户id：`{update.message.reply_to_message.from_user.id}`", parse_mode="MarkdownV2")
-        elif isgroup(update):
-            self.reply(
-                text=f"群id：`{self.lastchat}`\n您的id：`{self.lastuser}`", parse_mode="MarkdownV2")
-        elif isprivate(update):
-            self.reply(text=f"您的id：\n{self.lastchat}", parse_mode="MarkdownV2")
+    # @commandCallbackMethod
+    # def getid(self, update: Update, context: CallbackContext) -> None:
+    #     if ischannel(update):
+    #         return
+    #     if isgroup(update) and update.message.reply_to_message is not None:
+    #         self.reply(
+    #             text=f"群id：`{self.lastchat}`\n回复的消息的用户id：`{update.message.reply_to_message.from_user.id}`", parse_mode="MarkdownV2")
+    #     elif isgroup(update):
+    #         self.reply(
+    #             text=f"群id：`{self.lastchat}`\n您的id：`{self.lastuser}`", parse_mode="MarkdownV2")
+    #     elif isprivate(update):
+    #         self.reply(text=f"您的id：\n{self.lastchat}", parse_mode="MarkdownV2")
 
     # 非指令的handlers，供重载用。如果需要定义别的类型的handlers，务必在此处创建虚函数
 
@@ -270,7 +270,7 @@ class baseBot(object):
             raise err
 
         self.reply(
-            chat_id=MYID,
+            chat_id=ADMIN_ID,
             text=f"哎呀，出现了未知的错误呢……\n{err.__class__}\n\
                 {err}\ntraceback:{traceback.format_exc()}")
 
@@ -282,21 +282,20 @@ class baseBot(object):
                 self.reply("没有这个指令")
             else:
                 self.reply("似乎没有这个指令呢……")
-        except:
+        except Exception:
             ...
 
     # 聊天迁移
-    @classmethod
-    def chatmigrate(cls, oldchat: int, newchat: int, instance: 'baseBot'):
-        """Override"""
-        if cls is baseBot:
-            conn = sqlite3.connect(blacklistdatabase)
-            c = conn.cursor()
-            c.execute(f"""UPDATE BLACKLIST
-            SET TGID={newchat} WHERE TGID={oldchat}""")
-            if oldchat in instance.blacklist:
-                instance.blacklist[instance.blacklist.index(oldchat)] = newchat
+    def chatmigrate(self, oldchat: int, newchat: int):
+        """这里仅更新blacklist名单，其他需求请Override，不会影响本函数被调用"""
+        conn = sqlite3.connect(blacklistdatabase)
+        c = conn.cursor()
+        c.execute(f"""UPDATE BLACKLIST
+        SET TGID={newchat} WHERE TGID={oldchat}""")
+        if oldchat in self.blacklist:
+            self.blacklist[self.blacklist.index(oldchat)] = newchat
 
+    # 关闭前执行
     def beforestop(self):
         """Override"""
         return

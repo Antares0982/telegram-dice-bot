@@ -40,7 +40,7 @@ class cardCreate(diceBot):
         if (len(context.args)//2)*2 != len(context.args):
             self.reply("参数长度应该是偶数")
 
-        t = self.templateNewCard()
+        t = templateNewCard()
         # 遍历args获取attr和val
         mem: List[str] = []
         for i in range(0, len(context.args), 2):
@@ -115,7 +115,7 @@ class cardCreate(diceBot):
                 t["playerid"] = pl.id
 
         # 生成成功
-        card1 = self.GameCard(t)
+        card1 = GameCard(t)
         # 添加id
 
         if "id" not in context.args or card1.id < 0 or card1.id in self.allids:
@@ -132,23 +132,17 @@ class cardCreate(diceBot):
         else:
             self.reply("卡片添加成功")
 
-        return True if self.addcard(card1) else self.errorInfo("卡id重复")
+        return True if self.addonecard(card1) else self.errorInfo("卡id重复")
 
     @commandCallbackMethod
     def createcardhelp(self, update: Update, context: CallbackContext) -> None:
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
-        self.reply(self.CREATE_CARD_HELP, parse_mode="MarkdownV2")
+        self.reply(CREATE_CARD_HELP, parse_mode="MarkdownV2")
 
     @commandCallbackMethod
     def delcard(self, update: Update, context: CallbackContext) -> bool:
         """KP才能使用该指令，删除一张卡片。一次只能删除一张卡。
         `/delcard --cardid`：删除id为cardid的卡。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if len(context.args) == 0:
             return self.errorInfo("需要卡id作为参数", True)
@@ -171,6 +165,10 @@ class cardCreate(diceBot):
         self.addOP(getchatid(update), "delcard "+context.args[0])
         return True
 
+    def findAllDiscardCards(self, pl: Player) -> List[GameCard]:
+        """返回`plid`对应的所有`discard`为`True`的卡"""
+        return [card for card in pl.cards.values() if self.checkaccess(pl, card) & CANDISCARD]
+
     @commandCallbackMethod
     def discard(self, update: Update, context: CallbackContext) -> bool:
         """该指令用于删除角色卡。
@@ -188,9 +186,6 @@ class cardCreate(diceBot):
         若其中一个参数为群id（负数），则删除该群内所有可删除的卡。
         若其中一个参数为卡id，删除对应的那张卡。
         找不到参数对应的卡时，该参数会被忽略。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if isgroup(update):
             return self.errorInfo("发送私聊消息删除卡。")
@@ -287,9 +282,6 @@ class cardCreate(diceBot):
         角色类型（PL，NPC）；
         是否可以被删除；
         状态（存活，死亡，疯狂等）。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         gpid: int = None
         gp: Optional[Group] = None
@@ -362,9 +354,6 @@ class cardCreate(diceBot):
     @commandCallbackMethod
     def renewcard(self, update: Update, context: CallbackContext) -> bool:
         """如果卡片是可以discard的状态，使用该指令可以将卡片重置。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         pl = self.forcegetplayer(update)
         if pl.controlling is None:
@@ -390,9 +379,6 @@ class cardCreate(diceBot):
         测试创建的卡一定可以删除。
         创建新卡指令的帮助见`/help newcard`，
         对建卡过程有疑问，见 `/createcardhelp`。"""
-        if self.ischannel(update):
-            return False
-        self.chatinit(update, context)
 
         if isgroup(update):
             return self.errorInfo("发送私聊消息创建角色卡。")
@@ -402,4 +388,4 @@ class cardCreate(diceBot):
             gp = self.creategp(-1)
             gp.kp = self.forcegetplayer(ADMIN_ID)
 
-        return self.getnewcard(update.message.message_id, -1, getchatid(update))
+        return self.getnewcard(self.lastmsgid, -1, getchatid(update))

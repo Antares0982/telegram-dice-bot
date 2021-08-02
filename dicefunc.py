@@ -17,7 +17,7 @@ def dicemdn(m: int, n: int) -> List[int]:
 def isint(a: str) -> bool:
     try:
         int(a)
-    except:
+    except Exception:
         return False
     return True
 
