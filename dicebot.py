@@ -1431,11 +1431,6 @@ class diceBot(baseBot):
     def autoswitchhint(self, plid: int) -> None:
         self.sendto(plid, "创建新卡时，控制自动切换到新卡")
 
-    def __eq__(self, o: object) -> bool:
-        if not isinstance(o, diceBot):
-            return False
-        return self.IDENTIFIER == o.IDENTIFIER
-
     @staticmethod
     def searchifkp(pl: Player) -> bool:
         """判断plid是否至少是一个群的kp"""
