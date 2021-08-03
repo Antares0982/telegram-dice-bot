@@ -1831,7 +1831,7 @@ class diceBot(baseBot):
         if isprivate(update):
             self.reply(HELP_TEXT)
         else:
-            self.reply("")
+            self.reply(GROUP_HELP_TEXT)
 
     @commandCallbackMethod
     def tempcheck(self, update: Update, context: CallbackContext):
