@@ -113,6 +113,10 @@ class adminCommand(diceBot):
             return self.errorInfo("找不到进行中的游戏", True)
 
         rppl = self.getreplyplayer(update)
+        if update.message.reply_to_message is not None:
+            rpmsgid = update.message.reply_to_message.message_id
+        else:
+            rpmsgid = update.message.message_id
 
         if rppl is None:
             if len(context.args) < 2:
@@ -175,16 +179,19 @@ class adminCommand(diceBot):
             if takedmg < cardi.attr.MAXHP//2:
                 # 轻伤，若生命不降到0，不做任何事
                 if takedmg >= originhp:
-                    update.message.reply_to_message.reply_text("HP归0，角色昏迷")
+                    self.reply(
+                        text="HP归0，角色昏迷", reply_to_message_id=rpmsgid)
             elif takedmg > cardi.attr.MAXHP:
-                update.message.reply_to_message.reply_text("致死性伤害，角色死亡")
+                self.reply(
+                    text="致死性伤害，角色死亡", reply_to_message_id=rpmsgid)
                 cardi.status = STATUS_DEAD
             else:
-                update.message.reply_to_message.reply_text(
-                    "角色受到重伤，请进行体质检定以维持清醒")
+                self.reply(text="角色受到重伤，请进行体质检定以维持清醒",
+                           reply_to_message_id=rpmsgid)
                 cardi.status = STATUS_SERIOUSLYWOUNDED
                 if originhp <= takedmg:
-                    update.message.reply_to_message.reply_text("HP归0，进入濒死状态")
+                    self.reply(
+                        text="HP归0，进入濒死状态", reply_to_message_id=rpmsgid)
                     cardi.status = STATUS_NEARDEATH
 
             if cardi.attr.HP < 0:
@@ -194,14 +201,14 @@ class adminCommand(diceBot):
             # 恢复生命，可能脱离某种状态
             if cardi.attr.HP >= cardi.attr.MAXHP:
                 cardi.attr.HP = cardi.attr.MAXHP
-                update.message.reply_to_message.reply_text("HP达到最大值")
+                self.reply(text="HP达到最大值", reply_to_message_id=rpmsgid)
 
             if hpdiff > 1 and originhp <= 1 and cardi.status == STATUS_NEARDEATH:
-                self.reply("脱离濒死状态")
+                self.reply(text="脱离濒死状态", reply_to_message_id=rpmsgid)
                 cardi.status = STATUS_SERIOUSLYWOUNDED
         cardi.write()
 
-        self.reply("生命值从"+str(originhp)+"修改为"+str(cardi.attr.HP))
+        self.reply(text="生命值从"+str(originhp)+"修改为"+str(cardi.attr.HP), reply_to_message_id=rpmsgid)
         return True
 
     @commandCallbackMethod
@@ -249,12 +256,12 @@ class adminCommand(diceBot):
 
         if not isgroup(update):
             return self.errorInfo("在群聊使用该指令。")
-        if not self.isadmin(update, BOT_ID):
+        if not self.isadmin(self.lastchat, BOT_ID):
             return self.errorInfo("Bot没有权限")
-        if not self.isadmin(update, update.message.from_user.id):
+        if not self.isadmin(self.lastchat, self.lastuser):
             return self.errorInfo("没有权限", True)
 
-        adminid = update.message.from_user.id
+        adminid = self.lastuser
         gpid = update.effective_chat.id
         chat = context.bot.get_chat(chat_id=gpid)
         ivlink = chat.invite_link
@@ -335,7 +342,7 @@ class adminCommand(diceBot):
         delnum = 1
         chatid = getchatid(update)
 
-        if isgroup(update) and not self.isadmin(update, BOT_ID):
+        if isgroup(update) and not self.isadmin(self.lastchat, BOT_ID):
             return self.errorInfo("Bot没有管理权限")
 
         if isgroup(update) and self.checkaccess(self.forcegetplayer(update), self.forcegetgroup(update)) & (GROUPKP | GROUPADMIN) == 0:

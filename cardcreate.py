@@ -67,13 +67,13 @@ class cardCreate(diceBot):
                 argname = "points"
                 dt = t["interest"]
 
-            dt = self.findattrindict(t, argname)
+            dt = findattrindict(t, argname)
             if not dt:  # 可能是技能，否则返回
                 if argname in self.skilllist or argname == "母语" or argname == "闪避":
                     if not isint(argval) or int(argval) <= 0:
                         return self.errorInfo("技能值应该是正整数")
 
-                    dt = t["skill"]["skills"]
+                    dt: dict = t["skill"]["skills"]
                     dt[argname] = 0  # 这一行是为了防止之后判断类型报错
                 else:
                     return self.errorInfo("属性 "+argname+" 在角色卡模板中没有找到")
@@ -223,7 +223,7 @@ class cardCreate(diceBot):
         # 计算可以discard的卡有多少
         discardgpcdTupleList = self.findAllDiscardCards(pl)
         if len(discardgpcdTupleList) > 1:  # 创建按钮，接下来交给按钮完成
-            rtbuttons: List[List[str]] = [[]]
+            rtbuttons: List[List[InlineKeyboardButton]] = [[]]
 
             for card in discardgpcdTupleList:
                 if len(rtbuttons[len(rtbuttons)-1]) == 4:

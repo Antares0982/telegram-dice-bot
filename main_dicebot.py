@@ -128,7 +128,7 @@ class mainBot(adminCommand, cardCreate, cardHelper, cardShowBot, diceCommand, ga
 
         elif update.edited_channel_post is not None:
             for cls in self.__class__.__bases__:
-                status: handleStatus = cls.editedChannelHandler(
+                status = cls.editedChannelHandler(
                     self, update, context)
                 if status.blocked():
                     return status.normal

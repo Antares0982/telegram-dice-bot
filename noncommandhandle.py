@@ -79,7 +79,7 @@ class nonCommandHandlers(diceBot):
         card1.group.write()
         return True
 
-    def buttonaddmainskill(self: 'mainBot', query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
+    def buttonaddmainskill(self, query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
 
         if card1 is None:
             return self.errorHandlerQ(query, "找不到卡。")
@@ -373,10 +373,10 @@ class nonCommandHandlers(diceBot):
             return True
 
         if update.message.text == "记录":
-            update.message.reply_text(
+            self.reply(
                 "开启记录模式。记录时若开头有中英文左小括号，该条消息记录用户的名字；否则记录角色卡的名字。撤回的消息也会被记录，非文本不会被记录。")
             self.atgamestart(gp)
-            update.message.reply_text("游戏开始！")
+            self.reply("游戏开始！")
             gp.game.memfile = str(time.time())+".txt"
             gp.game.write()
             self.popOP(gp.id)
@@ -384,7 +384,7 @@ class nonCommandHandlers(diceBot):
             return True
 
         self.atgamestart(gp)
-        update.message.reply_text("游戏开始！")
+        self.reply("游戏开始！")
         self.popOP(gp.id)
         return True
 
@@ -417,7 +417,8 @@ class nonCommandHandlers(diceBot):
     def textpassskill(self, update: Update) -> bool:
         t = update.message.text.split()
         if getmsgfromid(update) != ADMIN_ID or (t[0] != "skillcomfirm" and t[0] != "skillreject"):
-            return self.botchat(update)
+            self.botchat(update)
+            return True
 
         if len(t) < 2 or not isint(t[1]):
             return self.errorInfo("参数无效")
@@ -444,7 +445,8 @@ class nonCommandHandlers(diceBot):
     def textpassjob(self, update: Update) -> bool:
         t = update.message.text.split()
         if getmsgfromid(update) != ADMIN_ID or (t[0] != "jobcomfirm" and t[0] != "jobreject"):
-            return self.botchat(update)
+            self.botchat(update)
+            return
 
         if len(t) < 2 or not isint(t[1]):
             return self.errorInfo("参数无效")
@@ -480,9 +482,9 @@ class nonCommandHandlers(diceBot):
 
         self.popOP(update.effective_chat.id)
         if update.message.text != "确认":
-            update.message.reply_text("已经取消删除卡片操作。")
+            self.reply("已经取消删除卡片操作。")
         else:
-            update.message.reply_text("卡片已删除。")
+            self.reply("卡片已删除。")
             self.popcard(cardid)
         return True
 
@@ -517,7 +519,7 @@ class nonCommandHandlers(diceBot):
             return self.errorInfo("找不到卡。")
 
         self.nameset(cardi, text)
-        update.message.reply_text("姓名设置完成："+text)
+        self.reply("姓名设置完成："+text)
         return True
 
     def botchat(self, update: Update) -> None:
@@ -550,7 +552,7 @@ class nonCommandHandlers(diceBot):
                 self.textmem(update)
 
         if update.message.text in ["cancel", "取消"]:
-            update.message.reply_text("操作取消")
+            self.reply("操作取消")
             self.popOP(getchatid(update))
             return handleBlocked()
 

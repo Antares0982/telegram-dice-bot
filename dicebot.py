@@ -1,5 +1,5 @@
 import time
-from typing import Dict, KeysView, List, Union, overload
+from typing import Dict, KeysView, List, Literal, Union, overload
 
 from telegram import Message
 from telegram.error import BadRequest, ChatMigrated, Unauthorized
@@ -331,7 +331,7 @@ class diceBot(baseBot):
     #     return gp.game
 
     @staticmethod
-    def findcardfromgame(game: GroupGame, pl: Player) -> GameCard:
+    def findcardfromgame(game: GroupGame, pl: Player) -> Optional[GameCard]:
         """从`game`中返回对应的`plid`的角色卡"""
         for i in pl.gamecards.values():
             if i.group == game.group:
@@ -397,14 +397,14 @@ class diceBot(baseBot):
         return True
 
     @overload
-    def checkaccess(self, pl: Player, card: GameCard) -> int:
+    def checkaccess(self, pl: Player, gporcard: GameCard) -> int:
         ...
 
     @overload
-    def checkaccess(self, pl: Player, gp: Group) -> int:
+    def checkaccess(self, pl: Player, gporcard: Group) -> int:
         ...
 
-    def checkaccess(self, pl: Player, thing: Union[GameCard, Group]) -> int:
+    def checkaccess(self, pl: Player, gporcard: Union[GameCard, Group]) -> int:
         """用FLAG给出玩家对角色卡或群聊的权限。
         卡片：
         CANREAD = 1
@@ -418,8 +418,8 @@ class diceBot(baseBot):
         GROUPADMIN = 4
         BOTADMIN = 8
         """
-        if isinstance(thing, GameCard):
-            card = thing
+        if isinstance(gporcard, GameCard):
+            card = gporcard
             f = 0
 
             if card.id in pl.cards or card.id in pl.gamecards:
@@ -440,7 +440,7 @@ class diceBot(baseBot):
 
             return f
 
-        gp: Group = thing
+        gp: Group = gporcard
         f = 0
 
         if self.isingroup(gp, pl):
@@ -565,18 +565,18 @@ class diceBot(baseBot):
         self.reply("请选择下面一项属性来设置下降值", reply_markup=rp_markup)
 
     @overload
-    def cardpop(self, card: GameCard) -> Optional[GameCard]:
+    def cardpop(self, cardorid: GameCard) -> Optional[GameCard]:
         ...
 
     @overload
-    def cardpop(self, id: int) -> Optional[GameCard]:
+    def cardpop(self, cardorid: int) -> Optional[GameCard]:
         ...
 
-    def cardpop(self, id: Union[GameCard, int]) -> Optional[GameCard]:
+    def cardpop(self, cardorid: Union[GameCard, int]) -> Optional[GameCard]:
         """删除一张卡并返回其数据。返回None则删除失败"""
-        if type(id) is int:
-            return self.popcard(id) if self.getcard(id) is not None else None
-        card = id
+        if isinstance(cardorid, int):
+            return self.popcard(cardorid) if self.getcard(cardorid) is not None else None
+        card = cardorid
         if card.isgamecard:
             return self.popgamecard(card.id)
         return self.popcard(card.id)
@@ -610,7 +610,7 @@ class diceBot(baseBot):
 
     @staticmethod
     def iskeyconstval(d: dict, keyname: str) -> bool:
-        if type(d[keyname], bool) or type(d[keyname]) is str or isinstance(d[keyname]) is int:
+        if type(d[keyname]) is bool or type(d[keyname]) is str or type(d[keyname]) is int:
             return True
         return False
 
@@ -660,7 +660,10 @@ class diceBot(baseBot):
         否则，返回True的同时返回修改前的值的格式化。"""
         if isinstance(d[attrname], dict):
             return "不能修改dict类型", False
-        if type(d[attrname]) is bool:
+
+        nowval = d[attrname]
+        whichtype = type(nowval)
+        if whichtype is bool:
             rtmsg = "False"
             if d[attrname]:
                 rtmsg = "True"
@@ -673,67 +676,50 @@ class diceBot(baseBot):
             else:
                 return "无效的值", False
             return rtmsg, True
-        if type(d[attrname]) is int:
+        if whichtype is int:
             if not isint(val):
                 return "无效的值", False
-            rtmsg = str(d[attrname])
+            rtmsg = str(nowval)
             d[attrname] = int(val)
             return rtmsg, True
-        if type(d[attrname]) is str:
-            rtmsg: str = d[attrname]
+        if whichtype is str:
+            rtmsg = nowval
             d[attrname] = val
             return rtmsg, True
         # 对应的值不是可修改的三个类型之一，也不是dict类型
         return "类型错误！", False
 
     @classmethod
-    def findattrindict(cls, d: dict, key: str) -> dict:
-        """从字典（键为字符串，值为字典或`int`, `str`, `bool`类型）中找到某个键所在的那层字典并返回。
-        搜索子字典时，如果`key`不是`global`，忽略`tempstatus`对应的字典。"""
-        if key in d:
-            return d
-
-        for k1 in d:
-            if not isinstance(d[k1], dict) or (k1 == "tempstatus" and key != "GLOBAL"):
-                continue
-            t = cls.findattrindict(d[k1], key)
-            if t:
-                return t
-        return None
-
-    @classmethod
-    def modifycardinfo(cls, card1: GameCard, attrname: str, val: str) -> Tuple[str, bool]:
-        """修改`card1`的某项属性。
-
-        因为`card1`的属性中有字典，`attrname`可能是其属性里的某项，
-        所以可能还要遍历`card1`的所有字典。"""
-        if attrname in card1.__dict__:
-            rtmsg, ok = cls.modifythisdict(card1.__dict__, attrname, val)
-            if not ok:
-                return rtmsg, ok
-            return "卡id："+str(card1.id)+"的属性："+attrname+"从"+rtmsg+"修改为"+val, True
-        for key in card1.__dict__:
-            if not isinstance(card1.__dict__[key], dict) or key == "tempstatus":
-                continue
-            if attrname in card1.__dict__[key]:
-                rtmsg, ok = cls.modifythisdict(
-                    card1.__dict__[key], attrname, val)
-                if not ok:
-                    return rtmsg, ok
-                return "卡id："+str(card1.id)+"的属性："+attrname+"从"+rtmsg+"修改为"+val, True
-        return "找不到该属性", False
-
-    def findkpcards(self, kpid) -> List[GameCard]:
-        """查找`kpid`作为kp，所控制的NPC卡片，并做成列表全部返回"""
-        ans = []
-        kp = self.getplayer(kpid)
-        if not kp:
-            return ans
-        for card in kp.cards.values():
-            if card.group.kp.id == kp.id:
-                ans.append(card)
-        return ans
-
+    # @classmethod
+    # def modifycardinfo(cls, card1: GameCard, attrname: str, val: str) -> Tuple[str, bool]:
+    #     """修改`card1`的某项属性。
+    #     因为`card1`的属性中有字典，`attrname`可能是其属性里的某项，
+    #     所以可能还要遍历`card1`的所有字典。"""
+    #     if attrname in card1.__dict__:
+    #         rtmsg, ok = cls.modifythisdict(card1.__dict__, attrname, val)
+    #         if not ok:
+    #             return rtmsg, ok
+    #         return "卡id："+str(card1.id)+"的属性："+attrname+"从"+rtmsg+"修改为"+val, True
+    #     for key in card1.__dict__:
+    #         if not isinstance(card1.__dict__[key], dict) or key == "tempstatus":
+    #             continue
+    #         if attrname in card1.__dict__[key]:
+    #             rtmsg, ok = cls.modifythisdict(
+    #                 card1.__dict__[key], attrname, val)
+    #             if not ok:
+    #                 return rtmsg, ok
+    #             return "卡id："+str(card1.id)+"的属性："+attrname+"从"+rtmsg+"修改为"+val, True
+    #     return "找不到该属性", False
+    # def findkpcards(self, kpid) -> List[GameCard]:
+    #     """查找`kpid`作为kp，所控制的NPC卡片，并做成列表全部返回"""
+    #     ans = []
+    #     kp = self.getplayer(kpid)
+    #     if not kp:
+    #         return ans
+    #     for card in kp.cards.values():
+    #         if card.group.kp.id == kp.id:
+    #             ans.append(card)
+    #     return ans
     @staticmethod
     def changecardsplid(gp: Group, oldpl: Player, newpl: Player) -> None:
         """将某个群中所有`oldplid`持有的卡改为`newplid`持有。"""
@@ -776,7 +762,7 @@ class diceBot(baseBot):
 
         self.changecardsplid(gp, kp, newkp)
 
-        self.delkp(kp)
+        self.delkp(gp)
         self.addkp(gp, newkp)
 
         gp.write()
@@ -969,21 +955,21 @@ class diceBot(baseBot):
 
         return self.addonecard(card, dontautoswitch)
 
-    def changecardgpid(self, oldgpid: int, newgpid: int) -> bool:
+    def changecardgpid(self, oldgpid: int, newgpid: int):
         """函数`changegroup`的具体实现。"""
         oldcdidlst = list(self.forcegetgroup(oldgpid).cards.keys())
         for cdid in oldcdidlst:
-            card = self.cardpop(oldgpid, cdid)
+            card = self.cardpop(cdid)
             self.addcardoverride(card, newgpid)
         self.getgp(oldgpid).write()
         self.getgp(newgpid).write()
 
-    @staticmethod
-    def getkpctrl(game: GroupGame) -> Optional[GameCard]:
-        for cardi in game.cards.values():
-            if cardi.id == game.kpctrl and cardi.playerid == game.kpid:
-                return cardi
-        return None
+    # @staticmethod
+    # def getkpctrl(game: GroupGame) -> Optional[GameCard]:
+    #     for cardi in game.cards.values():
+    #         if cardi.id == game.kpctrl and cardi.playerid == game.kp.id:
+    #             return cardi
+    #     return None
 
     def buttonmanual(self, query: CallbackQuery, plid: int, args: List[str]) -> bool:
         pagereq = args[2]
@@ -1046,7 +1032,7 @@ class diceBot(baseBot):
         return True
 
     @overload
-    def getgp(self, gpid: int) -> Optional[Group]:
+    def getgp(self, update: int) -> Optional[Group]:
         ...
 
     @overload
@@ -1062,7 +1048,7 @@ class diceBot(baseBot):
             return None if gpid not in self.groups else self.groups[gpid]
 
     @overload
-    def creategp(self, gpid: int) -> Group:
+    def creategp(self, update: int) -> Group:
         ...
 
     @overload
@@ -1073,6 +1059,7 @@ class diceBot(baseBot):
         if isinstance(update, Update):
             assert(isgroupmsg(update))
             return self.creategp(getchatid(update))
+
         gpid: int = update
         assert(gpid not in self.groups)
 
@@ -1086,9 +1073,10 @@ class diceBot(baseBot):
             self.sendtoAdmin("无法获取群"+str(gp.id)+" chat信息")
 
         gp.write()
+        return gp
 
     @overload
-    def forcegetgroup(self, gpid: int) -> Group:
+    def forcegetgroup(self, update: int) -> Group:
         ...
 
     @overload
@@ -1108,7 +1096,7 @@ class diceBot(baseBot):
         return gp.renew(self.updater) if gp else self.creategp(gpid)
 
     @overload
-    def getplayer(self, plid: int) -> Optional[Player]:
+    def getplayer(self, update: int) -> Optional[Player]:
         ...
 
     @overload
@@ -1116,21 +1104,21 @@ class diceBot(baseBot):
         ...
 
     @overload
-    def getplayer(self, username: str) -> Optional[Player]:
+    def getplayer(self, update: str) -> Optional[Player]:
         ...
 
     def getplayer(self, update: Union[int, Update, str]) -> Optional[Player]:
         if isinstance(update, Update):
             return None if getmsgfromid(update) not in self.players else self.players[getmsgfromid(update)]
-        if type(update) is int:
+        if isinstance(update, int):
             plid = update
             return None if plid not in self.players else self.players[plid]
-        if type(update) is str:
-            username = update
-            return self.usernametopl[username] if username in self.usernametopl else None
+
+        username = update
+        return self.usernametopl[username] if username in self.usernametopl else None
 
     @overload
-    def createplayer(self, plid: int) -> Player:
+    def createplayer(self, update: int) -> Player:
         ...
 
     @overload
@@ -1140,7 +1128,7 @@ class diceBot(baseBot):
     def createplayer(self, update: Union[int, Update]) -> Player:
         if isinstance(update, Update):
             return self.createplayer(getmsgfromid(update))
-        plid: int = update
+        plid = update
         assert(plid not in self.players)
 
         pl = Player(plid=plid)
@@ -1159,7 +1147,7 @@ class diceBot(baseBot):
         return pl
 
     @overload
-    def forcegetplayer(self, plid: int) -> Player:
+    def forcegetplayer(self, update: int) -> Player:
         ...
 
     @overload
@@ -1180,8 +1168,8 @@ class diceBot(baseBot):
             pl.renew(self.updater)
             if ousn != pl.username:
                 self.changeusername(ousn, pl.username, pl)
-        else:
-            return self.createplayer(plid)
+            return None
+        return self.createplayer(plid)
 
     def getcard(self, cdid: int) -> Optional[GameCard]:
         return self.cards[cdid] if cdid in self.cards else None
@@ -1245,7 +1233,7 @@ class diceBot(baseBot):
         card.delete()
         return card
 
-    def addgamecard(self, card: GameCard) -> bool:
+    def addgamecard(self, card: GameCard):
         # 排查
         assert(card.isgamecard)
 
@@ -1335,10 +1323,10 @@ class diceBot(baseBot):
         gp.write()
         pl.write()
 
-    def delkp(self, gp: Group) -> Optional[Player]:
+    def delkp(self, gp: Group) -> None:
         """仅删除kp。"""
         if gp.kp is None:
-            return None
+            return
         kp = gp.kp
         kp.kpgroups.pop(gp.id)
         gp.kp = None
@@ -1346,9 +1334,6 @@ class diceBot(baseBot):
         if game is not None:
             game.kp = None
             kp.kpgames.pop(gp.id)
-
-        gp.write()
-        kp.write()
 
     def groupmigrate(self, oldid: int, newid: int) -> None:
         """该方法维护时请务必注意。
@@ -1382,26 +1367,28 @@ class diceBot(baseBot):
         gp.write()
 
     @overload
-    def sendto(self, pl: Player, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Optional[Message]:
+    def sendto(self, who: Player, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Optional[Message]:
         ...
 
     @overload
-    def sendto(self, gp: Group, msg: str, rpmarkup: None) -> Optional[Message]:
+    def sendto(self, who: Group, msg: str, rpmarkup: None) -> Optional[Message]:
         ...
 
     @overload
-    def sendto(self, id: int, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Optional[Message]:
+    def sendto(self, who: int, msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Optional[Message]:
         ...
 
-    def sendto(self, pl: Union[Player, Group, int], msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Optional[Message]:
-        if isinstance(pl, Player) or isinstance(pl, Group):
-            chatid = pl.id
+    def sendto(self, who: Union[Player, Group, int], msg: str, rpmarkup: Optional[InlineKeyboardMarkup] = None) -> Optional[Message]:
+        if isinstance(who, Player) or isinstance(who, Group):
+            chatid = who.id
         else:
-            chatid = pl
+            chatid = who
         try:
             if chatid >= 0:
-                return self.reply(chat_id=chatid, text=msg, reply_markup=rpmarkup)
-            return self.reply(chat_id=chatid, text=msg)
+                ans = self.reply(chat_id=chatid, text=msg,
+                                 reply_markup=rpmarkup)
+            else:
+                ans = self.reply(chat_id=chatid, text=msg)
         except ChatMigrated as e:
             if chatid in self.groups:
                 self.groupmigrate(chatid, e.new_chat_id)
@@ -1410,23 +1397,24 @@ class diceBot(baseBot):
             else:
                 raise e
         except Exception:
-            if isinstance(pl, Player) or chatid >= 0:
-                if isinstance(pl, Player):
-                    name = pl.getname()
+            if isinstance(who, Player) or chatid >= 0:
+                if isinstance(who, Player):
+                    name = who.getname()
                 else:
                     if self.getplayer(chatid) is not None:
                         name = self.getplayer(chatid).getname()
                     else:
                         name = str(chatid)
                 return self.sendtoAdmin(f"无法向用户{name}发送消息："+msg)
-            if isinstance(pl, Group):
-                name = pl.getname()
+            if isinstance(who, Group):
+                name = who.getname()
             else:
                 if self.getgp(chatid) is not None:
                     name = self.getgp(chatid).getname()
                 else:
                     name = str(chatid)
             return self.sendtoAdmin(f"无法向群{name}发送消息："+msg)
+        return ans
 
     def autoswitchhint(self, plid: int) -> None:
         self.sendto(plid, "创建新卡时，控制自动切换到新卡")
@@ -1503,7 +1491,7 @@ class diceBot(baseBot):
         jobl += skilllist
 
         ans = (jobname, jobl)
-        self.addjobrequest[pl.id, ans]
+        self.addjobrequest[pl.id] = ans
 
         pl.renew(self.updater)
         plname = pl.username if pl.username != "" else pl.name
@@ -1541,7 +1529,7 @@ class diceBot(baseBot):
         cardi.info.age = age
 
         detailmsg = cardi.generateAgeAttributes()
-        update.message.reply_text(
+        self.reply(
             "年龄设置完成！详细信息如下：\n"+detailmsg+"\n如果年龄不小于40，或小于20，需要设置STR减值。如果需要帮助，使用 /createcardhelp 来获取帮助。")
 
         if cardi.data.datadec is not None:
@@ -1661,7 +1649,7 @@ class diceBot(baseBot):
             return self.errorInfo("该技能已经存在于列表中")
 
         ans = (skillname, bspt)
-        self.addskillrequest[pl.id, ans]
+        self.addskillrequest[pl.id] = ans
 
         pl.renew(self.updater)
         plname = pl.username if pl.username != "" else ""
@@ -1680,6 +1668,7 @@ class diceBot(baseBot):
             return None
         if isgroupmsg(update):
             return self.forcegetplayer(update.message.reply_to_message.from_user.id) if update.message.reply_to_message is not None else None
+        return None
 
     def hascard(self, plid: int, gpid: int) -> bool:
         """判断一个群内是否已经有pl的卡"""
@@ -1779,13 +1768,13 @@ class diceBot(baseBot):
 
                 self.reply("<code>"+str(chatid) +
                            "</code> \n点击即可复制", parse_mode='HTML', reply_markup=rp_markup)
-                return True
+                return
 
         self.reply("<code>"+str(chatid) +
                    "</code> \n点击即可复制", parse_mode='HTML')
 
     @commandCallbackMethod
-    def manual(self, update: Update, context: CallbackContext) -> bool:
+    def manual(self, update: Update, context: CallbackContext) -> None:
         """显示bot的使用指南"""
 
         if not isprivate(update):
@@ -1870,7 +1859,7 @@ class diceBot(baseBot):
         return True
 
     @commandCallbackMethod
-    def help(self, update: Update, context: CallbackContext) -> True:
+    def help(self, update: Update, context: CallbackContext) -> bool:
         """查看指令对应函数的说明文档。
 
         `/help --command`查看指令对应的文档。
@@ -1883,7 +1872,7 @@ class diceBot(baseBot):
                 if funcname == "helper":
                     funcname = "help"
                 rttext += "`/help "+funcname+"`\n"
-            update.message.reply_text(rttext, parse_mode="MarkdownV2")
+            self.reply(rttext, parse_mode="MarkdownV2")
             return True
 
         glb = globals()
@@ -1899,15 +1888,15 @@ class diceBot(baseBot):
                 rttext = rttext[:ind]+rttext[ind+4:]
                 ind = rttext.find("    ")
             try:
-                update.message.reply_text(rttext, parse_mode="MarkdownV2")
+                self.reply(rttext, parse_mode="MarkdownV2")
             except Exception:
-                update.message.reply_text("Markdown格式parse错误，请联系作者检查并改写文档")
+                self.reply("Markdown格式parse错误，请联系作者检查并改写文档")
                 return False
             return True
 
         return self.errorInfo("找不到这个指令，或这个指令没有帮助信息。")
 
-    def unknown(self, update: Update, context: CallbackContext) -> False:
+    def unknown(self, update: Update, context: CallbackContext) -> Literal[False]:
         return self.errorInfo("没有这一指令", True)
 
     def chatinit(self, update: Update, context: CallbackContext) -> Union[Player, Group, None]:
@@ -1925,6 +1914,7 @@ class diceBot(baseBot):
         if isgroupmsg(update):
             self.initplayer(self.lastuser)
             return self.initgroup(self.lastchat)
+        return None
 
     def isadmin(self, chatid: int, userid: int):
         admins = self.bot.get_chat(chatid).get_administrators()
@@ -1933,12 +1923,12 @@ class diceBot(baseBot):
                 return True
         return False
 
-    def errorInfo(self, message: str, needrecall: bool = False) -> False:
+    def errorInfo(self, message: str, needrecall: bool = False) -> Literal[False]:
         """指令无法执行时，调用的函数。
         固定返回`False`，并回复错误信息。
         如果`needrecall`为`True`，在Bot是对应群管理的情况下将删除那条消息。"""
 
-        if needrecall and self.lastchat < 0 and isadmin(self.lastchat, BOT_ID):
+        if needrecall and self.lastchat < 0 and self.isadmin(self.lastchat, BOT_ID):
             self.delmsg(self.lastchat, self.lastmsgid)
         else:
             if message == "找不到卡。":
@@ -1961,7 +1951,7 @@ class diceBot(baseBot):
         return False
 
     @staticmethod
-    def errorHandlerQ(query: CallbackQuery,  message: str) -> False:
+    def errorHandlerQ(query: CallbackQuery,  message: str) -> Literal[False]:
         if message == "找不到卡。":
             message += "请使用 /switch 切换当前操控的卡再试。"
         elif message.find("参数") != -1:

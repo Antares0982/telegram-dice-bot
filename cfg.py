@@ -131,9 +131,6 @@ HELP_TEXT = "欢迎使用COC dice bot，目前版本：v"+VERSION+"""
 （私聊时偶尔触发嘴臭模式）"""
 
 GROUP_HELP_TEXT = "欢迎使用COC dice bot，目前版本：v"+VERSION+"""
-群内使用dice bot建议将bot设为管理员，因为telegram的隐私设置，
-没有管理员权限的dice bot，不能自动删除无效指令，无法接收文字消息互动，
-无法获取消息的回复消息，无法获取成员username来识别指令中的参数。
-如果您不愿意将dice bot提升为管理员的话，dice bot将只能接收指令和回复dice bot的消息。
-与bot进行文字交互时，回复bot来交互才可以正常运作消息。
+群内使用dice bot建议将bot设为管理员，因为telegram的隐私设置，没有管理员权限的dice bot，不能自动删除无效指令，无法接收文字消息互动，无法获取消息的回复消息，无法获取成员username来识别指令中的参数。
+如果您不愿意将dice bot提升为管理员的话，dice bot将只能接收指令和回复dice bot的消息。与bot进行文字交互时，回复bot来交互才可以正常运作消息。
 """

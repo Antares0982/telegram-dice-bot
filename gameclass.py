@@ -1260,7 +1260,7 @@ class Skill(skilltype):
         if len(d) > 0:
             self.read_json(d=d)
 
-    def to_json(self, jumpkey: List[str] = {"card"}) -> dict:
+    def to_json(self, jumpkey: List[str] = ["card"]) -> dict:
         return super().to_json(jumpkey=jumpkey)
 
     def set(self, skillname: str, val: int, costpt: int = 0) -> None:

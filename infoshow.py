@@ -15,7 +15,8 @@ class infoShow(diceBot):
         
 
         if not isprivate(update):
-            return self.errorInfo("请在私聊中使用该指令")
+            self.errorInfo("请在私聊中使用该指令")
+            return
 
         rttext = "职业列表："
         counts = 0

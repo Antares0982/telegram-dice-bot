@@ -1,8 +1,8 @@
 # -*- coding:utf-8 -*-
 
-from typing import Any, Dict
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.callbackquery import CallbackQuery
+from typing import Any, Dict, Optional
+
+from telegram import Update
 
 from cfg import *
 
@@ -49,19 +49,20 @@ def popallempties(d: Dict[Any, dict]) -> bool:
     return ans
 
 
-def isadmin(chatid: int, userid: int) -> bool:
-    """检测发消息的人是不是群管理员"""
-    if chatid>=0:
-        return False
-    
+def findattrindict(d: dict, key: str) -> Optional[dict]:
+    """从字典（键为字符串，值为字典或`int`, `str`, `bool`类型）中找到某个键所在的那层字典并返回。
+    搜索子字典时，如果`key`不是`global`，忽略`tempstatus`对应的字典。"""
+    if key in d:
+        return d
 
+    for k1 in d:
+        if not isinstance(d[k1], dict) or (k1 == "tempstatus" and key != "GLOBAL"):
+            continue
+        t = findattrindict(d[k1], key)
+        if t:
+            return t
 
-def recallmsg(update: Update) -> bool:
-    """撤回群消息。如果自己不是管理员，不做任何事"""
-    if isprivatemsg(update) or not isadmin(update, BOT_ID):
-        return False
-    update.message.delete()
-    return True
+    return None
 
 
 def istrueconsttype(val) -> bool:
@@ -183,14 +184,14 @@ def templateNewCard() -> dict:
         },
         "skill": {
             "points": 0,
-            "skills":{}
+            "skills": {}
         },
         "interest": {
             "points": 0,
-            "skills":{}
+            "skills": {}
         },
         "suggestskill": {
-            "skills":{}
+            "skills": {}
         },
         "attr": {
             "SAN": 0,

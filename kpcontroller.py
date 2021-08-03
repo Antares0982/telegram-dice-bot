@@ -24,8 +24,13 @@ class kpController(diceBot):
             return self.errorInfo('你不是KP', True)
 
         self.changecardsplid(gp, gp.kp, self.forcegetplayer(0))
+
+        kp = gp.kp
         self.delkp(gp)
 
+        kp.write()
+        gp.write()
+        
         self.reply('KP已撤销')
 
         if self.getOP(gp.id).find("delcard") != -1:

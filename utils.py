@@ -1,7 +1,6 @@
 from functools import wraps
-from typing import TYPE_CHECKING, Callable, TypeVar
-
-from telegram import Update
+from typing import Any, TYPE_CHECKING, Callable, TypeVar
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from typing_extensions import final
 
 from cfg import *
@@ -98,7 +97,7 @@ class commandCallbackMethod(object):
     """表示一个指令的callback函数，仅限于类的成员方法。
     调用时，会执行一次指令的前置函数。"""
 
-    def __init__(self, func: Callable[[Update, 'CallbackContext'], _RT]) -> None:
+    def __init__(self, func: Callable[[Any, Update, 'CallbackContext'], _RT]) -> None:
         wraps(func)(self)
         self.instance: 'diceBot' = None
 

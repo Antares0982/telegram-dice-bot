@@ -1,5 +1,6 @@
 from dicebot import diceBot
 from utils import *
+
 from telegram.ext import CallbackContext
 from gameclass import *
 
@@ -25,7 +26,7 @@ class cardHelper(diceBot):
             mm = self.skillmaxval(skillname, card1, True)
             rtbuttons = self.makeIntButtons(m, mm, "cgmainskill", skillname)
             rp_markup = InlineKeyboardMarkup(rtbuttons)
-            update.message.reply_text(
+            self.reply(
                 "更改主要技能点数。剩余技能点："+str(card1.skill.points)+" 技能名称："+skillname+"，当前技能点："+str(card1.skill.get(skillname)), reply_markup=rp_markup)
             return True
 
@@ -33,7 +34,7 @@ class cardHelper(diceBot):
             mm = self.skillmaxval(skillname, card1, True)
             rtbuttons = self.makeIntButtons(m, mm, "addsgskill", skillname)
             rp_markup = InlineKeyboardMarkup(rtbuttons)
-            update.message.reply_text(
+            self.reply(
                 "添加建议技能。剩余技能点："+str(card1.skill.points)+" 技能名称："+skillname, reply_markup=rp_markup)
             return True
 
@@ -41,7 +42,7 @@ class cardHelper(diceBot):
             mm = self.skillmaxval(skillname, card1, False)
             rtbuttons = self.makeIntButtons(m, mm, "cgintskill", skillname)
             rp_markup = InlineKeyboardMarkup(rtbuttons)
-            update.message.reply_text(
+            self.reply(
                 "更改兴趣技能点数。剩余技能点："+str(card1.interest.points)+" 技能名称："+skillname+"，当前技能点："+str(card1.interest.get(skillname)), reply_markup=rp_markup)
             return True
 
@@ -49,14 +50,14 @@ class cardHelper(diceBot):
             mm = self.skillmaxval(skillname, card1, True)
             rtbuttons = self.makeIntButtons(m, mm, "addmainskill", skillname)
             rp_markup = InlineKeyboardMarkup(rtbuttons)
-            update.message.reply_text(
+            self.reply(
                 "添加主要技能。剩余技能点："+str(card1.skill.points)+" 技能名称："+skillname, reply_markup=rp_markup)
             return True
 
         mm = self.skillmaxval(skillname, card1, False)
-        rtbuttons = (m, mm, "addintskill", skillname)
+        rtbuttons = self.makeIntButtons(m, mm, "addintskill", skillname)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
-        update.message.reply_text(
+        self.reply(
             "添加兴趣技能。剩余技能点："+str(card1.interest.points)+" 技能名称："+skillname, reply_markup=rp_markup)
         return True
 
@@ -68,7 +69,7 @@ class cardHelper(diceBot):
             return self.errorInfo("目标技能点太高或太低")
         # 计算点数消耗
         costval = self.evalskillcost(skillname, skillvalue, card1, True)
-        update.message.reply_text(
+        self.reply(
             "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
         card1.skill.set(skillname, skillvalue, costval)
         card1.write()
@@ -90,7 +91,7 @@ class cardHelper(diceBot):
             return self.errorInfo("目标技能点太高或太低")
         # 计算点数消耗
         costval = self.evalskillcost(skillname, skillvalue, card1, False)
-        update.message.reply_text(
+        self.reply(
             "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
         card1.interest.set(skillname, skillvalue, costval)
         card1.write()
@@ -103,10 +104,10 @@ class cardHelper(diceBot):
             return self.errorInfo("目标技能点太高或太低")
         costval = self.evalskillcost(skillname, skillvalue, card1, True)
         if costval >= 0:
-            update.message.reply_text(
+            self.reply(
                 "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
         else:
-            update.message.reply_text(
+            self.reply(
                 "技能设置成功："+skillname+" "+str(skillvalue)+"，返还点数："+str(-costval))
         card1.skill.set(skillname, skillvalue, costval)
         card1.write()
@@ -118,17 +119,17 @@ class cardHelper(diceBot):
             return self.errorInfo("目标技能点太高或太低")
         costval = self.evalskillcost(skillname, skillvalue, card1, False)
         if costval >= 0:
-            update.message.reply_text(
+            self.reply(
                 "技能设置成功："+skillname+" "+str(skillvalue)+"，消耗点数："+str(costval))
         else:
-            update.message.reply_text(
+            self.reply(
                 "技能设置成功："+skillname+" "+str(skillvalue)+"，返还点数："+str(-costval))
         card1.interest.set(skillname, skillvalue, costval)
         card1.group.write()
         return True
 
     def addcredit(self, update: Update, card1: GameCard) -> bool:
-        update.message.reply_text("请先设置信用！")
+        self.reply("请先设置信用！")
         gp = card1.group
         if card1.info.job in self.joblist:
             m = self.joblist[card1.info.job][0]
@@ -146,7 +147,7 @@ class cardHelper(diceBot):
                 mm = skillmaxrule[0]
         rtbuttons = self.makeIntButtons(m, mm, "addmainskill", "信用")
         rp_markup = InlineKeyboardMarkup(rtbuttons)
-        update.message.reply_text(
+        self.reply(
             "添加主要技能。剩余技能点："+str(card1.skill.points)+" 技能名称：信用", reply_markup=rp_markup)
         return True
 
@@ -162,7 +163,7 @@ class cardHelper(diceBot):
 
         rtbutton = self.makeIntButtons(m, mm, "cgmainskill", "信用")
         rp_markup = InlineKeyboardMarkup(rtbutton)
-        update.message.reply_text(text="修改信用，现在还剩"+str(card1.skill.points)+"点，当前信用："+str(
+        self.reply(text="修改信用，现在还剩"+str(card1.skill.points)+"点，当前信用："+str(
             card1.skill.get("信用")), reply_markup=rp_markup)
         return True
 
