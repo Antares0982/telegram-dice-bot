@@ -1904,14 +1904,11 @@ class diceBot(baseBot):
             self.reply(rttext, parse_mode="MarkdownV2")
             return True
 
-        glb = globals()
-
         funcname = context.args[0]
-        if funcname == "help":
-            funcname = "helper"
+        func = getattr(self, funcname)
 
-        if funcname in allfuncs and glb[funcname].__doc__:
-            rttext: str = glb[funcname].__doc__
+        if funcname in allfuncs and func.__doc__:
+            rttext: str = func.__doc__
             ind = rttext.find("    ")
             while ind != -1:
                 rttext = rttext[:ind]+rttext[ind+4:]
