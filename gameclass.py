@@ -14,7 +14,7 @@ from dicefunc import *
 
 __all__ = [
     "GameCard", "Player", "GroupGame", "GroupRule", "Group", "CardData",
-    "CardStatus","CardInfo", "Skill", "SgSkill", "CardAttr", "CardBackground",
+    "CardStatus", "CardInfo", "Skill", "SgSkill", "CardAttr", "CardBackground",
     "Tuple", "Optional", "os", "json", "isint", "isprivatemsg", "isgroupmsg",
     "getmsgfromid", "plainNewCard", "commondice", "dicemdn", "isadicename",
     "List", "dicecalculator", "Dict", "templateNewCard", "findattrindict", "PLTYPE", "copy"
@@ -667,6 +667,14 @@ class Player(datatype):
             raise ValueError("写入文件时，Player实例没有id")
         with open(PATH_PLAYERS+str(self.id)+".json", 'w', encoding='utf-8') as f:
             json.dump(self.to_json(), f, indent=4, ensure_ascii=False)
+
+    def delete(self):
+        if self.id is None:
+            raise ValueError("删除文件时，Player实例没有id")
+        try:
+            os.remove(PATH_PLAYERS+str(self.id)+".json")
+        except Exception:
+            ...
 
     def __eq__(self, o: object) -> bool:
         if not isinstance(o, Player):
