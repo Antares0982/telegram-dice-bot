@@ -1,9 +1,10 @@
-from dicebot import diceBot
-from utils import *
-from telegram.ext import CallbackContext
-from gameclass import *
-
 import time
+
+from telegram.ext import CallbackContext
+
+from dicebot import diceBot
+from gameclass import *
+from utils import *
 
 
 class cardShowBot(diceBot):
@@ -18,7 +19,6 @@ class cardShowBot(diceBot):
         `/showkp game --groupid`: 显示发送者在某个群主持的游戏中所有的卡
         `/showkp card`: 显示发送者作为KP控制的所有卡
         `/showkp group --groupid`: 显示发送者是KP的某个群内的所有卡"""
-        
 
         if isgroup(update):
             return self.errorInfo("使用该指令请发送私聊消息", True)
@@ -101,7 +101,6 @@ class cardShowBot(diceBot):
     @commandCallbackMethod
     def showmycards(self, update: Update, context: CallbackContext) -> bool:
         """显示自己所持的卡。群聊时发送所有在本群可显示的卡片。私聊时发送所有卡片。"""
-        
 
         pl = self.forcegetplayer(update)
         if len(pl.cards) == 0:
@@ -146,7 +145,6 @@ class cardShowBot(diceBot):
         如果当前卡中没有这个属性，则无法显示。
         可以显示的属性例子：
         `STR`,`description`,`SAN`,`MAGIC`,`name`,`item`,`job`"""
-        
 
         pl = self.forcegetplayer(update)
         rppl = self.getreplyplayer(update)
@@ -234,7 +232,6 @@ class cardShowBot(diceBot):
         群聊环境：显示非本群的卡片，或者显示本群的type不为PL的卡片；
 
         私聊环境：显示没有查看权限的卡片。"""
-        
 
         if len(context.args) == 0:
             return self.errorInfo("需要参数")
@@ -299,7 +296,6 @@ class cardShowBot(diceBot):
         KP使用时有额外的一个功能：
 
         `showids kp`: 返回KP游戏中控制的所有卡片id"""
-        
 
         if isgroup(update):
             gp = self.forcegetgroup(update)

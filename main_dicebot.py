@@ -20,7 +20,17 @@ from utils import *
 
 
 @final
-class mainBot(adminCommand, cardCreate, cardHelper, cardShowBot, diceCommand, gameController, infoShow, kpController, nonCommandHandlers):
+class mainBot(
+    adminCommand,
+    cardCreate,
+    cardHelper,
+    cardShowBot,
+    diceCommand,
+    gameController,
+    infoShow,
+    kpController,
+    nonCommandHandlers
+):
     def __init__(self) -> None:
         print("subclass init")
         for cls in self.__class__.__bases__:

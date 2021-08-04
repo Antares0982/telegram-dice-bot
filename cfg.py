@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 from configparser import ConfigParser, NoOptionError, NoSectionError
+from os import getcwd, makedirs, path
 from sys import platform
-from os import getcwd, path, makedirs
 
 __all__ = [
     "PROXY", "PROXY_URL", "TOKEN", "DATA_PATH", "ADMIN_ID", "IGNORE_JOB_DICT", "VERSION", "BOT_ID",

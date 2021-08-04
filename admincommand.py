@@ -1,7 +1,8 @@
-from dicebot import diceBot
-from utils import *
 from telegram.ext import CallbackContext
+
+from dicebot import diceBot
 from gameclass import *
+from utils import *
 
 
 class adminCommand(diceBot):
@@ -208,7 +209,8 @@ class adminCommand(diceBot):
                 cardi.status = STATUS_SERIOUSLYWOUNDED
         cardi.write()
 
-        self.reply(text="生命值从"+str(originhp)+"修改为"+str(cardi.attr.HP), reply_to_message_id=rpmsgid)
+        self.reply(text="生命值从"+str(originhp)+"修改为" +
+                   str(cardi.attr.HP), reply_to_message_id=rpmsgid)
         return True
 
     @commandCallbackMethod

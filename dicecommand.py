@@ -1,7 +1,8 @@
-from dicebot import diceBot
-from utils import *
 from telegram.ext import CallbackContext
+
+from dicebot import diceBot
 from gameclass import *
+from utils import *
 
 
 class diceCommand(diceBot):
