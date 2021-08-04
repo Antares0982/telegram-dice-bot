@@ -1,6 +1,8 @@
 from functools import wraps
-from typing import Any, TYPE_CHECKING, Callable, TypeVar
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
+
+from telegram import (CallbackQuery, InlineKeyboardButton,
+                      InlineKeyboardMarkup, Update)
 from typing_extensions import final
 
 from cfg import *

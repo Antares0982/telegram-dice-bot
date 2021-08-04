@@ -159,9 +159,9 @@ class baseBot(object):
 
         return True
 
-    def errorInfo(self, msg: str) -> Literal[False]:
-        self.reply(text=msg)
-        return False
+    # def errorInfo(self, msg: str) -> Literal[False]:
+    #     self.reply(text=msg)
+    #     return False
 
     def remove_job_if_exists(self, name: str) -> bool:
         """Remove job with given name. Returns whether job was removed."""

@@ -159,6 +159,26 @@ class diceBot(baseBot):
         # ids
         self.allids.sort()
 
+    def chatinit(self, update: Update, context: CallbackContext) -> Union[Player, Group, None]:
+        """所有指令使用前调用该函数。具体功能如下：
+        * 检查全部数据，是否出现不一致
+        * `context.args`处理：将`context.args`中，形为`@username`的字符串转为tgid；
+        * 将消息发送者、所在群初始化（若未存储）"""
+        self.checkconsistency()
+
+        for i in range(len(context.args)):
+            if context.args[i][0] == '@':
+                pl = self.getplayer(context.args[i][1:])
+                if pl is not None:
+                    context.args[i] = str(pl.id)
+
+        if isprivatemsg(update):
+            return self.initplayer(self.lastchat)
+        if isgroupmsg(update):
+            self.initplayer(self.lastuser)
+            return self.initgroup(self.lastchat)
+        return None
+
     def createSkillPages(self) -> List[List[str]]:
         """创建技能的分页列表，用于添加兴趣技能"""
         # 一页16个
@@ -689,7 +709,6 @@ class diceBot(baseBot):
         # 对应的值不是可修改的三个类型之一，也不是dict类型
         return "类型错误！", False
 
-    @classmethod
     # @classmethod
     # def modifycardinfo(cls, card1: GameCard, attrname: str, val: str) -> Tuple[str, bool]:
     #     """修改`card1`的某项属性。
@@ -1212,7 +1231,7 @@ class diceBot(baseBot):
         return True
 
     def popcard(self, cdid: int) -> GameCard:
-        """删除一张游戏外的卡片"""
+        """删除一张游戏外的卡片，该方法调用时保证安全性"""
         if self.getcard(cdid) is None:
             raise KeyError("找不到id为"+str(cdid)+"的卡")
 
@@ -1263,6 +1282,7 @@ class diceBot(baseBot):
         card.write()
 
     def popgamecard(self, cdid: int) -> GameCard:
+        """删除一张游戏卡。该方法的调用保持数据的一致性"""
         if self.getgamecard(cdid) is None:
             raise KeyError("找不到id为"+str(cdid)+"的游戏中的卡")
 
@@ -1335,6 +1355,15 @@ class diceBot(baseBot):
             game.kp = None
             kp.kpgames.pop(gp.id)
 
+    def popkp(self, gp: Group) -> Player:
+        """删除kp，该方法调用保持数据的一致性"""
+        assert gp.kp is not None
+        kp = gp.kp
+        self.delkp(gp)
+        kp.write()
+        gp.write()
+        return kp
+
     def groupmigrate(self, oldid: int, newid: int) -> None:
         """该方法维护时请务必注意。
         在方法被调用时，`oldid`对应的群已经消失了。
@@ -1393,7 +1422,7 @@ class diceBot(baseBot):
             if chatid in self.groups:
                 self.groupmigrate(chatid, e.new_chat_id)
                 chatid = e.new_chat_id
-                self.sendto(chatid, msg)
+                self.reply(chatid, msg)
             else:
                 raise e
         except Exception:
@@ -1417,7 +1446,7 @@ class diceBot(baseBot):
         return ans
 
     def autoswitchhint(self, plid: int) -> None:
-        self.sendto(plid, "创建新卡时，控制自动切换到新卡")
+        self.reply(plid, "创建新卡时，控制自动切换到新卡")
 
     @staticmethod
     def searchifkp(pl: Player) -> bool:
@@ -1899,29 +1928,93 @@ class diceBot(baseBot):
     def unknown(self, update: Update, context: CallbackContext) -> Literal[False]:
         return self.errorInfo("没有这一指令", True)
 
-    def chatinit(self, update: Update, context: CallbackContext) -> Union[Player, Group, None]:
-        """所有指令使用前调用该函数"""
-        self.checkconsistency()
-
-        for i in range(len(context.args)):
-            if context.args[i][0] == '@':
-                pl = self.getplayer(context.args[i][1:])
-                if pl is not None:
-                    context.args[i] = str(pl.id)
-
-        if isprivatemsg(update):
-            return self.initplayer(self.lastchat)
-        if isgroupmsg(update):
-            self.initplayer(self.lastuser)
-            return self.initgroup(self.lastchat)
-        return None
-
     def isadmin(self, chatid: int, userid: int):
         admins = self.bot.get_chat(chatid).get_administrators()
         for admin in admins:
             if admin.user.id == userid:
                 return True
         return False
+
+    def atblock(self, blockid: int, recursive: bool = False):
+        """黑名单功能的具体实现"""
+        if blockid in self.blacklist or blockid == 1 or blockid == 0:
+            return
+
+        self.addblacklist(blockid)
+        if blockid > 0:
+            pl = self.getplayer(blockid)
+            if pl is None:
+                return
+            for cardid in list(pl.gamecards.keys()):
+                self.popgamecard(cardid)
+            for cardid in list(pl.cards.keys()):
+                self.popcard(cardid)
+            for gpid in list(pl.kpgroups.keys()):
+                self.popkp(self.getgp(gpid))
+                if recursive:
+                    self.atblock(gpid, True)
+            if recursive:
+                for gpid in list(self.groups):
+                    gp = self.getgp(gpid)
+                    if gp is None:
+                        continue
+                    try:
+                        gp.renew(self.updater)
+                    except:
+                        continue
+                    admins = gp.chat.get_administrators()
+                    if any(x.user.id == blockid for x in admins):
+                        self.atblock(gpid, True)
+            self.players.pop(blockid)
+            pl.delete()
+        else:
+            gp = self.getgp(blockid)
+            if gp is None:
+                return
+            self.gamepop(gp)
+            for cardid in list(gp.cards.keys()):
+                self.popcard(cardid)
+            if gp.kp is not None:
+                self.atblock(gp.kp, recursive)
+            if recursive:
+                try:
+                    gp.renew(self.updater)
+                except:
+                    ...
+                for admin in gp.chat.get_administrators():
+                    self.atblock(admin.user.id, True)
+            gp.delete()
+
+        rttext = f"id：{blockid}加入黑名单成功"
+        if recursive:
+            rttext += "（递归添加）"
+        if self.lastuser == ADMIN_ID:
+            self.reply(rttext)
+        else:
+            self.reply(ADMIN_ID, rttext)
+
+    @commandCallbackMethod
+    def block(self, update: Update, context: CallbackContext) -> bool:
+        """ADMIN才可以使用。用于将某些用户加入黑名单中。
+        参数`-r`出现时，将递归地将相关群组、用户全部拉黑。
+        非递归时，拉黑群时只会将KP也拉黑。"""
+        if self.lastuser != ADMIN_ID:
+            return self.errorInfo("没有权限", True)
+
+        recursive = False
+
+        addblk: List[int] = []
+        for arg in context.args:
+            if not recursive and arg == "-r":
+                recursive = True
+            elif isint(arg):
+                addblk.append(int(arg))
+
+        if not addblk:
+            return self.errorInfo("没有找到可加入黑名单的id", True)
+
+        for tgid in addblk:
+            self.atblock(tgid, recursive)
 
     def errorInfo(self, message: str, needrecall: bool = False) -> Literal[False]:
         """指令无法执行时，调用的函数。

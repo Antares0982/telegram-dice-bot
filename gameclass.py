@@ -12,6 +12,14 @@ from basicfunc import *
 from cfg import *
 from dicefunc import *
 
+__all__ = [
+    "GameCard", "Player", "GroupGame", "GroupRule", "Group", "CardData",
+    "CardStatus","CardInfo", "Skill", "SgSkill", "CardAttr", "CardBackground",
+    "Tuple", "Optional", "os", "json", "isint", "isprivatemsg", "isgroupmsg",
+    "getmsgfromid", "plainNewCard", "commondice", "dicemdn", "isadicename",
+    "List", "dicecalculator", "Dict", "templateNewCard", "findattrindict", "PLTYPE", "copy"
+]
+
 PLTYPE = "PL"
 NPCTYPE = "NPC"
 

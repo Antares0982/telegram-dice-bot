@@ -435,10 +435,10 @@ class nonCommandHandlers(diceBot):
             with open(PATH_SKILLDICT, 'w', encoding='utf-8') as f:
                 json.dump(self.skilllist, f, indent=4, ensure_ascii=False)
 
-            self.sendto(plid, "您的新增技能申请已通过。")
+            self.reply(plid, "您的新增技能申请已通过。")
 
         else:
-            self.sendto(plid, "您的新增技能申请没有通过。")
+            self.reply(plid, "您的新增技能申请没有通过。")
 
         return True
 
@@ -463,10 +463,10 @@ class nonCommandHandlers(diceBot):
             with open(PATH_JOBDICT, 'w', encoding='utf-8') as f:
                 json.dump(self.joblist, f, indent=4, ensure_ascii=False)
 
-            self.sendto(plid, "您的新增职业申请已通过。")
+            self.reply(plid, "您的新增职业申请已通过。")
 
         else:
-            self.sendto(plid, "您的新增职业申请没有通过。")
+            self.reply(plid, "您的新增职业申请没有通过。")
 
         return True
 
