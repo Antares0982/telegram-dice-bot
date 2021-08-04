@@ -1,6 +1,6 @@
 from telegram.ext import CallbackContext
 
-from dicebot import diceBot
+from dicebot import BUTTON_DISCARD, diceBot
 from gameclass import *
 from utils import *
 
@@ -231,11 +231,12 @@ class cardCreate(diceBot):
                     rtbuttons.append([])
                 cardname = card.getname()
                 rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(cardname,
-                                                                        callback_data=self.IDENTIFIER+" "+"discard "+str(card.id)))
+                                                                        callback_data="discard "+str(card.id)))
 
             rp_markup = InlineKeyboardMarkup(rtbuttons)
 
             self.reply("请点击要删除的卡片：", reply_markup=rp_markup)
+            self.workingMethod[self.lastchat] = BUTTON_DISCARD
             return True
 
         if len(discardgpcdTupleList) == 1:
@@ -347,7 +348,7 @@ class cardCreate(diceBot):
         if isprivate(update):
             remsgid = update.message.message_id
         else:
-            assert(rp_markup)
+            assert rp_markup
             self.reply("建卡信息已经私聊发送", reply_markup=rp_markup)
 
         return self.getnewcard(remsgid, gpid, plid, newcdid)
@@ -390,3 +391,39 @@ class cardCreate(diceBot):
             gp.kp = self.forcegetplayer(ADMIN_ID)
 
         return self.getnewcard(self.lastmsgid, -1, getchatid(update))
+    def buttondiscard(self, query: CallbackQuery, args: List[str]) -> bool:
+        cdid = int(args[1])
+
+        card = self.getcard(cdid)
+        if card is None:
+            return self.errorHandlerQ(query, "找不到这个id的卡。")
+
+        pl = self.forcegetplayer(self.lastchat)
+        if not self.checkaccess(pl, card) & CANDISCARD:
+            return self.errorHandlerQ(query, "该卡不可删除。")
+
+        self.cardpop(cdid)
+
+        query.edit_message_text(f"删除了：{card.getname()}。\n该删除操作不可逆。")
+        return True
+
+    def buttonHandler(self, update: Update, context: CallbackContext) -> handleStatus:
+        query: CallbackQuery = update.callback_query
+
+        args = query.data.split(" ")
+
+        workingmethod = self.workingMethod[self.lastchat]
+
+        matchdict = {
+            "discard":BUTTON_DISCARD
+        }
+
+        if args[0] not in matchdict:
+            return handlePassed
+        
+        if workingmethod != matchdict[args[0]]:
+            return handleBlocked(self.queryError(query))
+        
+        if args[0] == "discard":
+            return handleBlocked(self.buttondiscard(query, args))
+        return handleBlocked(False)

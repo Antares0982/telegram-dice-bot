@@ -105,6 +105,12 @@ class mainBot(
         if any(x in self.blacklist for x in (self.lastuser, self.lastchat)):
             return self.queryError(update.callback_query)
 
+        if self.lastchat not in self.workingMethod or self.workingMethod[self.lastchat] == "":
+            return False
+
+        if update.callback_query.data == "None" or isgroup(update):
+            return False
+
         for cls in self.__class__.__bases__:
             status: handleStatus = cls.buttonHandler(self, update, context)
             if status.blocked():

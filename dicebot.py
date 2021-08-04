@@ -9,12 +9,25 @@ from basebot import baseBot
 from gameclass import *
 from utils import *
 
+BUTTON_JOB = "b_job"
+BUTTON_ADDMAINSKILL = "b_ams"
+BUTTON_CGMAINSKILL = "b_cgms"
+BUTTON_ADDSGSKILL = "b_ass"
+BUTTON_ADDINTSKILL = "b_ais"
+BUTTON_CGINTSKILL = "b_cgis"
+BUTTON_CHOOSEDEC = "b_cdec"
+BUTTON_SETDEC = "b_sdec"
+BUTTON_DISCARD = "b_dcd"
+BUTTON_SWITCH = "b_swh"
+BUTTON_SWITCHGAMECARD = "b_swhgc"
+BUTTON_SETSEX = "b_ssx"
+BUTTON_MANUAL = "b_mnl"
+
 
 class diceBot(baseBot):
     def __init__(self) -> None:
         super().__init__()
 
-        self.IDENTIFIER = str(time.time())
         self.groups: Dict[int, Group] = {}  # readall()赋值
         self.players: Dict[int, Player] = {}  # readall()赋值
         self.cards: Dict[int, GameCard] = {}  # readall()赋值
@@ -159,48 +172,6 @@ class diceBot(baseBot):
         # ids
         self.allids.sort()
 
-    def chatinit(self, update: Update, context: CallbackContext) -> Union[Player, Group, None]:
-        """所有指令使用前调用该函数。具体功能如下：
-        * 检查全部数据，是否出现不一致
-        * `context.args`处理：将`context.args`中，形为`@username`的字符串转为tgid；
-        * 将消息发送者、所在群初始化（若未存储）"""
-        self.checkconsistency()
-
-        for i in range(len(context.args)):
-            if context.args[i][0] == '@':
-                pl = self.getplayer(context.args[i][1:])
-                if pl is not None:
-                    context.args[i] = str(pl.id)
-
-        if isprivatemsg(update):
-            return self.initplayer(self.lastchat)
-        if isgroupmsg(update):
-            self.initplayer(self.lastuser)
-            return self.initgroup(self.lastchat)
-        return None
-
-    def createSkillPages(self) -> List[List[str]]:
-        """创建技能的分页列表，用于添加兴趣技能"""
-        # 一页16个
-        skillPaged: List[List[str]] = [["母语", "闪避"]]
-        for key in self.skilllist:
-            if key == "克苏鲁神话":
-                continue
-            if len(skillPaged[len(skillPaged)-1]) == 16:
-                skillPaged.append([])
-            skillPaged[len(skillPaged)-1].append(key)
-        return skillPaged
-
-    def readhandlers(self) -> List[str]:
-        """读取全部handlers。
-        使用时，先写再读，正常情况下不会有找不到文件的可能"""
-        with open(PATH_HANDLERS, 'r', encoding='utf-8') as f:
-            d = json.load(f)
-        return d
-
-    def sendtoAdmin(self, msg: str) -> None:
-        self.reply(ADMIN_ID, msg)
-
     def checkconsistency(self):
         for card in self.cards.values():
             if card.player is None or card.player.id != card.playerid:
@@ -252,6 +223,7 @@ class diceBot(baseBot):
                     game.kp.kpgames[game.group.id] = game
                     self.sendtoAdmin("kp.kpgames出现不一致")
 
+    # 数据读取
     def writegroup(self) -> None:
         for gp in self.groups.values():
             gp.write()
@@ -267,6 +239,48 @@ class diceBot(baseBot):
         for card in self.gamecards.values():
             assert(card.isgamecard)
             card.write()
+
+    def readhandlers(self) -> List[str]:
+        """读取全部handlers。
+        使用时，先写再读，正常情况下不会有找不到文件的可能"""
+        with open(PATH_HANDLERS, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        return d
+
+    def chatinit(self, update: Update, context: CallbackContext) -> Union[Player, Group, None]:
+        """所有指令使用前调用该函数。具体功能如下：
+        * 检查全部数据，是否出现不一致
+        * `context.args`处理：将`context.args`中，形为`@username`的字符串转为tgid；
+        * 将消息发送者、所在群初始化（若未存储）"""
+        self.checkconsistency()
+
+        for i in range(len(context.args)):
+            if context.args[i][0] == '@':
+                pl = self.getplayer(context.args[i][1:])
+                if pl is not None:
+                    context.args[i] = str(pl.id)
+
+        if isprivatemsg(update):
+            return self.initplayer(self.lastchat)
+        if isgroupmsg(update):
+            self.initplayer(self.lastuser)
+            return self.initgroup(self.lastchat)
+        return None
+
+    def createSkillPages(self) -> List[List[str]]:
+        """创建技能的分页列表，用于添加兴趣技能"""
+        # 一页16个
+        skillPaged: List[List[str]] = [["母语", "闪避"]]
+        for key in self.skilllist:
+            if key == "克苏鲁神话":
+                continue
+            if len(skillPaged[len(skillPaged)-1]) == 16:
+                skillPaged.append([])
+            skillPaged[len(skillPaged)-1].append(key)
+        return skillPaged
+
+    def sendtoAdmin(self, msg: str, **kwargs) -> None:
+        self.reply(ADMIN_ID, msg, **kwargs)
 
     @staticmethod
     def isingroup(gp: Group, pl: Player) -> bool:
@@ -290,6 +304,13 @@ class diceBot(baseBot):
             break
         for admin in admins:
             if admin.user.id == pl.id:
+                return True
+        return False
+
+    def isadmin(self, chatid: int, userid: int):
+        admins = self.bot.get_chat(chatid).get_administrators()
+        for admin in admins:
+            if admin.user.id == userid:
                 return True
         return False
 
@@ -324,11 +345,10 @@ class diceBot(baseBot):
         if lower > upper:
             upper = lower
 
-        IDENTIFIER = self.IDENTIFIER
         rtbuttons = [[]]
         if (lower//step)*step != lower:
             rtbuttons[0].append(InlineKeyboardButton(
-                str(lower), callback_data=IDENTIFIER+" "+keystr1+" "+keystr2+" "+str(lower)))
+                str(lower), callback_data=keystr1+" "+keystr2+" "+str(lower)))
             t = step+(lower//step)*step
         else:
             t = lower
@@ -336,11 +356,11 @@ class diceBot(baseBot):
             if len(rtbuttons[len(rtbuttons)-1]) == column:
                 rtbuttons.append([])
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(str(i),
-                                                                    callback_data=IDENTIFIER+" "+keystr1+" "+keystr2+" "+str(i)))
+                                                                    callback_data=keystr1+" "+keystr2+" "+str(i)))
         if len(rtbuttons[len(rtbuttons)-1]) == column:
             rtbuttons.append([])
         rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(str(upper),
-                                                                callback_data=IDENTIFIER+" "+keystr1+" "+keystr2+" "+str(upper)))
+                                                                callback_data=keystr1+" "+keystr2+" "+str(upper)))
         return rtbuttons
 
     # def findgame(self, gpid: int) -> Optional[GroupGame]:
@@ -390,20 +410,22 @@ class diceBot(baseBot):
                     if len(rtbuttons[len(rtbuttons)-1]) == 4:
                         rtbuttons.append([])
                     rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys +
-                                                                            ": "+str(card1.skill.get(keys)), callback_data=self.IDENTIFIER+" "+"cgmainskill "+keys))
+                                                                            ": "+str(card1.skill.get(keys)), callback_data="cgmainskill "+keys))
                 rp_markup = InlineKeyboardMarkup(rtbuttons)
                 self.sendto(pl, "剩余点数："+str(
                     card1.skill.points)+"\n请选择一项主要技能用于增加技能点", rpmarkup=rp_markup)
+                self.workingMethod[self.lastchat] = BUTTON_CGMAINSKILL
                 return True
             # GOOD TRAP: addsgskill
             for keys in card1.suggestskill.allskills():
                 if len(rtbuttons[len(rtbuttons)-1]) == 4:
                     rtbuttons.append([])
                 rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(keys+": " +
-                                                                        str(card1.suggestskill.get(keys)), callback_data=self.IDENTIFIER+" "+"addsgskill "+keys))
+                                                                        str(card1.suggestskill.get(keys)), callback_data="addsgskill "+keys))
             rp_markup = InlineKeyboardMarkup(rtbuttons)
             self.sendto(pl, "剩余点数："+str(
                 card1.skill.points)+"\n请选择一项主要技能", rpmarkup=rp_markup)
+            self.workingMethod[self.lastchat] = BUTTON_ADDSGSKILL
             return True
         # turn to interest.
         if card1.interest.points <= 0:  # HIT BAD TRAP
@@ -414,6 +436,7 @@ class diceBot(baseBot):
         rttext, rtbuttons = self.showskillpages(0, card1)
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         self.sendto(pl, rttext, rpmarkup=rp_markup)
+        self.workingMethod[self.lastchat] = BUTTON_ADDINTSKILL
         return True
 
     @overload
@@ -579,10 +602,11 @@ class diceBot(baseBot):
         rtbuttons = [[]]
         for dname in datas:
             rtbuttons[0].append(InlineKeyboardButton(
-                text=dname, callback_data=self.IDENTIFIER+" choosedec "+dname))
+                text=dname, callback_data="choosedec "+dname))
 
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         self.reply("请选择下面一项属性来设置下降值", reply_markup=rp_markup)
+        self.workingMethod[self.lastchat] = BUTTON_CHOOSEDEC
 
     @overload
     def cardpop(self, cardorid: GameCard) -> Optional[GameCard]:
@@ -796,7 +820,7 @@ class diceBot(baseBot):
             if len(rtbuttons[len(rtbuttons)-1]) == 3:
                 rtbuttons.append([])
             rtbuttons[len(
-                rtbuttons)-1].append(InlineKeyboardButton(keys, callback_data=self.IDENTIFIER+" job "+keys))
+                rtbuttons)-1].append(InlineKeyboardButton(keys, callback_data="job "+keys))
         return rtbuttons
 
     def skillcantouchmax(self, card1: GameCard, jumpskill: Optional[str] = None) -> Tuple[bool, bool]:
@@ -990,7 +1014,7 @@ class diceBot(baseBot):
     #             return cardi
     #     return None
 
-    def buttonmanual(self, query: CallbackQuery, plid: int, args: List[str]) -> bool:
+    def buttonmanual(self, query: CallbackQuery, args: List[str]) -> bool:
         pagereq = args[2]
         thispage = int(args[1])
 
@@ -998,58 +1022,38 @@ class diceBot(baseBot):
             page = thispage-1
             if page == 0:
                 rtbuttons = [[InlineKeyboardButton(
-                    text="下一页", callback_data=self.IDENTIFIER+" manual 0 next")]]
+                    text="下一页", callback_data="manual 0 next")]]
             else:
                 rtbuttons = [[
                     InlineKeyboardButton(
-                        text="上一页", callback_data=self.IDENTIFIER+f" manual {page} pre"),
+                        text="上一页", callback_data=f"manual {page} pre"),
                     InlineKeyboardButton(
-                        text="下一页", callback_data=self.IDENTIFIER+f" manual {page} next")
+                        text="下一页", callback_data=f"manual {page} next")
                 ]]
             rp_markup = InlineKeyboardMarkup(rtbuttons)
             query.edit_message_text(
                 text=self.MANUALTEXTS[page], parse_mode="MarkdownV2", reply_markup=rp_markup)
+            self.workingMethod[self.lastchat] = BUTTON_MANUAL
 
         else:
             page = thispage+1
-            if page == len(self.MANUALTEXTS)-1 or (page == len(self.MANUALTEXTS)-2 and plid != ADMIN_ID):
+            if page == len(self.MANUALTEXTS)-1 or (page == len(self.MANUALTEXTS)-2 and self.lastchat != ADMIN_ID):
                 rtbuttons = [[InlineKeyboardButton(
-                    text="上一页", callback_data=self.IDENTIFIER+f" manual {page} pre")]]
+                    text="上一页", callback_data=f"manual {page} pre")]]
             else:
                 rtbuttons = [[
                     InlineKeyboardButton(
-                        text="上一页", callback_data=self.IDENTIFIER+f" manual {page} pre"),
+                        text="上一页", callback_data=f"manual {page} pre"),
                     InlineKeyboardButton(
-                        text="下一页", callback_data=self.IDENTIFIER+f" manual {page} next")
+                        text="下一页", callback_data=f"manual {page} next")
                 ]]
             rp_markup = InlineKeyboardMarkup(rtbuttons)
             query.edit_message_text(
                 text=self.MANUALTEXTS[page], parse_mode="MarkdownV2", reply_markup=rp_markup)
+            self.workingMethod[self.lastchat] = BUTTON_MANUAL
 
         return True
-
-    def buttonsetsex(self, query: CallbackQuery, plid: int,  args: List[str]) -> bool:
-        cardi = self.findcard(plid)
-        if cardi is None:
-            return self.errorHandlerQ(query, "找不到卡。")
-
-        sex = args[1]
-        if sex == "other":
-            self.addOP(plid, "setsex")
-            query.edit_message_text("请输入具体的性别：")
-            return True
-
-        cardi.info.sex = sex
-        cardi.write()
-
-        rttext = "性别设定为"
-        if sex == "male":
-            rttext += "男性。"
-        else:
-            rttext += "女性。"
-        query.edit_message_text(rttext)
-        return True
-
+# groups：查，增
     @overload
     def getgp(self, update: int) -> Optional[Group]:
         ...
@@ -1113,7 +1117,7 @@ class diceBot(baseBot):
         """若gpid未存储过，创建Group对象并返回，否则返回None"""
         gp = self.getgp(gpid)
         return gp.renew(self.updater) if gp else self.creategp(gpid)
-
+# players：查，增
     @overload
     def getplayer(self, update: int) -> Optional[Player]:
         ...
@@ -1190,6 +1194,7 @@ class diceBot(baseBot):
             return None
         return self.createplayer(plid)
 
+# cards：查，增，删
     def getcard(self, cdid: int) -> Optional[GameCard]:
         return self.cards[cdid] if cdid in self.cards else None
 
@@ -1301,6 +1306,7 @@ class diceBot(baseBot):
         card.player.write()
         return card
 
+# 
     def cardtransferto(self, card: GameCard, newpl: Player) -> bool:
         """转移一张卡所属权，游戏进行中则无法转移"""
         if card.player == newpl or card.id in card.player.gamecards or card.isgamecard:
@@ -1331,6 +1337,7 @@ class diceBot(baseBot):
             if nusn != "":
                 self.usernametopl[nusn] = pl
 
+# kp：增，删
     def addkp(self, gp: Group, pl: Player) -> None:
         """如果要更新kp，需要先执行delkp"""
         gp.kp = pl
@@ -1572,7 +1579,6 @@ class diceBot(baseBot):
     @staticmethod
     def nameset(cardi: GameCard, name: str) -> None:
         cardi.info.name = name
-        # cardi.cardcheck["check5"] = True
         cardi.write()
 
     def atcardtransfer(self, msg: Message, cdid: int, tpl: Player) -> None:
@@ -1620,7 +1626,6 @@ class diceBot(baseBot):
         return ans
 
     def showskillpages(self, page: int, card1: GameCard) -> Tuple[str, List[List[InlineKeyboardButton]]]:
-        IDENTIFIER = self.IDENTIFIER
         thispageskilllist = self.skillpages[page]
         rttext = f"添加/修改兴趣技能，剩余点数：{str(card1.interest.points)}。目前的数值/基础值如下："
         rtbuttons = [[]]
@@ -1632,20 +1637,20 @@ class diceBot(baseBot):
             if key in card1.interest.allskills():
                 rttext += "（已有技能）"+key+"："+str(card1.interest.get(key))+"\n"
                 rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(text=key,
-                                                                        callback_data=IDENTIFIER+" cgintskill "+key))
+                                                                        callback_data="cgintskill "+key))
                 continue
             rttext += key+"："+str(self.getskilllevelfromdict(card1, key))+"\n"
             rtbuttons[len(rtbuttons)-1].append(InlineKeyboardButton(text=key,
-                                                                    callback_data=IDENTIFIER+" addintskill "+key))
+                                                                    callback_data="addintskill "+key))
         if page == 0:
             rtbuttons.append([InlineKeyboardButton(
-                text="下一页", callback_data=IDENTIFIER+" addintskill page 1")])
+                text="下一页", callback_data="addintskill page 1")])
         elif page == len(self.skillpages)-1:
             rtbuttons.append([InlineKeyboardButton(
-                text="上一页", callback_data=IDENTIFIER+" addintskill page "+str(page-1))])
+                text="上一页", callback_data="addintskill page "+str(page-1))])
         else:
-            rtbuttons.append([InlineKeyboardButton(text="上一页", callback_data=IDENTIFIER+" addintskill page "+str(
-                page-1)), InlineKeyboardButton(text="下一页", callback_data=IDENTIFIER+" addintskill page "+str(page+1))])
+            rtbuttons.append([InlineKeyboardButton(text="上一页", callback_data="addintskill page "+str(
+                page-1)), InlineKeyboardButton(text="下一页", callback_data="addintskill page "+str(page+1))])
         return rttext, rtbuttons
 
     @commandCallbackMethod
@@ -1816,10 +1821,11 @@ class diceBot(baseBot):
             return self.errorInfo("README文件丢失，请联系bot管理者")
 
         rtbuttons = [[InlineKeyboardButton(
-            text="下一页", callback_data=self.IDENTIFIER+" manual 0 next")]]
+            text="下一页", callback_data="manual 0 next")]]
         rp_markup = InlineKeyboardMarkup(rtbuttons)
         self.reply(
             self.MANUALTEXTS[0], reply_markup=rp_markup, parse_mode="MarkdownV2")
+        self.workingMethod[self.lastchat] = BUTTON_MANUAL
         return
 
     @commandCallbackMethod
@@ -1924,13 +1930,6 @@ class diceBot(baseBot):
 
     def unknown(self, update: Update, context: CallbackContext) -> False:
         return self.errorInfo("没有这一指令", True)
-
-    def isadmin(self, chatid: int, userid: int):
-        admins = self.bot.get_chat(chatid).get_administrators()
-        for admin in admins:
-            if admin.user.id == userid:
-                return True
-        return False
 
     def atblock(self, blockid: int, recursive: bool = False):
         """黑名单功能的具体实现"""

@@ -1,6 +1,6 @@
 from telegram.ext import CallbackContext
 
-from dicebot import diceBot
+from dicebot import BUTTON_SWITCHGAMECARD, diceBot
 from gameclass import *
 from utils import *
 
@@ -493,3 +493,43 @@ class adminCommand(diceBot):
 
         self.reply(msg)
         return True
+    def buttonswitchgamecard(self, query: CallbackQuery, args: List[str]) -> bool:
+        kp = self.forcegetplayer(self.lastchat)
+        cdid = int(args[1])
+        card = self.getgamecard(cdid)
+
+        if card is None:
+            return self.errorHandlerQ(query, "没有这张卡")
+        if card.player != kp:
+            return self.errorHandlerQ(query, "这不是你的卡片")
+        if card.group.kp != kp:
+            return self.errorHandlerQ(query, "你不是对应群的kp")
+
+        game = card.group.game if card.group.game is not None else card.group.pausedgame
+        assert(game is not None)
+
+        game.kpctrl = card
+        game.write()
+        query.edit_message_text("修改操纵的npc卡成功，现在正在使用："+card.getname())
+        return True
+
+    def buttonHandler(self, update: Update, context: CallbackContext) -> handleStatus:
+        query: CallbackQuery = update.callback_query
+
+        args = query.data.split(" ")
+
+        workingmethod = self.workingMethod[self.lastchat]
+
+        matchdict = {
+            "switchgamecard":BUTTON_SWITCHGAMECARD
+        }
+
+        if args[0] not in matchdict:
+            return handlePassed
+        
+        if workingmethod != matchdict[args[0]]:
+            return handleBlocked(self.queryError(query))
+        
+        if args[0] == "switchgamecard":
+            return handleBlocked(self.buttonswitchgamecard(query, args))
+        return handleBlocked(False)
