@@ -3,7 +3,7 @@ import sqlite3
 import time
 import traceback
 from signal import SIGINT
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Optional
 
 from telegram import Bot, CallbackQuery, Update
 from telegram.error import BadRequest, NetworkError, TimedOut
@@ -159,7 +159,7 @@ class baseBot(object):
 
         return True
 
-    # def errorInfo(self, msg: str) -> Literal[False]:
+    # def errorInfo(self, msg: str) -> False:
     #     self.reply(text=msg)
     #     return False
 
@@ -174,7 +174,7 @@ class baseBot(object):
         return True
 
     @staticmethod
-    def queryError(query: CallbackQuery) -> Literal[False]:
+    def queryError(query: CallbackQuery) -> False:
         try:
             query.edit_message_text(
                 text="这个按钮请求已经无效了", reply_markup=None)

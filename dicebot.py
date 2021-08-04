@@ -1,5 +1,5 @@
 import time
-from typing import Dict, KeysView, List, Literal, Union, overload
+from typing import Dict, KeysView, List, Union, overload
 
 from telegram import Message
 from telegram.error import BadRequest, ChatMigrated, Unauthorized
@@ -1925,7 +1925,7 @@ class diceBot(baseBot):
 
         return self.errorInfo("找不到这个指令，或这个指令没有帮助信息。")
 
-    def unknown(self, update: Update, context: CallbackContext) -> Literal[False]:
+    def unknown(self, update: Update, context: CallbackContext) -> False:
         return self.errorInfo("没有这一指令", True)
 
     def isadmin(self, chatid: int, userid: int):
@@ -2016,7 +2016,7 @@ class diceBot(baseBot):
         for tgid in addblk:
             self.atblock(tgid, recursive)
 
-    def errorInfo(self, message: str, needrecall: bool = False) -> Literal[False]:
+    def errorInfo(self, message: str, needrecall: bool = False) -> False:
         """指令无法执行时，调用的函数。
         固定返回`False`，并回复错误信息。
         如果`needrecall`为`True`，在Bot是对应群管理的情况下将删除那条消息。"""
@@ -2044,7 +2044,7 @@ class diceBot(baseBot):
         return False
 
     @staticmethod
-    def errorHandlerQ(query: CallbackQuery,  message: str) -> Literal[False]:
+    def errorHandlerQ(query: CallbackQuery,  message: str) -> False:
         if message == "找不到卡。":
             message += "请使用 /switch 切换当前操控的卡再试。"
         elif message.find("参数") != -1:
