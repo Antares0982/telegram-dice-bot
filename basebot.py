@@ -53,7 +53,7 @@ class baseBot(object):
         conn = sqlite3.connect(blacklistdatabase)
         c = conn.cursor()
         c.execute(f"""INSERT INTO BLACKLIST(TGID)
-        VALUES(id);""")
+        VALUES({id});""")
         conn.commit()
         conn.close()
 
