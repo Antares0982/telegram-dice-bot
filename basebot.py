@@ -44,7 +44,7 @@ class baseBot(object):
         ans = cur.fetchall()
         conn.close()
         for tgid in ans:
-            self.blacklist.append(tgid)
+            self.blacklist.append(tgid[0])
 
     def addblacklist(self, id: int):
         if id in self.blacklist:
