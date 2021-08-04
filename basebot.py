@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import time
@@ -183,11 +184,16 @@ class baseBot(object):
         return False
 
     def importHandlers(self) -> None:
+        handlerlist: List[str] = []
         for key in self.__dir__():
             func = getattr(self, key)
             if type(func) is commandCallbackMethod:
                 print(f"Handler added: {key}")
+                handlerlist.append(key)
                 self.updater.dispatcher.add_handler(CommandHandler(key, func))
+
+        with open(PATH_HANDLERS, 'w', encoding='utf-8') as f:
+            json.dump(handlerlist, f, indent=4, ensure_ascii=False)
 
         self.updater.dispatcher.add_handler(
             MessageHandler((Filters.text | Filters.status_update) & (~Filters.command) & (~Filters.video) & (
