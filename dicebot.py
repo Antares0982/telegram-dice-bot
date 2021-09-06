@@ -1054,6 +1054,7 @@ class diceBot(baseBot):
 
         return True
 # groups：查，增
+
     @overload
     def getgp(self, update: int) -> Optional[Group]:
         ...
@@ -1118,6 +1119,7 @@ class diceBot(baseBot):
         gp = self.getgp(gpid)
         return gp.renew(self.updater) if gp else self.creategp(gpid)
 # players：查，增
+
     @overload
     def getplayer(self, update: int) -> Optional[Player]:
         ...
@@ -1306,7 +1308,7 @@ class diceBot(baseBot):
         card.player.write()
         return card
 
-# 
+#
     def cardtransferto(self, card: GameCard, newpl: Player) -> bool:
         """转移一张卡所属权，游戏进行中则无法转移"""
         if card.player == newpl or card.id in card.player.gamecards or card.isgamecard:
@@ -1927,6 +1929,10 @@ class diceBot(baseBot):
             return True
 
         return self.errorInfo("找不到这个指令，或这个指令没有帮助信息。")
+
+    @commandCallbackMethod
+    def delmsg(self, update: Update, context: CallbackContext) -> bool:
+        ...
 
     def unknown(self, update: Update, context: CallbackContext) -> False:
         return self.errorInfo("没有这一指令", True)
