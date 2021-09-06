@@ -1930,10 +1930,6 @@ class diceBot(baseBot):
 
         return self.errorInfo("找不到这个指令，或这个指令没有帮助信息。")
 
-    @commandCallbackMethod
-    def delmsg(self, update: Update, context: CallbackContext) -> bool:
-        ...
-
     def unknown(self, update: Update, context: CallbackContext) -> False:
         return self.errorInfo("没有这一指令", True)
 
