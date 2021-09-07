@@ -364,7 +364,10 @@ class adminCommand(diceBot):
             try:
                 context.bot.delete_message(
                     chat_id=chatid, message_id=lastmsgid)
-            except Exception:
+            except Exception as e:
+                if str(e).find("can't be deleted for everyone") != -1:
+                    self.errorInfo("消息删除失败，发送时间较久的消息无法删除")
+                    break
                 lastmsgid -= 1
             else:
                 delnum -= 1
@@ -493,6 +496,7 @@ class adminCommand(diceBot):
 
         self.reply(msg)
         return True
+
     def buttonswitchgamecard(self, query: CallbackQuery, args: List[str]) -> bool:
         kp = self.forcegetplayer(self.lastchat)
         cdid = int(args[1])
@@ -521,15 +525,15 @@ class adminCommand(diceBot):
         workingmethod = self.workingMethod[self.lastchat]
 
         matchdict = {
-            "switchgamecard":BUTTON_SWITCHGAMECARD
+            "switchgamecard": BUTTON_SWITCHGAMECARD
         }
 
         if args[0] not in matchdict:
             return handlePassed
-        
+
         if workingmethod != matchdict[args[0]]:
             return handleBlocked(self.queryError(query))
-        
+
         if args[0] == "switchgamecard":
             return handleBlocked(self.buttonswitchgamecard(query, args))
         return handleBlocked(False)

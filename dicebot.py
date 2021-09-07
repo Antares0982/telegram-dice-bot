@@ -1,4 +1,3 @@
-import time
 from typing import Dict, KeysView, List, Union, overload
 
 from telegram import Message
@@ -526,7 +525,7 @@ class diceBot(baseBot):
         kp.kpgames[gp.id] = gp.game
 
         kpcardcount = 0
-        kpcardptr: GameCard = None
+        kpcardptr = None
         for card in gp.game.cards.values():
             self.gamecards[card.id] = card
             card.group = gp
@@ -535,15 +534,18 @@ class diceBot(baseBot):
 
             if card.player == kp:
                 kpcardcount += 1
-                kpcardptr = card
+                kpcardptr: GameCard = card
 
         if kpcardcount == 1:
             gp.game.kpctrl = kpcardptr
             self.sendto(kp, "在游戏中只有一张卡，操作的卡片自动切换到该卡：" +
                         gp.game.kpctrl.getname())
         elif kpcardcount > 1:
-            self.sendto(
-                kp, f"NPC卡片多于1张，在需要使用NPC卡片进行对抗前，请使用指令：\n`/switchgamecard {gp.id}`")
+            self.reply(
+                kp.id,
+                f"NPC卡片多于1张，在需要使用NPC卡片进行对抗前，请使用指令：\n`/switchgamecard {gp.id}`",
+                parse_mode="MarkdownV2"
+            )
 
         gp.game.write()
 
