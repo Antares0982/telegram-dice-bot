@@ -21,6 +21,7 @@
     "block",
     "cancel",
     "stop",
+    "restart",
     "addcard",
     "createcardhelp",
     "delcard",

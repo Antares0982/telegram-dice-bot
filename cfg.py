@@ -7,7 +7,7 @@ __all__ = [
     "PROXY", "PROXY_URL", "TOKEN", "DATA_PATH", "ADMIN_ID", "IGNORE_JOB_DICT", "VERSION", "BOT_ID",
     "PATH_PLAYERS", "PATH_GROUPS", "GLOBAL_DATA_PATH", "PATH_SKILLDICT", "PATH_JOBDICT", "PATH_HANDLERS",
     "CREATE_CARD_HELP", "HELP_TEXT", "GROUP_HELP_TEXT", "PATH_CARDS", "PATH_GAME_CARDS", "PATH_MEM",
-    "blacklistdatabase"
+    "blacklistdatabase", "startcommand"
 ]
 
 PROXY: bool = False
@@ -19,7 +19,7 @@ IGNORE_JOB_DICT: bool = False
 
 
 def __cfgparse():
-    global PROXY, PROXY_URL, TOKEN, DATA_PATH, ADMIN_ID, IGNORE_JOB_DICT, blacklistdatabase
+    global PROXY, PROXY_URL, TOKEN, DATA_PATH, ADMIN_ID, IGNORE_JOB_DICT, blacklistdatabase, startcommand
     cfgparser = ConfigParser()
     cfgparser.read('config.ini')
 
@@ -35,6 +35,8 @@ def __cfgparse():
     IGNORE_JOB_DICT = cfgparser.getboolean("SETTINGS", "ignore_job_dict")
 
     blacklistdatabase = cfgparser.get("SETTINGS", "blacklistdatabase")
+
+    startcommand = cfgparser.get("SETTINGS", "startcommand")
 
 
 def __defaultcfg():

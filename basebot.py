@@ -1,10 +1,11 @@
 import json
+import multiprocessing
 import os
 import sqlite3
 import time
 import traceback
 from signal import SIGINT
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, overload
 
 from telegram import Bot, CallbackQuery, Update
 from telegram.error import BadRequest, NetworkError, TimedOut
@@ -72,6 +73,18 @@ class baseBot(object):
         else:
             self.lastuser = update.callback_query.from_user.id
             self.lastmsgid = -1
+
+    @overload
+    def reply(
+        self,
+        chat_id: int,
+        text: str,
+        reply_markup: InlineKeyboardMarkup,
+        reply_to_message_id: int,
+        parse_mode: str,
+        timeout: int
+    ) -> int:
+        ...
 
     def reply(self, *args, **kwargs) -> int:
         """调用send_message方法，回复或发送消息。
@@ -253,6 +266,17 @@ class baseBot(object):
         pid = os.getpid()
         os.kill(pid, SIGINT)
         return True
+
+    @commandCallbackMethod
+    def restart(self, update: Update, context: CallbackContext) -> bool:
+        if not isfromme(update):
+            self.reply("你没有权限")
+            return False
+
+        mp = multiprocessing.Process(target=os.system, args=(startcommand,))
+        mp.start()
+
+        self.stop.__wrapped__(self, update, context)
 
     # @commandCallbackMethod
     # def getid(self, update: Update, context: CallbackContext) -> None:
