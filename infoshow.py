@@ -1,8 +1,11 @@
-from dicebot import diceBot
-from utils import *
-from telegram.ext import CallbackContext
-from gameclass import *
 import time
+
+from telegram.ext import CallbackContext
+
+from dicebot import diceBot
+from gameclass import *
+from utils import *
+
 
 class infoShow(diceBot):
     def __init__(self) -> None:
@@ -12,7 +15,6 @@ class infoShow(diceBot):
     @commandCallbackMethod
     def showjoblist(self, update: Update, context: CallbackContext) -> None:
         """显示职业列表"""
-        
 
         if not isprivate(update):
             self.errorInfo("请在私聊中使用该指令")
@@ -47,7 +49,6 @@ class infoShow(diceBot):
         """显示当前群内的规则。
         如果想了解群规则的详情，请查阅setrule指令的帮助：
         `/help setrule`"""
-        
 
         if isprivate(update):
             return self.errorInfo("请在群内查看规则")
@@ -61,7 +62,6 @@ class infoShow(diceBot):
     @commandCallbackMethod
     def showskilllist(self, update: Update, context: CallbackContext) -> None:
         """显示技能列表"""
-        
 
         rttext = "技能：基础值\n"
         rttext += "母语：等于EDU\n"
@@ -78,7 +78,6 @@ class infoShow(diceBot):
         群聊时不可以使用该指令。
         Bot管理者使用该指令，bot将逐条显示群-KP信息、
         全部的卡信息、游戏信息。KP使用时，只会显示与TA相关的这些消息。"""
-        
 
         if isgroup(update):  # Group msg: do nothing, even sender is USER or KP
             return self.errorInfo("没有这一指令", True)

@@ -391,6 +391,7 @@ class cardCreate(diceBot):
             gp.kp = self.forcegetplayer(ADMIN_ID)
 
         return self.getnewcard(self.lastmsgid, -1, getchatid(update))
+
     def buttondiscard(self, query: CallbackQuery, args: List[str]) -> bool:
         cdid = int(args[1])
 
@@ -415,15 +416,15 @@ class cardCreate(diceBot):
         workingmethod = self.workingMethod[self.lastchat]
 
         matchdict = {
-            "discard":BUTTON_DISCARD
+            "discard": BUTTON_DISCARD
         }
 
         if args[0] not in matchdict:
             return handlePassed
-        
+
         if workingmethod != matchdict[args[0]]:
             return handleBlocked(self.queryError(query))
-        
+
         if args[0] == "discard":
             return handleBlocked(self.buttondiscard(query, args))
         return handleBlocked(False)

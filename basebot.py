@@ -191,10 +191,6 @@ class baseBot(object):
 
         return True
 
-    # def errorInfo(self, msg: str) -> False:
-    #     self.reply(text=msg)
-    #     return False
-
     def remove_job_if_exists(self, name: str) -> bool:
         """Remove job with given name. Returns whether job was removed."""
 
@@ -277,21 +273,6 @@ class baseBot(object):
         mp.start()
 
         self.stop.__wrapped__(self, update, context)
-
-    # @commandCallbackMethod
-    # def getid(self, update: Update, context: CallbackContext) -> None:
-    #     if ischannel(update):
-    #         return
-    #     if isgroup(update) and update.message.reply_to_message is not None:
-    #         self.reply(
-    #             text=f"群id：`{self.lastchat}`\n回复的消息的用户id：`{update.message.reply_to_message.from_user.id}`", parse_mode="MarkdownV2")
-    #     elif isgroup(update):
-    #         self.reply(
-    #             text=f"群id：`{self.lastchat}`\n您的id：`{self.lastuser}`", parse_mode="MarkdownV2")
-    #     elif isprivate(update):
-    #         self.reply(text=f"您的id：\n{self.lastchat}", parse_mode="MarkdownV2")
-
-    # 非指令的handlers，供重载用。如果需要定义别的类型的handlers，务必在此处创建虚函数
 
     def textHandler(self, update: Update, context: CallbackContext) -> handleStatus:
         """Override"""

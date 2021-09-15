@@ -19,7 +19,6 @@ from noncommandhandle import nonCommandHandlers
 from utils import *
 
 
-@final
 class mainBot(
     adminCommand,
     cardCreate,

@@ -1,4 +1,3 @@
-# -*- coding:utf-8 -*-
 from configparser import ConfigParser, NoOptionError, NoSectionError
 from os import getcwd, makedirs, path
 from sys import platform

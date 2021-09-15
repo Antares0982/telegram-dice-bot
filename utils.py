@@ -1,11 +1,15 @@
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar
 
 from telegram import (CallbackQuery, InlineKeyboardButton,
                       InlineKeyboardMarkup, Update)
-from typing_extensions import final
 
 from cfg import *
+
+try:
+    from typing import TYPE_CHECKING
+except ImportError:
+    TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from telegram.ext import CallbackContext
@@ -83,7 +87,6 @@ class handleStatus(object):
 handlePassed = handleStatus(True, False)
 
 
-@final
 class handleBlocked(handleStatus):
     __slots__ = []
 
@@ -94,7 +97,6 @@ class handleBlocked(handleStatus):
         return self.normal
 
 
-@final
 class commandCallbackMethod(object):
     """表示一个指令的callback函数，仅限于类的成员方法。
     调用时，会执行一次指令的前置函数。"""
@@ -135,19 +137,3 @@ class commandCallbackMethod(object):
         if self.instance is None:
             self.instance = instance
         return self
-
-# @final
-# class commandCallback(object):
-#     def __init__(self, func: Callable) -> None:
-#         wraps(func)(self)
-
-#     def __call__(self, *args, **kwargs):
-#         numOfArgs = len(args)+len(kwargs.keys())
-#         if numOfArgs != 2:
-#             raise TypeError(f"指令的callback function参数个数应为2，但接受到{numOfArgs}个")
-#         return self.__wrapped__(*args, **kwargs)
-
-#     def __get__(self, instance, cls):
-#         if instance is not None:
-#             raise TypeError("该装饰器不适用于方法")
-#         return self

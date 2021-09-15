@@ -1,7 +1,10 @@
-from dicebot import diceBot
-from utils import *
 from telegram.ext import CallbackContext
+
+from dicebot import diceBot
 from gameclass import *
+from utils import *
+
+
 class kpController(diceBot):
     def __init__(self) -> None:
         if not hasattr(self, "updater"):
@@ -11,7 +14,6 @@ class kpController(diceBot):
     def unbindkp(self, update: Update, context: CallbackContext) -> bool:
         """撤销自己的KP权限。只有当前群内KP可以使用该指令。
         在撤销KP之后的新KP会自动获取原KP的所有NPC的卡片"""
-        
 
         if isprivate(update):
             return self.errorInfo('发群消息撤销自己的KP权限')
@@ -30,7 +32,7 @@ class kpController(diceBot):
 
         kp.write()
         gp.write()
-        
+
         self.reply('KP已撤销')
 
         if self.getOP(gp.id).find("delcard") != -1:
@@ -45,7 +47,6 @@ class kpController(diceBot):
         若原KP不在群里，该指令可以替换KP。
 
         如果原KP在群里，需要先发送`/unbindkp`来撤销自己的KP，或者管理员用`/transferkp`来强制转移KP权限。"""
-        
 
         if isprivate(update):
             return self.errorInfo('发送群消息添加KP')

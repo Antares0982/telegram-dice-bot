@@ -1,14 +1,10 @@
 import time
 
 from telegram.ext import CallbackContext
-from typing_extensions import TYPE_CHECKING
 
-from dicebot import BUTTON_ADDINTSKILL, BUTTON_ADDMAINSKILL, BUTTON_ADDSGSKILL, BUTTON_CGINTSKILL, BUTTON_CGMAINSKILL, BUTTON_CHOOSEDEC, BUTTON_JOB, BUTTON_MANUAL, BUTTON_SETDEC, diceBot
+from dicebot import BUTTON_MANUAL, diceBot
 from gameclass import *
 from utils import *
-
-if TYPE_CHECKING:
-    from main_dicebot import mainBot
 
 
 class nonCommandHandlers(diceBot):
