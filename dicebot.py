@@ -1915,22 +1915,24 @@ class diceBot(baseBot):
             return True
 
         funcname = context.args[0]
+        if funcname not in allfuncs:
+            return self.errorInfo("找不到这个指令。")
+
         func = getattr(self, funcname)
+        if not func.__doc__:
+            return self.errorInfo("这个指令没有帮助信息。")
 
-        if funcname in allfuncs and func.__doc__:
-            rttext: str = func.__doc__
+        rttext: str = func.__doc__
+        ind = rttext.find("    ")
+        while ind != -1:
+            rttext = rttext[:ind]+rttext[ind+4:]
             ind = rttext.find("    ")
-            while ind != -1:
-                rttext = rttext[:ind]+rttext[ind+4:]
-                ind = rttext.find("    ")
-            try:
-                self.reply(rttext, parse_mode="MarkdownV2")
-            except Exception:
-                self.reply("Markdown格式parse错误，请联系作者检查并改写文档")
-                return False
-            return True
+        try:
+            self.reply(rttext, parse_mode="MarkdownV2")
+        except Exception:
+            return self.errorInfo("Markdown格式parse错误，请联系作者检查并改写文档")
 
-        return self.errorInfo("找不到这个指令，或这个指令没有帮助信息。")
+        return True
 
     def unknown(self, update: Update, context: CallbackContext) -> False:
         return self.errorInfo("没有这一指令", True)
