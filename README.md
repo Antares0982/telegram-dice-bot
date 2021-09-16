@@ -1,5 +1,5 @@
 # telegram-dice-bot
-tg跑团用骰子机器人，目前版本`v1.2.1`
+tg跑团用骰子机器人，目前版本`v1.2.2`
 
 如果有任何意见或修改建议请提交issue或者联系[我](https://t.me/AntaresChr)。
 
@@ -15,14 +15,37 @@ pip3 install -r requirements.txt
 
 > 第一次使用前，如果不准备更改数据文件的位置，先执行一遍`cfg.py`，这时会执行失败并退出
 
-重命名`sample_config.ini`为`config.ini`，并填入相应参数（`TOKEN`, `ADMIN_ID`）。如果有需要改变存储位置的话请手动修改参数说明如下：
+重命名`sample_config.ini`为`config.ini`，并填入相应参数（`TOKEN`, `ADMIN_ID`）。如果有需要改变存储位置的话请手动修改。参数说明如下：
 
-* 使用代理的话将`PROXY`参数设为`true`，不需要则设为`false`。使用代理时，填写相应的代理地址`PROXY_URL`。
-* `TOKEN`一项中填写你的tgbot token。
-* `DATA_PATH`填写数据文件夹的位置
-* `ADMIN_ID`填写你的telegram id。如果不知道自己的ID可以先填0，启动之后对bot发送`/getid`来获得ID，修改后重启bot。
-* `IGNORE_JOB_DICT`是否可以设置职业表以外的职业（职业表位置：`/data/jobdict.json`），如果设为`false`则只能设置职业表内的职业。
+* 使用代理的话将`proxy`参数设为`true`，不需要则设为`false`。使用代理时，填写相应的代理地址和端口`proxy_url`，socks5与http都支持。
+
+* `token`一项中填写你的tgbot token。
+
+* `data_path`填写数据文件夹的位置。
+
+* `admin_id`填写你的telegram id。如果不知道自己的ID可以先填0，启动之后对bot发送`/getid`来获得ID，修改后重启bot。
+
+* `ignore_job_dict`是否可以设置职业表以外的职业（职业表位置：`/data/jobdict.json`），如果设为`false`则只能设置职业表内的职业。
+
 * 可以在默认的`data/global`文件夹下找到职业表、技能表的JSON文件。如果有需要，可以自行添加技能和职业。
+
+* `blacklistdatabase`黑名单数据库的路径。
+
+* `startcommand`：设置启动脚本。如果不准备使用`/restart`指令，可以不管这一项。注意，该脚本必须能在成功启动bot后立即退出，否则会有两个bot进程。这一启动脚本用于在bot聊天窗口中使用`/restart`指令（从git仓库拉取并）重启bot。对于Linux用户，命令行中创建启动脚本的推荐方案如下：（注意自行修改`/path/to/dicebotFolder`，并确保原本在路径下没有`startup.sh`这一文件）
+
+  ```bash
+  cd ~
+  echo "#\!/bin/bash" > startup.sh
+  echo "cd /path/to/dicebotFolder && git pull" >> startup.sh # git pull 可选，如果不想获取到更新可以忽略'&& git pull'。有时更新新功能后会新增config项，需要手动更改才能正常运行。
+  echo "nohup python3 -O main_dicebot.py > ~/dicebot.log &" >> startup.sh
+  chmod +x startup.sh
+  ```
+
+  config中填写如下：
+
+  ```
+  startcommand = cd /home/tgbot && ./startup.sh &
+  ```
 
 然后运行`main_dicebot.py`即可。
 
@@ -173,11 +196,9 @@ KP使用`/kill`，`/mad`撕卡。`/recover`使角色从重伤状态恢复。
 
 `/bot <arg>`对bot的直接操作。
 
-`/bot check`对数据进行一次检查。如果没有发现问题，没有除了该指令执行提示之外的消息返回。
+`/stop`终止python进程，请务必用这种方式终止本bot。终止前会先进行文件写入保存数据。
 
-`/bot stop`终止python进程，请务必用这种方式终止本bot。终止前会先进行文件写入保存数据。
+`/restart`相当于`/reload`。
 
-`/bot restart`相当于`/reload`。
-
-`/bot exec (r) <code>` **请谨慎使用**。将会执行一段python代码。如果代码前有参数`r`，则代码执行的返回值会输出给用户。没有参数`r`则只会提示执行成功与否。
+`/exec (r) <code>` **请谨慎使用**。将会执行一段python代码。如果代码前有参数`r`，则代码执行的返回值会输出给用户。没有参数`r`则只会提示执行成功与否。
 

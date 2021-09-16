@@ -66,6 +66,8 @@ def __defaultcfg():
         cfgparser["SETTINGS"]["blacklistdatabase"] = getcwd() + \
             '/data/blacklist.db'
 
+    cfgparser["SETTINGS"]['startcommand'] = 'startcommand = cd /home/tgbot/dicebot && nohup python3 -O main_dicebot.py >> dicebot.log &'
+
     with open("sample_config.ini", 'w') as f:
         cfgparser.write(f)
 
