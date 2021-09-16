@@ -517,23 +517,8 @@ class adminCommand(diceBot):
         query.edit_message_text("修改操纵的npc卡成功，现在正在使用："+card.getname())
         return True
 
-    def buttonHandler(self, update: Update, context: CallbackContext) -> handleStatus:
-        query: CallbackQuery = update.callback_query
-
-        args = query.data.split(" ")
-
-        workingmethod = self.workingMethod[self.lastchat]
-
-        matchdict = {
-            "switchgamecard": BUTTON_SWITCHGAMECARD
+    @buttonQueryHandleMethod
+    def buttonHandler(self, *args, **kwargs):
+        return {
+            "switchgamecard": (BUTTON_SWITCHGAMECARD, self.buttonswitchgamecard)
         }
-
-        if args[0] not in matchdict:
-            return handlePassed
-
-        if workingmethod != matchdict[args[0]]:
-            return handleBlocked(self.queryError(query))
-
-        if args[0] == "switchgamecard":
-            return handleBlocked(self.buttonswitchgamecard(query, args))
-        return handleBlocked(False)

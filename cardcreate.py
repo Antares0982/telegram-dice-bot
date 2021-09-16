@@ -408,23 +408,8 @@ class cardCreate(diceBot):
         query.edit_message_text(f"删除了：{card.getname()}。\n该删除操作不可逆。")
         return True
 
-    def buttonHandler(self, update: Update, context: CallbackContext) -> handleStatus:
-        query: CallbackQuery = update.callback_query
-
-        args = query.data.split(" ")
-
-        workingmethod = self.workingMethod[self.lastchat]
-
-        matchdict = {
-            "discard": BUTTON_DISCARD
+    @buttonQueryHandleMethod
+    def buttonHandler(self, *args, **kwargs):
+        return {
+            "discard": (BUTTON_DISCARD, self.buttondiscard)
         }
-
-        if args[0] not in matchdict:
-            return handlePassed
-
-        if workingmethod != matchdict[args[0]]:
-            return handleBlocked(self.queryError(query))
-
-        if args[0] == "discard":
-            return handleBlocked(self.buttondiscard(query, args))
-        return handleBlocked(False)

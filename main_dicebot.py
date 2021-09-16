@@ -104,8 +104,8 @@ class mainBot(
         if any(x in self.blacklist for x in (self.lastuser, self.lastchat)):
             return self.queryError(update.callback_query)
 
-        if self.lastchat not in self.workingMethod or self.workingMethod[self.lastchat] == "":
-            return False
+        if self.lastchat not in self.workingMethod or not self.workingMethod[self.lastchat]:
+            return self.queryError(update.callback_query)
 
         if update.callback_query.data == "None" or isgroup(update):
             return False

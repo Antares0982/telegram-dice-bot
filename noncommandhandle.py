@@ -261,27 +261,29 @@ class nonCommandHandlers(diceBot):
             return handleBlocked(self.textstartgame(update))
         return handleBlocked(False)
 
-    def buttonHandler(self, update: Update, context: CallbackContext) -> handleStatus:
-        query: CallbackQuery = update.callback_query
-
-        args = query.data.split(" ")
-
-        workingmethod = self.workingMethod[self.lastchat]
-
-        matchdict = {
-            "manual": BUTTON_MANUAL
+    @buttonQueryHandleMethod
+    def buttonHandler(self, *args, **kwargs):
+        return {
+            "manual": (BUTTON_MANUAL, self.buttonmanual)
         }
+        # query: CallbackQuery = update.callback_query
 
-        if args[0] not in matchdict:
-            return handlePassed
+        # args = query.data.split(" ")
 
-        if workingmethod != matchdict[args[0]]:
-            return handleBlocked(self.queryError(query))
+        # workingmethod = self.workingMethod[self.lastchat]
 
-        if args[0] == "manual":
-            return handleBlocked(self.buttonmanual(query, args))
-        # HIT BAD TRAP
-        return handleBlocked(False)
+        # matchdict = {
+        #     "manual": BUTTON_MANUAL
+        # }
+
+        # if args[0] not in matchdict:
+        #     return handlePassed
+
+        # if workingmethod != matchdict[args[0]]:
+        #     return handleBlocked(self.queryError(query))
+
+        # if args[0] == "manual":
+        #     return handleBlocked(self.buttonmanual(query, args))
 
     def chatmigrate(self, oldchat: int, newchat: int):
         self.groupmigrate(oldchat, newchat)

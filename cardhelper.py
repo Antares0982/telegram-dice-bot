@@ -750,6 +750,7 @@ class cardHelper(diceBot):
             if game.kp != pl:
                 return self.errorInfo("你不是该卡对应群的kp")
             game.kpctrl = card
+            self.reply("切换成功")
             game.write()
             return True
 
@@ -1098,6 +1099,7 @@ class cardHelper(diceBot):
         return True
 
     def buttonHandler(self, update: Update, context: CallbackContext) -> handleStatus:
+        # TODO(Antares): try to use @buttonQueryHandleMethod decorate this
         query: CallbackQuery = update.callback_query
 
         args = query.data.split(" ")
