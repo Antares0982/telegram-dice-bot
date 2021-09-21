@@ -141,7 +141,7 @@ class commandCallbackMethod(object):
 
 class buttonQueryHandleMethod(object):
     """
-    用于相应按钮请求分发的装饰器。
+    用于响应按钮请求分发的装饰器。
     被装饰的方法必须通过`class.buttonHandler(self, ...)`的方式调用，并且只返回`matchdict`.
     `matchdict`结构如下：
         `key:(workingmethod, dispatched_method)`
