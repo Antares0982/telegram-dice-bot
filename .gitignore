@@ -9,6 +9,7 @@ data/players/*
 data/groups/*
 data/textmem/*
 data/*
+data/global/handlers.json
 .*
 !.gitignore
 old*
