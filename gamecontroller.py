@@ -10,13 +10,34 @@ class gameController(diceBot):
         if not hasattr(self, "updater"):
             diceBot.__init__(self)
 
+    def checkstart(self, gp: Group) -> bool:
+        if len(gp.cards) == 0:
+            return self.errorInfo("本群没有任何卡片，无法开始游戏")
+
+        canstart = True
+        for card in gp.cards.values():
+            card.generateOtherAttributes()
+            if card.type != PLTYPE:
+                continue
+            ck = card.check()
+            if ck != "":
+                canstart = False
+                self.reply(ck)
+
+        return canstart
+
+    @commandCallbackMethod
+    def gamecheck(self, update: Update, context: CallbackContext) -> bool:
+        gp = self.forcegetgroup(update)
+        return self.checkstart(gp)
+
     @commandCallbackMethod
     def startgame(self, update: Update, context: CallbackContext) -> bool:
         """开始一场游戏。
 
         这一指令将拷贝本群内所有卡，之后将用拷贝的卡片副本进行游戏，修改属性将不会影响到游戏外的原卡属性。
         如果要正常结束游戏，使用`/endgame`可以将游戏的角色卡数据覆写到原本的数据上。
-        如果要放弃这些游戏内进行的修改，使用`/abortgame`会直接删除这些副本副本。
+        如果要放弃这些游戏内进行的修改，使用`/abortgame`会直接删除这些副本。
         `/startgame`：正常地开始游戏，对所有玩家的卡片（type为PL）进行卡片检查。
         `/startgame ignore`跳过开始游戏的检查，直接开始游戏。
 
@@ -37,25 +58,22 @@ class gameController(diceBot):
 
         # 开始验证
         if not(len(context.args) > 0 and context.args[0] == "ignore"):
-            if len(gp.cards) == 0:
-                return self.errorInfo("本群没有任何卡片，无法开始游戏")
-            canstart = True
-            for card in gp.cards.values():
-                card.generateOtherAttributes()
-                if card.type != PLTYPE:
-                    continue
-                ck = card.check()
-                if ck != "":
-                    canstart = False
-                    self.reply(ck)
-
-            if not canstart:
+            if not self.checkstart(gp):
                 return False
 
         self.reply(
-            "准备开始游戏，是否需要记录聊天文本？如果需要记录文本，请回复'记录'。回复'cancel'或者'取消'来取消游戏。")
+            "准备开始游戏，是否需要记录聊天文本？如果需要记录文本，请回复'记录'，否则不会记录文本。\n\
+            回复'cancel'或者'取消'来取消游戏。"
+        )
         self.addOP(gp.id, "startgame")
         return True
+
+    def sendmem(self, game: GroupGame, update: Update):
+        mempath = game.memfile
+        if mempath != "":
+            with open(PATH_MEM+mempath, 'r', encoding='utf-8') as f:
+                update.message.reply_document(
+                    f, filename=game.group.getname()+".txt", timeout=120)
 
     @commandCallbackMethod
     def abortgame(self, update: Update, context: CallbackContext) -> bool:
@@ -71,11 +89,7 @@ class gameController(diceBot):
 
         game = gp.game if gp.game is not None else gp.pausedgame
         if game is not None:
-            mempath = game.memfile
-            if mempath != "":
-                with open(PATH_MEM+mempath, 'r', encoding='utf-8') as f:
-                    update.message.reply_document(
-                        f, filename=gp.getname()+".txt", timeout=120)
+            self.sendmem(game, update)
 
         if self.gamepop(gp) is None:
             return self.errorInfo("没有找到游戏", True)
@@ -129,14 +143,9 @@ class gameController(diceBot):
         if game is None:
             return self.errorInfo("没找到进行中的游戏。")
 
-        mempath = game.memfile
-
         self.atgameending(game)
 
-        if mempath != "":
-            with open(PATH_MEM+mempath, 'r', encoding='utf-8') as f:
-                update.message.reply_document(
-                    f, filename=gp.getname()+".txt", timeout=120)
+        self.sendmem(game, update)
 
         self.reply("游戏结束！")
         return True
@@ -165,7 +174,7 @@ class gameController(diceBot):
             assert(outcard is not None)
             card.info.name = outcard.info.name
             card.info.sex = outcard.info.sex
-            card.item = copy.copy(outcard.item)
+            card.item = outcard.item.copy()
             card.assets = outcard.assets
             card.background = CardBackground(d=outcard.background.to_json())
 

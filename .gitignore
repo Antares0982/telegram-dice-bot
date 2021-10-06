@@ -8,11 +8,11 @@ data/cards/game/*.json
 data/players/*
 data/groups/*
 data/textmem/*
+data/*
 .*
 !.gitignore
 old*
 nohup*
-sqlite.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

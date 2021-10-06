@@ -786,7 +786,7 @@ class cardHelper(diceBot):
         # 交给按钮来完成
         return True
 
-    def buttonaddmainskill(self, query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
+    def buttonaddmainskill(self, query: CallbackQuery, args: List[str], card1: GameCard) -> bool:
 
         if card1 is None:
             return self.errorHandlerQ(query, "找不到卡。")
@@ -811,7 +811,7 @@ class cardHelper(diceBot):
         self.workingMethod[self.lastchat] = BUTTON_ADDMAINSKILL
         return True
 
-    def buttoncgmainskill(self, query: CallbackQuery,  card1: GameCard, args: List[str]) -> bool:
+    def buttoncgmainskill(self, query: CallbackQuery, args: List[str], card1: GameCard) -> bool:
         if card1 is None:
             return self.errorHandlerQ(query, "找不到卡。")
 
@@ -835,7 +835,7 @@ class cardHelper(diceBot):
         self.workingMethod[self.lastchat] = BUTTON_CGMAINSKILL
         return True
 
-    def buttonaddsgskill(self, query: CallbackQuery,  card1: Optional[GameCard], args: List[str]) -> bool:
+    def buttonaddsgskill(self, query: CallbackQuery,  args: List[str], card1: Optional[GameCard]) -> bool:
         if not card1:
             return self.errorHandlerQ(query, "找不到卡。")
         if len(args) == 3:
@@ -859,7 +859,7 @@ class cardHelper(diceBot):
         self.workingMethod[self.lastchat] = BUTTON_ADDSGSKILL
         return True
 
-    def buttonaddintskill(self, query: CallbackQuery,  card1: Optional[GameCard], args: List[str]) -> bool:
+    def buttonaddintskill(self, query: CallbackQuery,  args: List[str], card1: Optional[GameCard]) -> bool:
         """响应KeyboardButton的addintskill请求。
 
         因为使用的是能翻页的列表，所以有可能位置1的参数是`page`，
@@ -896,7 +896,7 @@ class cardHelper(diceBot):
         self.workingMethod[self.lastchat] = BUTTON_ADDINTSKILL
         return True
 
-    def buttoncgintskill(self, query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
+    def buttoncgintskill(self, query: CallbackQuery, args: List[str], card1: Optional[GameCard]) -> bool:
         if not card1:
             return self.errorHandlerQ(query, "找不到卡。")
         if len(args) == 3:
@@ -919,7 +919,7 @@ class cardHelper(diceBot):
         self.workingMethod[self.lastchat] = BUTTON_CGINTSKILL
         return True
 
-    def buttonjob(self, query: CallbackQuery, card1: GameCard, args: List[str]) -> bool:
+    def buttonjob(self, query: CallbackQuery, args: List[str], card1: GameCard) -> bool:
         jobname = args[1]
         if len(args) == 2:
             # 切换至显示职业详情
@@ -976,7 +976,7 @@ class cardHelper(diceBot):
         card1.group.write()
         return True
 
-    def buttonchoosedec(self, query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
+    def buttonchoosedec(self, query: CallbackQuery, args: List[str], card1: Optional[GameCard]) -> bool:
         if not card1:
             return self.errorHandlerQ(query, "找不到卡。")
 
@@ -1008,7 +1008,7 @@ class cardHelper(diceBot):
         self.workingMethod[self.lastchat] = BUTTON_SETDEC
         return True
 
-    def buttonsetdec(self, query: CallbackQuery, card1: Optional[GameCard], args: List[str]) -> bool:
+    def buttonsetdec(self, query: CallbackQuery, args: List[str], card1: Optional[GameCard]) -> bool:
         if not card1:
             return self.errorHandlerQ(query, "找不到卡。")
 
@@ -1098,58 +1098,27 @@ class cardHelper(diceBot):
         query.edit_message_text(rttext)
         return True
 
-    def buttonHandler(self, update: Update, context: CallbackContext) -> handleStatus:
+    @buttonQueryHandleMethod
+    def buttonHandler(self, *args, **kwargs) -> handleStatus:
         # TODO(Antares): try to use @buttonQueryHandleMethod decorate this
-        query: CallbackQuery = update.callback_query
-
-        args = query.data.split(" ")
-
-        workingmethod = self.workingMethod[self.lastchat]
-
-        if args[0] != "choosedec" and args[0].find("dec") != -1 and workingmethod != BUTTON_SETDEC:
-            return handleBlocked(self.errorHandlerQ(query, "该请求已经过期，请点击 /choosedec 重新进行操作。"))
-
-        if args[0] == "choosedec" or args[0].find("dec") == -1:
-            matchdict = {
-                "addmainskill": BUTTON_ADDMAINSKILL,
-                "cgmainskill": BUTTON_CGMAINSKILL,
-                "addsgskill": BUTTON_ADDSGSKILL,
-                "addintskill": BUTTON_ADDINTSKILL,
-                "cgintskill": BUTTON_CGINTSKILL,
-                "job": BUTTON_JOB,
-                "choosedec": BUTTON_CHOOSEDEC,
-                "switch": BUTTON_SWITCH,
-                "setsex": BUTTON_SETSEX
-            }
-            if args[0] not in matchdict:
-                return handlePassed
-
-            if workingmethod != matchdict[args[0]]:
-                return handleBlocked(self.queryError(query))
-
         pl = self.forcegetplayer(self.lastuser)
         card1 = pl.controlling
-
-        # receive types: job, skill, sgskill, intskill, cgskill, addmainskill, addintskill, addsgskill
-
-        if args[0] == "addmainskill":
-            return handleBlocked(self.buttonaddmainskill(query, card1, args))
-        if args[0] == "cgmainskill":
-            return handleBlocked(self.buttoncgmainskill(query, card1, args))
-        if args[0] == "addsgskill":
-            return handleBlocked(self.buttonaddsgskill(query, card1, args))
-        if args[0] == "addintskill":
-            return handleBlocked(self.buttonaddintskill(query, card1, args))
-        if args[0] == "cgintskill":
-            return handleBlocked(self.buttoncgintskill(query, card1, args))
-        if args[0] == "job":  # Job in buttons must be classical
-            return handleBlocked(self.buttonjob(query, card1, args))
-        if args[0] == "choosedec":
-            return handleBlocked(self.buttonchoosedec(query, card1, args))
-        if args[0] != "choosedec" and args[0].find("dec") != -1:
-            return handleBlocked(self.buttonsetdec(query, card1, args))
-        if args[0] == "switch":
-            return handleBlocked(self.buttonswitch(query, args))
-        if args[0] == "setsex":
-            return handleBlocked(self.buttonsetsex(query, args))
-        return handleBlocked(False)
+        matchdict = {
+            "addmainskill": (BUTTON_ADDMAINSKILL, self.buttonaddmainskill, (card1,)),
+            "cgmainskill": (BUTTON_CGMAINSKILL, self.buttoncgmainskill, (card1,)),
+            "addsgskill": (BUTTON_ADDSGSKILL, self.buttonaddsgskill, (card1,)),
+            "addintskill": (BUTTON_ADDINTSKILL, self.buttonaddintskill, (card1,)),
+            "cgintskill": (BUTTON_CGINTSKILL, self.buttoncgintskill, (card1,)),
+            "job": (BUTTON_JOB, self.buttonjob, (card1,)),
+            "choosedec": (BUTTON_CHOOSEDEC, self.buttonchoosedec, (card1,)),
+            "switch": (BUTTON_SWITCH, self.buttonswitch),
+            "setsex": (BUTTON_SETSEX, self.buttonsetsex)
+        }
+        for x in CardData.alldatanames:
+            matchdict[x+"dec"] = (
+                BUTTON_SETDEC,
+                self.buttonsetdec,
+                (card1,),
+                "该请求已经过期，请点击 /choosedec 重新进行操作。"
+            )
+        return matchdict

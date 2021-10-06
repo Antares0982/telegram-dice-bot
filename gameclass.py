@@ -1053,6 +1053,10 @@ class Group(datatype):
 
 
 class CardData(datatype):
+    datanames = ["STR", "SIZ", "CON", "DEX", "POW", "APP", "INT", "EDU"]
+    alldatanames = ["STR", "SIZ", "CON", "DEX",
+                    "POW", "APP", "INT", "EDU", "LUCK"]
+
     def __init__(self, d: dict = {}):
         self.STR: int = 0
         self.SIZ: int = 0
@@ -1065,11 +1069,6 @@ class CardData(datatype):
         self.LUCK: int = 0
         self.TOTAL: int = 0
         self.datainfo: str = ""
-        self.datanames: List[str] = ["STR", "SIZ", "CON",
-                                     "DEX", "POW", "APP", "INT", "EDU"]
-        self.alldatanames: List[str] = copy.copy(
-            self.datanames)
-        self.alldatanames.append("LUCK")
         self.datadec: Optional[Tuple[str, int]] = None
         self.card: GameCard = None  # 用cardConstruct()赋值
         if len(d) == 0:

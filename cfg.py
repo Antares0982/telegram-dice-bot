@@ -112,6 +112,9 @@ if not path.exists(PATH_PLAYERS):
     makedirs(PATH_PLAYERS)
 if not path.exists(PATH_MEM):
     makedirs(PATH_MEM)
+if not path.exists(blacklistdatabase):
+    import dicesql
+    dicesql.createBlacklist(blacklistdatabase)
 
 PATH_SKILLDICT = GLOBAL_DATA_PATH+r'skilldict.json'
 PATH_JOBDICT = GLOBAL_DATA_PATH+r'jobdict.json'
