@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar
 from telegram import (CallbackQuery, InlineKeyboardButton,
                       InlineKeyboardMarkup, Update)
 
-from cfg import *
+from errorchecker import *
 
 try:
     from typing import TYPE_CHECKING
@@ -59,14 +59,6 @@ def getmsgid(update: Update) -> int:
     return update.message.message_id
 
 
-def isprivate(update: Update) -> bool:
-    return update.effective_chat.type == "private"
-
-
-def isgroup(update: Update) -> bool:
-    return update.effective_chat.type.find("group") != -1
-
-
 def ischannel(update: Update) -> bool:
     return update.effective_chat.type == "channel"
 
@@ -106,7 +98,7 @@ class commandCallbackMethod(object):
         wraps(func)(self)
         self.instance: 'diceBot' = None
 
-    def __call__(self, *args, **kwargs):
+    def prechecker(self, *args, **kwargs) -> bool:
         numOfArgs = len(args)+len(kwargs.keys())
         if numOfArgs != 2:
             raise RuntimeError(
@@ -121,6 +113,11 @@ class commandCallbackMethod(object):
         inst = self.instance
         if any(x in inst.blacklist for x in (inst.lastchat, inst.lastuser)):
             inst.errorInfo("你在黑名单中，无法使用任何功能")
+            return False
+        return True
+
+    def __call__(self, *args, **kwargs):
+        if not self.prechecker(*args, **kwargs):
             return
 
         return self.__wrapped__(self.instance, *args, **kwargs)
@@ -138,6 +135,23 @@ class commandCallbackMethod(object):
         if self.instance is None:
             self.instance = instance
         return self
+
+
+class commandCallbackMethodWithErrorDispatch(commandCallbackMethod):
+    def __init__(
+        self,
+        func: Callable[[Any, Update, 'CallbackContext'], _RT],
+        errorDispatchDict: Dict[str, Any]
+    ) -> None:
+        super().__init__(func)
+        self.errorDispatcher = errorDispatchDict
+
+    def __call__(self, *args, **kwargs):
+        return super().__call__(*args, **kwargs)
+
+
+def commandErrorDispatch(d: Dict[str, Any]) -> Callable:
+    return lambda x: commandCallbackMethodWithErrorDispatch(x, d)
 
 
 class buttonQueryHandleMethod(object):
@@ -216,48 +230,48 @@ class buttonQueryHandleMethod(object):
         return handleBlocked(utilfunc(query, args, *orderArgs))
 
 
-class diceDataTask(object):
-    """
-    表示一个dicebot任务，用于自动化管理数据。
-    将task和相应的arguments传入，执行后再对数据进行读、写、删除操作。
-    """
-    # flags
-    DONOTHING = 0
-    READ = 1
-    WRITE = 2
-    REMOVE = 3
+# class diceDataTask(object):
+#     """
+#     表示一个dicebot任务，用于自动化管理数据。
+#     将task和相应的arguments传入，执行后再对数据进行读、写、删除操作。
+#     """
+#     # flags
+#     DONOTHING = 0
+#     READ = 1
+#     WRITE = 2
+#     REMOVE = 3
 
-    def __init__(
-            self,
-            tasks: Tuple[Callable[[Any], bool]],
-            args: Tuple[tuple],
-            afterwardTaskTarget: List['datatype'],
-            signals: List[int]) -> None:
-        if len(tasks) != len(args):
-            raise ValueError("任务个数和argument个数不一致")
-        if len(afterwardTaskTarget) != len(signals):
-            raise ValueError("执行后目标个数和signal个数不一致")
-        self.tasks = tasks
-        self.args = args
-        self.afterTarget = afterwardTaskTarget
-        self.signals = signals
+#     def __init__(
+#             self,
+#             tasks: Tuple[Callable[[Any], bool]],
+#             args: Tuple[tuple],
+#             afterwardTaskTarget: List['datatype'],
+#             signals: List[int]) -> None:
+#         if len(tasks) != len(args):
+#             raise ValueError("任务个数和argument个数不一致")
+#         if len(afterwardTaskTarget) != len(signals):
+#             raise ValueError("执行后目标个数和signal个数不一致")
+#         self.tasks = tasks
+#         self.args = args
+#         self.afterTarget = afterwardTaskTarget
+#         self.signals = signals
 
-    def run(self):
-        for i in range(len(self.tasks)):
-            ans = self.tasks[i](*self.args[i])
-            if not ans:
-                return False
+#     def run(self):
+#         for i in range(len(self.tasks)):
+#             ans = self.tasks[i](*self.args[i])
+#             if not ans:
+#                 return False
 
-        for i in range(len(self.afterTarget)):
-            sig = self.signals[i]
-            if not sig:
-                continue
-            if sig == self.READ:
-                self.afterTarget[i].read()  # TODO(Antares): To be implemented
-            elif sig == self.WRITE:
-                self.afterTarget[i].write()
-            elif sig == self.REMOVE:
-                self.afterTarget[i].delete()
-            else:
-                raise ValueError("无效的信号值")
-        return True
+#         for i in range(len(self.afterTarget)):
+#             sig = self.signals[i]
+#             if not sig:
+#                 continue
+#             if sig == self.READ:
+#                 self.afterTarget[i].read()  # TODO(Antares): To be implemented
+#             elif sig == self.WRITE:
+#                 self.afterTarget[i].write()
+#             elif sig == self.REMOVE:
+#                 self.afterTarget[i].delete()
+#             else:
+#                 raise ValueError("无效的信号值")
+#         return True

@@ -313,6 +313,9 @@ class diceBot(baseBot):
                 return True
         return False
 
+    def isbotadmin(self, chatid: int) -> bool:
+        return self.isadmin(chatid, BOT_ID)
+
     def findcard(self, plid: int) -> Optional[GameCard]:
         """输入一个player的id，返回该player当前选择中的卡"""
         pl = self.getplayer(plid)

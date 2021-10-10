@@ -230,7 +230,7 @@ class adminCommand(diceBot):
         rppl = self.getreplyplayer(update)
         if rppl is None:
             if len(context.args) == 0:
-                return self.errorInfo("使用回复或@username指定恢复者")
+                return self.errorInfo("使用回复或@username指定对象")
             if not isint(context.args[0]) or int(context.args[0]) < 0:
                 return self.errorInfo("参数无效", True)
 

@@ -137,7 +137,7 @@ class cardCreate(diceBot):
 
     @commandCallbackMethod
     def createcardhelp(self, update: Update, context: CallbackContext) -> None:
-
+        """发送车卡帮助。"""
         self.reply(CREATE_CARD_HELP, parse_mode="MarkdownV2")
 
     @commandCallbackMethod
