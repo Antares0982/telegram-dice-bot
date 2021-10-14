@@ -1,10 +1,14 @@
 import time
+from typing import Dict
 
+from telegram import Update
 from telegram.ext import CallbackContext
 
+from cfg import ADMIN_ID
 from dicebot import diceBot
-from gameclass import *
-from utils import *
+from diceconstants import BOTADMIN, GROUPKP
+from errorchecker import isgroup, isprivate
+from utils import commandCallbackMethod
 
 
 class infoShow(diceBot):

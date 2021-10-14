@@ -1,10 +1,9 @@
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar
 
-from telegram import (CallbackQuery, InlineKeyboardButton,
-                      InlineKeyboardMarkup, Update)
+from telegram import CallbackQuery, Update
 
-from errorchecker import *
+from cfg import ADMIN_ID
 
 try:
     from typing import TYPE_CHECKING
@@ -19,24 +18,6 @@ if TYPE_CHECKING:
 
 _RT = TypeVar('_RT')
 # FLAGS
-
-CANREAD = 1
-OWNCARD = 2
-CANSETINFO = 4
-CANDISCARD = 8
-CANMODIFY = 16
-
-INGROUP = 1
-GROUPKP = 2
-GROUPADMIN = 4
-BOTADMIN = 8
-
-STATUS_DEAD = "dead"
-STATUS_ALIVE = "alive"
-STATUS_SERIOUSLYWOUNDED = "seriously wounded"
-STATUS_NEARDEATH = "near-death"
-STATUS_TEMPSTABLE = "temporarily stable"
-STATUS_PERMANENTINSANE = "permanently insane"
 
 
 def isfromme(update: Update) -> bool:

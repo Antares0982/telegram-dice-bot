@@ -1,10 +1,15 @@
 import time
+from typing import List, Optional
 
+from telegram import Update
 from telegram.ext import CallbackContext
 
 from dicebot import diceBot
-from gameclass import *
-from utils import *
+from diceconstants import CANREAD, PLTYPE
+from dicefunc import isint
+from errorchecker import isgroup, isprivate
+from gameclass import GameCard, Group
+from utils import commandCallbackMethod
 
 
 class cardShowBot(diceBot):

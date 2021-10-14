@@ -2,7 +2,6 @@ from typing import Any, Dict, Optional
 
 from telegram import Update
 
-from cfg import *
 
 # Update相关
 

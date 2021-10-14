@@ -1,8 +1,12 @@
+from telegram import Update
 from telegram.ext import CallbackContext
 
+from cfg import PATH_MEM
 from dicebot import diceBot
-from gameclass import *
-from utils import *
+from diceconstants import PLTYPE
+from errorchecker import isgroup, isprivate
+from gameclass import CardBackground, GameCard, Group, GroupGame
+from utils import commandCallbackMethod
 
 
 class gameController(diceBot):

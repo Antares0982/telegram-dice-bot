@@ -1,8 +1,19 @@
+from typing import Dict, List, Optional
+
+from telegram import (CallbackQuery, InlineKeyboardButton,
+                      InlineKeyboardMarkup, Update)
 from telegram.ext import CallbackContext
 
-from dicebot import BUTTON_SWITCHGAMECARD, diceBot
-from gameclass import *
-from utils import *
+from cfg import ADMIN_ID, BOT_ID
+from dicebot import diceBot
+from diceconstants import (BUTTON_SWITCHGAMECARD, GROUPADMIN, GROUPKP,
+                           STATUS_ALIVE, STATUS_DEAD, STATUS_NEARDEATH,
+                           STATUS_PERMANENTINSANE, STATUS_SERIOUSLYWOUNDED)
+from dicefunc import dicecalculator, isint
+from errorchecker import isgroup, isprivate
+from gameclass import GameCard, GroupGame
+from utils import (buttonQueryHandleMethod, commandCallbackMethod,
+                   commandErrorDispatch, getchatid)
 
 
 class adminCommand(diceBot):
@@ -45,6 +56,10 @@ class adminCommand(diceBot):
         oldgp.write()
 
         return True
+
+    # @commandErrorDispatch()
+    # def _copygroup(self, update: Update, context: CallbackContext) -> bool:
+    #     ...
 
     @commandCallbackMethod
     def copygroup(self, update: Update, context: CallbackContext) -> bool:

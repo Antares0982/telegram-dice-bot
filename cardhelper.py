@@ -1,12 +1,21 @@
+from typing import List, Optional
+
+from telegram import (CallbackQuery, InlineKeyboardButton,
+                      InlineKeyboardMarkup, Update)
 from telegram.ext import CallbackContext
 
-from dicebot import (BUTTON_ADDINTSKILL, BUTTON_ADDMAINSKILL,
-                     BUTTON_ADDSGSKILL, BUTTON_CGINTSKILL, BUTTON_CGMAINSKILL,
-                     BUTTON_CHOOSEDEC, BUTTON_JOB, BUTTON_SETDEC,
-                     BUTTON_SETSEX, BUTTON_SWITCH, BUTTON_SWITCHGAMECARD,
-                     diceBot)
-from gameclass import *
-from utils import *
+from cfg import ADMIN_ID, IGNORE_JOB_DICT
+from dicebot import diceBot
+from diceconstants import (BUTTON_ADDINTSKILL, BUTTON_ADDMAINSKILL,
+                           BUTTON_ADDSGSKILL, BUTTON_CGINTSKILL,
+                           BUTTON_CGMAINSKILL, BUTTON_CHOOSEDEC, BUTTON_JOB,
+                           BUTTON_SETDEC, BUTTON_SETSEX, BUTTON_SWITCH,
+                           BUTTON_SWITCHGAMECARD, CANMODIFY, OWNCARD)
+from dicefunc import isint
+from errorchecker import isgroup, isprivate
+from gameclass import CardData, GameCard, GroupGame, Player
+from utils import (buttonQueryHandleMethod, commandCallbackMethod, getchatid,
+                   handleStatus)
 
 
 class cardHelper(diceBot):

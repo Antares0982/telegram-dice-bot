@@ -7,12 +7,16 @@ import traceback
 from signal import SIGINT
 from typing import Dict, List, Optional, overload
 
-from telegram import Bot, CallbackQuery, Update
+from telegram import Bot, CallbackQuery, InlineKeyboardMarkup, Update
 from telegram.error import BadRequest, NetworkError, TimedOut
 from telegram.ext import (CallbackContext, CallbackQueryHandler,
                           CommandHandler, Filters, MessageHandler, Updater)
 
-from utils import *
+from basicfunc import getchatid, ischannel
+from cfg import (ADMIN_ID, PATH_HANDLERS, PROXY, PROXY_URL, TOKEN,
+                 blacklistdatabase, startcommand)
+from utils import (commandCallbackMethod, getfromid, getmsgid, handlePassed,
+                   handleStatus, isfromme)
 
 
 class baseBot(object):

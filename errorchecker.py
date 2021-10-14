@@ -1,5 +1,5 @@
-from cfg import *
-from dicefunc import *
+from cfg import ADMIN_ID
+from dicefunc import isint
 
 try:
     from typing import TYPE_CHECKING

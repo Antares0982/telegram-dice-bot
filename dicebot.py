@@ -1,26 +1,27 @@
-from typing import Dict, KeysView, List, Union, overload
+import json
+import os
+from typing import Dict, KeysView, List, Optional, Tuple, Union, overload
 
-from telegram import Message
+from telegram import (CallbackQuery, InlineKeyboardButton,
+                      InlineKeyboardMarkup, Message, Update)
 from telegram.error import BadRequest, ChatMigrated, Unauthorized
 from telegram.ext import CallbackContext
 
 from basebot import baseBot
-from gameclass import *
-from utils import *
+from basicfunc import getmsgfromid, plainNewCard
+from cfg import (ADMIN_ID, BOT_ID, GROUP_HELP_TEXT, HELP_TEXT, PATH_CARDS,
+                 PATH_GAME_CARDS, PATH_GROUPS, PATH_HANDLERS, PATH_JOBDICT,
+                 PATH_PLAYERS, PATH_SKILLDICT)
+from diceconstants import (BOTADMIN, BUTTON_ADDINTSKILL, BUTTON_ADDSGSKILL,
+                           BUTTON_CGMAINSKILL, BUTTON_CHOOSEDEC, BUTTON_MANUAL,
+                           BUTTON_SETDEC, CANDISCARD, CANMODIFY, CANREAD,
+                           CANSETINFO, GROUPADMIN, GROUPKP, INGROUP, OWNCARD)
+from dicefunc import isint
+from errorchecker import isgroup, isprivate
+from gameclass import GameCard, Group, GroupGame, Player
+from utils import commandCallbackMethod, getchatid
 
-BUTTON_JOB = "b_job"
-BUTTON_ADDMAINSKILL = "b_ams"
-BUTTON_CGMAINSKILL = "b_cgms"
-BUTTON_ADDSGSKILL = "b_ass"
-BUTTON_ADDINTSKILL = "b_ais"
-BUTTON_CGINTSKILL = "b_cgis"
-BUTTON_CHOOSEDEC = "b_cdec"
-BUTTON_SETDEC = "b_sdec"
-BUTTON_DISCARD = "b_dcd"
-BUTTON_SWITCH = "b_swh"
-BUTTON_SWITCHGAMECARD = "b_swhgc"
-BUTTON_SETSEX = "b_ssx"
-BUTTON_MANUAL = "b_mnl"
+from basicfunc import isgroupmsg, isprivatemsg
 
 
 class diceBot(baseBot):

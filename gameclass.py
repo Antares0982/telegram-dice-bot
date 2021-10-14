@@ -4,23 +4,24 @@ import os
 from inspect import isfunction
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
+import numpy as np
 from telegram import Chat
 from telegram.ext.updater import Updater
 
-from basicfunc import *
-from cfg import *
-from dicefunc import *
+from basicfunc import (isallkeyint, isconsttype, istrueconsttype, tobool,
+                       turnkeyint)
+from cfg import (PATH_CARDS, PATH_GAME_CARDS, PATH_GROUPS, PATH_PLAYERS,
+                 PATH_SKILLDICT)
+from dicefunc import dicemdn, get2d6_6str, get3d6str, isint
 
-__all__ = [
-    "GameCard", "Player", "GroupGame", "GroupRule", "Group", "CardData",
-    "CardStatus", "CardInfo", "Skill", "SgSkill", "CardAttr", "CardBackground",
-    "Tuple", "Optional", "os", "json", "isint", "isprivatemsg", "isgroupmsg",
-    "getmsgfromid", "plainNewCard", "commondice", "dicemdn", "isadicename",
-    "List", "dicecalculator", "Dict", "templateNewCard", "findattrindict", "PLTYPE", "copy"
-]
+# __all__ = [
+#     "GameCard", "Player", "GroupGame", "GroupRule", "Group", "CardData",
+#     "CardStatus", "CardInfo", "Skill", "SgSkill", "CardAttr", "CardBackground",
+#     "Tuple", "Optional", "os", "json", "isint", "isprivatemsg", "isgroupmsg",
+#     "getmsgfromid", "plainNewCard", "commondice", "dicemdn", "isadicename",
+#     "List", "dicecalculator", "Dict", "templateNewCard", "findattrindict", "PLTYPE", "copy"
+# ]
 
-PLTYPE = "PL"
-NPCTYPE = "NPC"
 
 skl: Dict[str, int]
 

@@ -1,8 +1,17 @@
+from typing import List, Optional
+
+from telegram import (CallbackQuery, InlineKeyboardButton,
+                      InlineKeyboardMarkup, Update)
 from telegram.ext import CallbackContext
 
-from dicebot import BUTTON_DISCARD, diceBot
-from gameclass import *
-from utils import *
+from basicfunc import findattrindict, getchatid, templateNewCard
+from cfg import ADMIN_ID, CREATE_CARD_HELP
+from dicebot import diceBot
+from diceconstants import BUTTON_DISCARD, CANDISCARD, CANMODIFY
+from dicefunc import isint
+from errorchecker import isgroup, isprivate
+from gameclass import GameCard, Group, Player
+from utils import buttonQueryHandleMethod, commandCallbackMethod
 
 
 class cardCreate(diceBot):

@@ -1,8 +1,9 @@
-#!/usr/bin/python3 -O
+#!/usr/bin/python3
 
 import logging
 from typing import List
 
+from telegram import Update
 from telegram.ext import CallbackContext
 from telegram.ext.filters import Filters
 
@@ -11,12 +12,14 @@ from basebot import baseBot
 from cardcreate import cardCreate
 from cardhelper import cardHelper
 from cardshowbot import cardShowBot
+from cfg import ADMIN_ID
 from dicecommand import diceCommand
+from errorchecker import isgroup
 from gamecontroller import gameController
 from infoshow import infoShow
 from kpcontroller import kpController
 from noncommandhandle import nonCommandHandlers
-from utils import *
+from utils import commandCallbackMethod, getchatid, handleStatus, isfromme
 
 
 class mainBot(
