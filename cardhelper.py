@@ -5,6 +5,7 @@ from telegram import (CallbackQuery, InlineKeyboardButton,
 from telegram.ext import CallbackContext
 
 from cfg import ADMIN_ID, IGNORE_JOB_DICT
+from commandCallback import commandCallbackMethod, isgroup, isprivate
 from dicebot import diceBot
 from diceconstants import (BUTTON_ADDINTSKILL, BUTTON_ADDMAINSKILL,
                            BUTTON_ADDSGSKILL, BUTTON_CGINTSKILL,
@@ -12,10 +13,8 @@ from diceconstants import (BUTTON_ADDINTSKILL, BUTTON_ADDMAINSKILL,
                            BUTTON_SETDEC, BUTTON_SETSEX, BUTTON_SWITCH,
                            BUTTON_SWITCHGAMECARD, CANMODIFY, OWNCARD)
 from dicefunc import isint
-from errorchecker import isgroup, isprivate
 from gameclass import CardData, GameCard, GroupGame, Player
-from utils import (buttonQueryHandleMethod, commandCallbackMethod, getchatid,
-                   handleStatus)
+from utils import buttonQueryHandleMethod, getchatid, handleStatus
 
 
 class cardHelper(diceBot):

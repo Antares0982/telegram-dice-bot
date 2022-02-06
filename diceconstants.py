@@ -32,3 +32,14 @@ BUTTON_MANUAL = "b_mnl"
 
 PLTYPE = "PL"
 NPCTYPE = "NPC"
+
+E_GP = "group"
+E_PL = "player"
+E_IND = "index"
+E_LEN = "length"
+E_TAR = "target"
+
+EP_CTX_IND_TOINT = "context_index_to_int"
+EP_UPD = "update"
+
+EPRE_REPLY_NONE = "reply_to_is_none"

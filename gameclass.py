@@ -1,4 +1,3 @@
-import copy
 import json
 import os
 from inspect import isfunction
@@ -1017,7 +1016,6 @@ class Group(datatype):
 
     def write(self):
         if not type(self.id) is int:
-            print(type(self.id))
             raise ValueError("写入文件时，Group实例没有id")
         with open(PATH_GROUPS+str(self.id)+".json", 'w', encoding='utf-8') as f:
             json.dump(self.to_json(), f, indent=4, ensure_ascii=False)

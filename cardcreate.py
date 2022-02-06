@@ -6,12 +6,12 @@ from telegram.ext import CallbackContext
 
 from basicfunc import findattrindict, getchatid, templateNewCard
 from cfg import ADMIN_ID, CREATE_CARD_HELP
+from commandCallback import commandCallbackMethod, isgroup, isprivate
 from dicebot import diceBot
 from diceconstants import BUTTON_DISCARD, CANDISCARD, CANMODIFY
 from dicefunc import isint
-from errorchecker import isgroup, isprivate
 from gameclass import GameCard, Group, Player
-from utils import buttonQueryHandleMethod, commandCallbackMethod
+from utils import buttonQueryHandleMethod
 
 
 class cardCreate(diceBot):

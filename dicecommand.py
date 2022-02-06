@@ -1,11 +1,10 @@
 from telegram import Update
 from telegram.ext import CallbackContext
 
+from commandCallback import commandCallbackMethod, isprivate
 from dicebot import diceBot
 from diceconstants import STATUS_DEAD, STATUS_PERMANENTINSANE
 from dicefunc import commondice, dicemdn, isadicename, isint
-from errorchecker import isprivate
-from utils import commandCallbackMethod
 
 
 class diceCommand(diceBot):

@@ -15,8 +15,8 @@ from telegram.ext import (CallbackContext, CallbackQueryHandler,
 from basicfunc import getchatid, ischannel
 from cfg import (ADMIN_ID, PATH_HANDLERS, PROXY, PROXY_URL, TOKEN,
                  blacklistdatabase, startcommand)
-from utils import (commandCallbackMethod, getfromid, getmsgid, handlePassed,
-                   handleStatus, isfromme)
+from commandCallback import commandCallbackMethod
+from utils import getfromid, getmsgid, handlePassed, handleStatus, isfromme
 
 
 class baseBot(object):
@@ -218,7 +218,7 @@ class baseBot(object):
         handlerlist: List[str] = []
         for key in self.__dir__():
             func = getattr(self, key)
-            if type(func) is commandCallbackMethod:
+            if isinstance(func, commandCallbackMethod):
                 print(f"Handler added: {key}")
                 handlerlist.append(key)
                 self.updater.dispatcher.add_handler(CommandHandler(key, func))

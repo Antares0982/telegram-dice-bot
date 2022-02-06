@@ -4,12 +4,11 @@ from typing import List, Optional
 from telegram import Update
 from telegram.ext import CallbackContext
 
+from commandCallback import commandCallbackMethod, isgroup, isprivate
 from dicebot import diceBot
 from diceconstants import CANREAD, PLTYPE
 from dicefunc import isint
-from errorchecker import isgroup, isprivate
 from gameclass import GameCard, Group
-from utils import commandCallbackMethod
 
 
 class cardShowBot(diceBot):

@@ -1,3 +1,4 @@
+import enum
 import json
 import os
 from typing import Dict, KeysView, List, Optional, Tuple, Union, overload
@@ -8,20 +9,18 @@ from telegram.error import BadRequest, ChatMigrated, Unauthorized
 from telegram.ext import CallbackContext
 
 from basebot import baseBot
-from basicfunc import getmsgfromid, plainNewCard
+from basicfunc import getmsgfromid, isgroupmsg, isprivatemsg, plainNewCard
 from cfg import (ADMIN_ID, BOT_ID, GROUP_HELP_TEXT, HELP_TEXT, PATH_CARDS,
                  PATH_GAME_CARDS, PATH_GROUPS, PATH_HANDLERS, PATH_JOBDICT,
                  PATH_PLAYERS, PATH_SKILLDICT)
+from commandCallback import commandCallbackMethod, isgroup, isprivate
 from diceconstants import (BOTADMIN, BUTTON_ADDINTSKILL, BUTTON_ADDSGSKILL,
                            BUTTON_CGMAINSKILL, BUTTON_CHOOSEDEC, BUTTON_MANUAL,
-                           BUTTON_SETDEC, CANDISCARD, CANMODIFY, CANREAD,
-                           CANSETINFO, GROUPADMIN, GROUPKP, INGROUP, OWNCARD)
+                           CANDISCARD, CANMODIFY, CANREAD, CANSETINFO,
+                           GROUPADMIN, GROUPKP, INGROUP, OWNCARD)
 from dicefunc import isint
-from errorchecker import isgroup, isprivate
 from gameclass import GameCard, Group, GroupGame, Player
-from utils import commandCallbackMethod, getchatid
-
-from basicfunc import isgroupmsg, isprivatemsg
+from utils import getchatid
 
 
 class diceBot(baseBot):
@@ -254,9 +253,9 @@ class diceBot(baseBot):
         * 将消息发送者、所在群初始化（若未存储）"""
         self.checkconsistency()
 
-        for i in range(len(context.args)):
-            if context.args[i][0] == '@':
-                pl = self.getplayer(context.args[i][1:])
+        for i, arg in enumerate(context.args):
+            if arg[0] == '@':
+                pl = self.getplayer(arg[1:])
                 if pl is not None:
                     context.args[i] = str(pl.id)
 
@@ -1708,8 +1707,8 @@ class diceBot(baseBot):
         """如果有回复的人，调用forcegetplayer获取玩家信息，否则返回None"""
         if isprivatemsg(update):
             return None
-        if isgroupmsg(update):
-            return self.forcegetplayer(update.message.reply_to_message.from_user.id) if update.message.reply_to_message is not None else None
+        if isgroupmsg(update) and update.message.reply_to_message is not None:
+            return self.forcegetplayer(update.message.reply_to_message.from_user.id)
         return None
 
     def hascard(self, plid: int, gpid: int) -> bool:
@@ -1943,7 +1942,8 @@ class diceBot(baseBot):
 
     def atblock(self, blockid: int, recursive: bool = False):
         """黑名单功能的具体实现"""
-        if blockid in self.blacklist or blockid == 1 or blockid == 0:
+        if blockid in self.blacklist or blockid == 1 or blockid == 0 or blockid == ADMIN_ID or blockid == BOT_ID:
+            self.reply(f"id:{blockid}已经在黑名单中，或该id无效")
             return
 
         self.addblacklist(blockid)
@@ -1981,7 +1981,7 @@ class diceBot(baseBot):
             for cardid in list(gp.cards.keys()):
                 self.popcard(cardid)
             if gp.kp is not None:
-                self.atblock(gp.kp, recursive)
+                self.atblock(gp.kp.id, recursive)
             if recursive:
                 try:
                     gp.renew(self.updater)

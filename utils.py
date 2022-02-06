@@ -1,9 +1,12 @@
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar
+from inspect import getfullargspec
+from typing import (Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar,
+                    Union, overload)
 
 from telegram import CallbackQuery, Update
 
 from cfg import ADMIN_ID
+from diceconstants import EP_CTX_IND_TOINT, EP_UPD, EPRE_REPLY_NONE
 
 try:
     from typing import TYPE_CHECKING
@@ -69,70 +72,6 @@ class handleBlocked(handleStatus):
 
     def __bool__(self):
         return self.normal
-
-
-class commandCallbackMethod(object):
-    """表示一个指令的callback函数，仅限于类的成员方法。
-    调用时，会执行一次指令的前置函数。"""
-
-    def __init__(self, func: Callable[[Any, Update, 'CallbackContext'], _RT]) -> None:
-        wraps(func)(self)
-        self.instance: 'diceBot' = None
-
-    def prechecker(self, *args, **kwargs) -> bool:
-        numOfArgs = len(args)+len(kwargs.keys())
-        if numOfArgs != 2:
-            raise RuntimeError(
-                f"指令{self.__name__}的callback function参数个数应为2，但接受到{numOfArgs}个")
-        if len(args) == 2:
-            self.preExecute(*args)
-        elif len(args) == 1:
-            self.preExecute(args[0], **kwargs)
-        else:
-            self.preExecute(**kwargs)
-
-        inst = self.instance
-        if any(x in inst.blacklist for x in (inst.lastchat, inst.lastuser)):
-            inst.errorInfo("你在黑名单中，无法使用任何功能")
-            return False
-        return True
-
-    def __call__(self, *args, **kwargs):
-        if not self.prechecker(*args, **kwargs):
-            return
-
-        return self.__wrapped__(self.instance, *args, **kwargs)
-
-    def preExecute(self, update: Update, context: 'CallbackContext') -> None:
-        """在每个command Handler前调用，是指令的前置函数"""
-        if self.instance is None:
-            raise RuntimeError("command callback method还未获取实例")
-        self.instance.renewStatus(update)
-        self.instance.chatinit(update, context)
-
-    def __get__(self, instance, cls):
-        if instance is None:
-            raise TypeError("该装饰器仅适用于方法")
-        if self.instance is None:
-            self.instance = instance
-        return self
-
-
-class commandCallbackMethodWithErrorDispatch(commandCallbackMethod):
-    def __init__(
-        self,
-        func: Callable[[Any, Update, 'CallbackContext'], _RT],
-        errorDispatchDict: Dict[str, Any]
-    ) -> None:
-        super().__init__(func)
-        self.errorDispatcher = errorDispatchDict
-
-    def __call__(self, *args, **kwargs):
-        return super().__call__(*args, **kwargs)
-
-
-def commandErrorDispatch(d: Dict[str, Any]) -> Callable:
-    return lambda x: commandCallbackMethodWithErrorDispatch(x, d)
 
 
 class buttonQueryHandleMethod(object):

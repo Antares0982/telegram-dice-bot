@@ -5,15 +5,21 @@ from telegram import (CallbackQuery, InlineKeyboardButton,
 from telegram.ext import CallbackContext
 
 from cfg import ADMIN_ID, BOT_ID
+from commandCallback import (CheckSettingsGroup, ErrorDispatcher,
+                             arglengthCheck, checkSettings,
+                             commandCallbackMethod, commandErrorDispatch,
+                             contextArgsToInt, emptyReplyToMsg,
+                             grouphascardCheck, isgamingCheck, isgroup,
+                             isgroupCheck, iskpCheck, isprivate, noargCheck,
+                             nonnegativeintCheck, nonpositiveintCheck,
+                             parseUpdate)
 from dicebot import diceBot
 from diceconstants import (BUTTON_SWITCHGAMECARD, GROUPADMIN, GROUPKP,
                            STATUS_ALIVE, STATUS_DEAD, STATUS_NEARDEATH,
                            STATUS_PERMANENTINSANE, STATUS_SERIOUSLYWOUNDED)
 from dicefunc import dicecalculator, isint
-from errorchecker import isgroup, isprivate
 from gameclass import GameCard, GroupGame
-from utils import (buttonQueryHandleMethod, commandCallbackMethod,
-                   commandErrorDispatch, getchatid)
+from utils import buttonQueryHandleMethod, getchatid
 
 
 class adminCommand(diceBot):
@@ -28,7 +34,7 @@ class adminCommand(diceBot):
         return gp.getexistgame()
 
     def groupcopy(self, oldgpid: int, newgpid: int, copyall: bool) -> bool:
-        """copyall为False则只复制NPC卡片"""
+        """copyall为False则只复制NPC卡片."""
         if self.findexistgame(oldgpid) is not None or self.findexistgame(newgpid) is not None:
             return False
 
@@ -46,7 +52,7 @@ class adminCommand(diceBot):
 
         dstlist = [GameCard(card.to_json()) for card in srclist]
 
-        for i in range(len(dstlist)):
+        for i, _ in enumerate(dstlist):
             dstlist[i].id = newids[i]
 
         for card in dstlist:
@@ -57,13 +63,63 @@ class adminCommand(diceBot):
 
         return True
 
-    # @commandErrorDispatch()
-    # def _copygroup(self, update: Update, context: CallbackContext) -> bool:
-    #     ...
-
-    @commandCallbackMethod
+    @commandErrorDispatch([
+        ErrorDispatcher([CheckSettingsGroup(
+            checker=nonpositiveintCheck(),
+            settings=[checkSettings('index', input=0)],
+            errorArgs=("输入无效，参数1为旧群ID，参数2为新群ID", True)
+        )]),
+        # {True: {
+        #     checknonpositiveint: ((None, ), (None,), (0,),
+        #                           (E_IND,), ("输入无效，参数1为旧群ID，参数2为新群ID", True))
+        # }},
+        ErrorDispatcher([CheckSettingsGroup(
+            checker=nonpositiveintCheck(),
+            settings=[checkSettings('index', input=1)],
+            errorArgs=("输入无效，参数1为旧群ID，参数2为新群ID", True)
+        )]),
+        # {True: {
+        #     checknonpositiveint: ((None, ), (None,), (1,),
+        #                           (E_IND,), ("输入无效，参数1为旧群ID，参数2为新群ID", True))
+        # }},
+        ErrorDispatcher([
+            CheckSettingsGroup(
+                checker=grouphascardCheck(),
+                settings=[checkSettings('group', 0,
+                                        preTreat=diceBot.getgp,
+                                        parse_method=contextArgsToInt())],
+                errorArgs=("该群没有卡", True)
+            ),
+            CheckSettingsGroup(
+                checker=iskpCheck(),
+                settings=[
+                    checkSettings('group', 0,
+                                  preTreat=diceBot.getgp,
+                                  parse_method=contextArgsToInt()),
+                    checkSettings('player', input=None,
+                                  preTreat=diceBot.forcegetplayer,
+                                  parse_method=parseUpdate())
+                ],
+                errorArgs=("没有权限", True)
+            )
+        ])
+        # {True: {
+        #     checkgrouphascard: (
+        #         (diceBot.getgp,), (EP_CTX_IND_TOINT,
+        #                            ), (0, ), (E_GP,), ("该群没有卡", True)
+        #     ),
+        #     checkiskp: (
+        #         (diceBot.getgp, diceBot.forcegetplayer),
+        #         (EP_CTX_IND_TOINT, EP_UPD),
+        #         (0, None),
+        #         (E_GP, E_PL),
+        #         ("没有权限", True)
+        #     )
+        # }}
+    ])
     def copygroup(self, update: Update, context: CallbackContext) -> bool:
-        """复制一个群的所有数据到另一个群。
+        """
+        复制一个群的所有数据到另一个群。
         新的卡片id将自动从小到大生成。
 
         格式：
@@ -72,34 +128,191 @@ class adminCommand(diceBot):
         如果有第三个参数kp，则仅复制kp的卡片。
 
         使用者需要同时是两个群的kp。
-        任何一个群在进行游戏的时候，该指令都无法使用。"""
-
-        try:
-            oldgpid, newgpid = int(context.args[0]), int(context.args[1])
-            assert oldgpid < 0 and newgpid < 0
-        except (IndexError, ValueError, AssertionError):
-            return self.errorInfo("输入无效", True)
-
-        ogp = self.getgp(oldgpid)
-        if ogp is None or len(ogp.cards) == 0:
-            return self.errorInfo("该群没有卡", True)
-
-        kp = self.forcegetplayer(update)
-        ngp = self.getgp(newgpid)
-        if ngp is None or kp != ogp.kp or ngp.kp != kp:
-            return self.errorInfo("没有权限", True)
-
+        任何一个群在进行游戏的时候，该指令都无法使用。
+        """
         copyall = True
         if len(context.args) >= 3 and context.args[2] == "kp":
             copyall = False
 
+        oldgpid, newgpid = list(map(int, context.args[:2]))
         if not self.groupcopy(oldgpid, newgpid, copyall):
             return self.errorInfo("无法复制")
 
         self.reply("复制成功")
         return True
 
-    @commandCallbackMethod
+    @commandErrorDispatch([
+        ErrorDispatcher([CheckSettingsGroup(
+            checker=isgroupCheck(),
+            settings=[],
+            errorArgs=("游戏中才可以修改HP。", False)
+        )]),
+        # {True: {
+        #     checkisgroupmsg: (
+        #         tuple(), tuple(), tuple(), tuple(), ("游戏中才可以修改HP。", False)
+        #     )
+        # }},
+        ErrorDispatcher([CheckSettingsGroup(
+            checker=iskpCheck(),
+            settings=[checkSettings('player', input=None, preTreat=diceBot.forcegetplayer, parse_method=parseUpdate()),
+                      checkSettings('group', input=None, preTreat=diceBot.forcegetgroup, parse_method=parseUpdate())],
+            errorArgs=("没有权限", True)
+        ),
+            CheckSettingsGroup(
+                noargCheck(), [], errorArgs=("需要指定修改的HP", True)),
+            CheckSettingsGroup(isgamingCheck(), [
+                checkSettings('group', input=None, preTreat=diceBot.forcegetgroup, parse_method=parseUpdate())],
+                errorArgs=("找不到进行中的游戏", True))
+        ]),
+
+        # {True: {
+        #     checkiskp: (
+        #         (diceBot.forcegetplayer, diceBot.forcegetgroup),
+        #         (EP_UPD, EP_UPD),
+        #         (None, None),
+        #         (E_PL, E_GP),
+        #         ("没有权限", True)
+        #     ),
+        #     checknoarg: (tuple(), tuple(), tuple(), tuple(), ("需要指定修改的HP", True)),
+        #     checkisgaming: (
+        #         (diceBot.forcegetgroup,),
+        #         (EP_UPD,), (None,), (E_GP,), ("找不到进行中的游戏", True)
+        #     )
+        # }},
+        ErrorDispatcher([
+            CheckSettingsGroup(nonnegativeintCheck(), [checkSettings('index', 0)],
+                               errorArgs=("参数无效", False)),
+            CheckSettingsGroup(arglengthCheck(), [checkSettings('length', 2)],
+                               errorArgs=("请用回复或@用户名的方式来选择玩家改变HP", False))
+        ], preCondition=emptyReplyToMsg()),
+        # {EPRE_REPLY_NONE: {
+        #     checknonnegativeint: ((None, ), (None,), (0,),
+        #                           (E_IND,), ("参数无效", False)),
+        #     checkarglength: ((None,), (None,), (2,), (E_LEN,),
+        #                      ("请用回复或@用户名的方式来选择玩家改变HP", False))
+        # }},
+        ErrorDispatcher([
+            CheckSettingsGroup(nonnegativeintCheck(), [checkSettings('target', 0, preTreat=diceBot.getplayer, parse_method=contextArgsToInt())],
+                               errorArgs=("指定的用户无效", False))
+        ], preCondition=emptyReplyToMsg()),
+        #     {EPRE_REPLY_NONE: {
+        #         checktargetexist: ((diceBot.getplayer,),
+        #                            (EP_CTX_IND_TOINT,), (0,), (E_TAR,), ("指定的用户无效", False))
+        #     }}
+    ])
+    def _hp(self, update: Update, context: CallbackContext) -> bool:
+        """修改HP。KP通过回复某位PL消息并在回复消息中使用本指令即可修改对方卡片的HP。
+        回复自己的消息，则修改KP当前选中的游戏卡。
+        或者，也可以使用@用户名以及用玩家id的方法选中某名PL，但请不要同时使用回复和用户名。
+        使用范例：
+        `/hp +1d3`：恢复1d3点HP。
+        `/hp -2`：扣除2点HP。
+        `/hp -(1d2+1d3)`：扣除1d2+1d3点HP。
+        `/hp 10`：将被回复者HP设置为10。
+        `/hp @username 12`：将用户名为username的玩家HP设为12。
+        下面的例子是无效输入：
+        `/hp 1d3`：无法将HP设置为一个骰子的结果，恢复1d3生命请在参数前加上符号`+`，扣除同理。
+        在生命变动的情况下，角色状态也会同步地变动。"""
+        kp = self.getplayer(update)
+        game = self.getgp(update).game
+
+        chp: str = context.args[0]
+        rppl = self.getreplyplayer(update)
+
+        if update.message.reply_to_message is not None:
+            rpmsgid = update.message.reply_to_message.message_id
+        else:
+            rpmsgid = update.message.message_id
+
+        if rppl is None:
+            rppl = self.getplayer(int(context.args[0]))
+            chp = context.args[1]
+
+        if rppl != kp:
+            cardi = self.findcardfromgame(game, rppl)
+        else:
+            cardi = game.kpctrl
+
+        if cardi is None:
+            return self.errorInfo("找不到这名玩家的卡。")
+
+        if chp[0] == "+" or chp[0] == "-":
+            if len(chp) == 1:
+                return self.errorInfo("参数无效", True)
+
+            # 由dicecalculator()处理。减法时，检查可能的括号导致的输入错误
+            if chp[0] == '-' and chp[1] != '(' and (chp[1:].find('+') != -1 or chp[1:].find('-') != -1):
+                return self.errorInfo("当第一个减号的后面是可计算的骰子，且存在加减法时，请在第一个符号之后使用括号")
+
+            try:
+                diceans = dicecalculator(chp[1:])
+            except Exception:
+                return self.errorInfo("参数无效", True)
+
+            if diceans < 0:
+                return self.errorInfo("骰子的结果为0，生命值不修改")
+
+            chp = chp[0]+str(diceans)
+        else:
+            # 直接修改生命为目标值的情形。不支持dicecalculator()，仅支持整数
+            if not isint(chp) or int(chp) > 100 or int(chp) < 0:
+                return self.errorInfo("参数无效", True)
+
+        if cardi.status == STATUS_DEAD:
+            return self.errorInfo("该角色已死亡")
+
+        originhp = cardi.attr.HP
+        if chp[0] == "+":
+            cardi.attr.HP += int(chp[1:])
+        elif chp[0] == "-":
+            cardi.attr.HP -= int(chp[1:])
+        else:
+            cardi.attr.HP = int(chp)
+
+        hpdiff = cardi.attr.HP - originhp
+        if hpdiff == 0:
+            return self.errorInfo("HP不变，目前HP："+str(cardi.attr.HP))
+
+        if hpdiff < 0:
+            # 承受伤害描述。分类为三种状态
+            takedmg = -hpdiff
+            if takedmg < cardi.attr.MAXHP//2:
+                # 轻伤，若生命不降到0，不做任何事
+                if takedmg >= originhp:
+                    self.reply(
+                        text="HP归0，角色昏迷", reply_to_message_id=rpmsgid)
+            elif takedmg > cardi.attr.MAXHP:
+                self.reply(
+                    text="致死性伤害，角色死亡", reply_to_message_id=rpmsgid)
+                cardi.status = STATUS_DEAD
+            else:
+                self.reply(text="角色受到重伤，请进行体质检定以维持清醒",
+                           reply_to_message_id=rpmsgid)
+                cardi.status = STATUS_SERIOUSLYWOUNDED
+                if originhp <= takedmg:
+                    self.reply(
+                        text="HP归0，进入濒死状态", reply_to_message_id=rpmsgid)
+                    cardi.status = STATUS_NEARDEATH
+
+            if cardi.attr.HP < 0:
+                cardi.attr.HP = 0
+
+        else:
+            # 恢复生命，可能脱离某种状态
+            if cardi.attr.HP >= cardi.attr.MAXHP:
+                cardi.attr.HP = cardi.attr.MAXHP
+                self.reply(text="HP达到最大值", reply_to_message_id=rpmsgid)
+
+            if hpdiff > 1 and originhp <= 1 and cardi.status == STATUS_NEARDEATH:
+                self.reply(text="脱离濒死状态", reply_to_message_id=rpmsgid)
+                cardi.status = STATUS_SERIOUSLYWOUNDED
+        cardi.write()
+
+        self.reply(text="生命值从"+str(originhp)+"修改为" +
+                   str(cardi.attr.HP), reply_to_message_id=rpmsgid)
+        return True
+
+    @ commandCallbackMethod
     def hp(self, update: Update, context: CallbackContext) -> bool:
         """修改HP。KP通过回复某位PL消息并在回复消息中使用本指令即可修改对方卡片的HP。
         回复自己的消息，则修改kp当前选中的游戏卡。
@@ -137,6 +350,7 @@ class adminCommand(diceBot):
         if rppl is None:
             if len(context.args) < 2:
                 return self.errorInfo("请用回复或@用户名的方式来选择玩家改变HP")
+            print(context.args[0])
             if not isint(context.args[0]) or int(context.args[0]) < 0:
                 return self.errorInfo("参数无效")
             rppl = self.getplayer(int(context.args[0]))
@@ -228,7 +442,7 @@ class adminCommand(diceBot):
                    str(cardi.attr.HP), reply_to_message_id=rpmsgid)
         return True
 
-    @commandCallbackMethod
+    @ commandCallbackMethod
     def kill(self, update: Update, context: CallbackContext) -> bool:
         """使角色死亡。使用回复或者`@username`作为参数来选择对象撕卡。
         回复的优先级高于参数。"""
@@ -298,7 +512,7 @@ class adminCommand(diceBot):
         self.reply("群邀请链接已经私聊发送。", reply_markup=rp_markup)
         return True
 
-    @commandCallbackMethod
+    @ commandCallbackMethod
     def mad(self, update: Update, context: CallbackContext) -> bool:
         """使角色陷入永久疯狂。使用回复或者`@username`作为参数来选择对象撕卡。
         回复的优先级高于参数。"""
@@ -338,7 +552,7 @@ class adminCommand(diceBot):
         self.reply("已撕卡")
         return True
 
-    @commandCallbackMethod
+    @ commandCallbackMethod
     def deletemsg(self, update: Update, context: CallbackContext) -> bool:
         """用于删除消息，清空当前对话框中没有用的消息。
         bot可以删除任意私聊消息，无论是来自用户还是bot。
@@ -391,7 +605,7 @@ class adminCommand(diceBot):
         update.effective_chat.send_message("删除完成").delete()
         return True
 
-    @commandCallbackMethod
+    @ commandCallbackMethod
     def recover(self, update: Update, context: CallbackContext) -> bool:
         """将重伤患者的状态恢复。使用回复或者`@username`作为参数来选择对象恢复。
         回复的优先级高于参数。"""
@@ -428,7 +642,7 @@ class adminCommand(diceBot):
         card.write()
         return True
 
-    @commandCallbackMethod
+    @ commandCallbackMethod
     def reload(self, update: Update, context: CallbackContext) -> bool:
         """重新读取所有文件，只有bot管理者可以使用"""
 
@@ -444,7 +658,7 @@ class adminCommand(diceBot):
         self.reply('重新读取文件成功。')
         return True
 
-    @commandCallbackMethod
+    @ commandCallbackMethod
     def setrule(self, update: Update, context: CallbackContext) -> bool:
         """设置游戏的规则。
         一个群里游戏有自动生成的默认规则，使用本指令可以修改这些规则。
@@ -532,7 +746,7 @@ class adminCommand(diceBot):
         query.edit_message_text("修改操纵的npc卡成功，现在正在使用："+card.getname())
         return True
 
-    @buttonQueryHandleMethod
+    @ buttonQueryHandleMethod
     def buttonHandler(self, *args, **kwargs):
         return {
             "switchgamecard": (BUTTON_SWITCHGAMECARD, self.buttonswitchgamecard)

@@ -1,21 +1,18 @@
+import json
 import time
+from typing import Optional
 
+from telegram import Update
 from telegram.ext import CallbackContext
 
-from dicebot import BUTTON_MANUAL, diceBot
-from gameclass import GameCard
-from utils import (buttonQueryHandleMethod, getchatid,
-                   handleStatus)
-from typing import Optional
-from telegram import Update
-from dicefunc import isint
-from cfg import PATH_MEM, ADMIN_ID, PATH_SKILLDICT
-import json
-from cfg import PATH_JOBDICT
 from basicfunc import getmsgfromid, isgroupmsg
-from errorchecker import isgroup
-from utils import handleBlocked
-from dicefunc import dicecalculator
+from cfg import ADMIN_ID, PATH_JOBDICT, PATH_MEM, PATH_SKILLDICT
+from commandCallback import isgroup
+from dicebot import BUTTON_MANUAL, diceBot
+from dicefunc import dicecalculator, isint
+from gameclass import GameCard
+from utils import (buttonQueryHandleMethod, getchatid, handleBlocked,
+                   handleStatus)
 
 
 class nonCommandHandlers(diceBot):

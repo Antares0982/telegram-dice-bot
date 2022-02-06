@@ -13,13 +13,13 @@ from cardcreate import cardCreate
 from cardhelper import cardHelper
 from cardshowbot import cardShowBot
 from cfg import ADMIN_ID
+from commandCallback import commandCallbackMethod, isgroup
 from dicecommand import diceCommand
-from errorchecker import isgroup
 from gamecontroller import gameController
 from infoshow import infoShow
 from kpcontroller import kpController
 from noncommandhandle import nonCommandHandlers
-from utils import commandCallbackMethod, getchatid, handleStatus, isfromme
+from utils import getchatid, handleStatus, isfromme
 
 
 class mainBot(

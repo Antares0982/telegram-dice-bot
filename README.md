@@ -1,4 +1,6 @@
 # telegram-dice-bot
+![image](https://img.shields.io/tokei/lines/github/Antares0982/telegram-dice-bot)![image](https://img.shields.io/github/last-commit/Antares0982/telegram-dice-bot)
+
 tg跑团用骰子机器人，目前版本`v1.3.0`
 
 如果有任何意见或修改建议请提交issue或者联系[我](https://t.me/AntaresChr)。

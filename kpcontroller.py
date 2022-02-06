@@ -1,11 +1,10 @@
 from telegram import Update
 from telegram.ext import CallbackContext
 
+from commandCallback import commandCallbackMethod, isprivate
 from dicebot import diceBot
 from diceconstants import GROUPADMIN, GROUPKP
 from dicefunc import isint
-from errorchecker import isprivate
-from utils import commandCallbackMethod
 
 
 class kpController(diceBot):

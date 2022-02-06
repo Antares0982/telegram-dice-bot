@@ -5,10 +5,9 @@ from telegram import Update
 from telegram.ext import CallbackContext
 
 from cfg import ADMIN_ID
+from commandCallback import commandCallbackMethod, isgroup, isprivate
 from dicebot import diceBot
 from diceconstants import BOTADMIN, GROUPKP
-from errorchecker import isgroup, isprivate
-from utils import commandCallbackMethod
 
 
 class infoShow(diceBot):
